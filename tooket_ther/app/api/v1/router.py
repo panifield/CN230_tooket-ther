@@ -1,9 +1,20 @@
 from fastapi import APIRouter
 
-from tooket_ther.app.api.v1 import auth, queue, bookings, payments, organizer, refunds, checker, reports
+from tooket_ther.app.api.v1 import (
+    auth,
+    bookings,
+    checker,
+    concerts,
+    organizer,
+    payments,
+    queue,
+    refunds,
+    reports,
+)
 
 api_router = APIRouter()
 api_router.include_router(auth.router, prefix="/auth", tags=["Auth"])
+api_router.include_router(concerts.router)
 api_router.include_router(queue.router, prefix="/queue", tags=["Queue"])
 api_router.include_router(bookings.router, prefix="/bookings", tags=["Bookings"])
 api_router.include_router(payments.router, prefix="/payments", tags=["Payments"])

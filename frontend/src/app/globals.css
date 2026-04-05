@@ -1,0 +1,187 @@
+/* ============================================================
+   Tooket-ther Design System
+   Theme: Dark Luxury Concert Hall
+   Fonts: Cinzel (display) + DM Sans (body)
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap');
+
+/* ── Tokens ── */
+:root {
+  /* Colors */
+  --color-bg:           #080808;
+  --color-bg-elevated:  #111111;
+  --color-bg-card:      #141414;
+  --color-surface:      #1a1a1a;
+  --color-border:       rgba(255, 255, 255, 0.08);
+  --color-border-gold:  rgba(212, 175, 55, 0.35);
+
+  --color-gold:         #d4af37;
+  --color-gold-light:   #f0d060;
+  --color-gold-dim:     rgba(212, 175, 55, 0.15);
+
+  --color-text-primary:   #f0ece0;
+  --color-text-secondary: rgba(240, 236, 224, 0.55);
+  --color-text-muted:     rgba(240, 236, 224, 0.30);
+
+  --color-success: #4ade80;
+  --color-error:   #f87171;
+  --color-warning: #fbbf24;
+
+  /* Typography */
+  --font-display: 'Cinzel', serif;
+  --font-body:    'DM Sans', sans-serif;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-24: 6rem;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-gold: 0 0 40px rgba(212, 175, 55, 0.12);
+  --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.6);
+  --shadow-elevated: 0 8px 48px rgba(0, 0, 0, 0.8);
+
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-base: 250ms ease;
+  --transition-slow: 400ms ease;
+
+  /* Layout */
+  --max-width: 1280px;
+  --header-height: 64px;
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
+  font-family: var(--font-body);
+  font-weight: 400;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── Typography ── */
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+  color: var(--color-text-primary);
+}
+
+h1 { font-size: clamp(2rem, 5vw, 4rem); }
+h2 { font-size: clamp(1.5rem, 3vw, 2.5rem); }
+h3 { font-size: clamp(1.2rem, 2vw, 1.75rem); }
+h4 { font-size: 1.25rem; }
+
+p { color: var(--color-text-secondary); }
+
+a {
+  color: var(--color-gold);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+a:hover { color: var(--color-gold-light); }
+
+/* ── Utilities ── */
+.container {
+  width: 100%;
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+.gold-text {
+  color: var(--color-gold);
+}
+
+.gold-gradient-text {
+  background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-gold-light) 50%, var(--color-gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-border-gold), transparent);
+  border: none;
+  margin: var(--space-8) 0;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb { background: var(--color-border-gold); border-radius: 3px; }
+
+/* ── Selection ── */
+::selection { background: var(--color-gold-dim); color: var(--color-gold-light); }
+
+/* ── Grain overlay ── */
+.grain-overlay::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.4;
+}
+
+/* ── Animations ── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes pulse-gold {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(212, 175, 55, 0.3); }
+  50%       { box-shadow: 0 0 0 8px rgba(212, 175, 55, 0); }
+}
+
+.animate-fade-in-up { animation: fadeInUp 0.6s ease both; }
+.animate-fade-in    { animation: fadeIn 0.4s ease both; }
+
+/* Stagger */
+.stagger-1 { animation-delay: 0.1s; }
+.stagger-2 { animation-delay: 0.2s; }
+.stagger-3 { animation-delay: 0.3s; }
+.stagger-4 { animation-delay: 0.4s; }
+.stagger-5 { animation-delay: 0.5s; }

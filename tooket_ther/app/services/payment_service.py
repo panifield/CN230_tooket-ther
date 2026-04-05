@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select
 from redis import Redis
 
@@ -11,6 +11,12 @@ from tooket_ther.app.integrations.payment import PaymentGateway, PaymentCreateRe
 from tooket_ther.app.schemas.payment import PaymentResponse
 
 MAX_CONCURRENT_CHECKOUTS = 100
+
+def _stub_qr_url(external_ref: str | None) -> str | None:
+    if not external_ref:
+        return None
+    return f"https://sandbox.payment-gateway.com/qr/{external_ref}"
+
 
 class PaymentService:
     def __init__(self, db: Session, gateway: PaymentGateway, redis_client: Redis):
@@ -25,10 +31,34 @@ class PaymentService:
         Create a new payment record and fetch QR from gateway.
         Note: gateway.create_payment is async, but db operations are sync.
         """
+        existing_pay = self.db.scalar(
+            select(Payment)
+            .where(
+                Payment.booking_id == booking_id,
+                Payment.status == PaymentStatus.PENDING.value,
+            )
+            .order_by(Payment.created_at.desc())
+            .limit(1)
+        )
+        if existing_pay is not None:
+            return PaymentResponse(
+                id=existing_pay.id,
+                booking_id=existing_pay.booking_id,
+                amount=float(existing_pay.amount),
+                method=existing_pay.method,
+                status=existing_pay.status,
+                external_ref=existing_pay.external_ref,
+                created_at=existing_pay.created_at,
+                qr_code_url=_stub_qr_url(existing_pay.external_ref),
+            )
+
         with self.db.begin_nested():
             # Fetch booking to ensure it exists and is in pending state
             booking = self.db.execute(
-                select(Booking).where(Booking.id == booking_id).with_for_update()
+                select(Booking)
+                .where(Booking.id == booking_id)
+                .options(joinedload(Booking.seat).joinedload(Seat.zone))
+                .with_for_update()
             ).scalar_one_or_none()
             if not booking:
                 raise ValueError("Booking not found")
@@ -50,7 +80,7 @@ class PaymentService:
                     # Slot queue full!
                     raise ValueError("Payment queue is full. Please try again in a few moments.")
 
-                amount = 1500.00  # Default dummy price
+                amount = float(booking.seat.zone.price)
 
                 payment = Payment(
                     booking_id=booking.id,
@@ -93,7 +123,7 @@ class PaymentService:
             status=payment.status,
             external_ref=payment.external_ref,
             created_at=payment.created_at,
-            qr_code_url=gw_resp.qr_code_url
+            qr_code_url=gw_resp.qr_code_url or _stub_qr_url(payment.external_ref),
         )
 
     def process_webhook(self, payload_dict: dict, signature: str) -> None:

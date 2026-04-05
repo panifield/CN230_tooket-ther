@@ -3,21 +3,25 @@ import uuid
 import jwt
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from tooket_ther.app.api.deps import get_current_user, get_db
 from tooket_ther.app.core.jwt_tokens import TOKEN_TYPE_ADMISSION, decode_token
 from tooket_ther.app.models.booking import Booking
 from tooket_ther.app.models.user import User
+from tooket_ther.app.models.concert import Seat
+from tooket_ther.app.models.enums import BookingStatus
 from tooket_ther.app.schemas.booking import (
+    BookingDetailResponse,
     BookingResponse,
     BookingUpdate,
     HoldRequest,
     HoldResponse,
 )
 from tooket_ther.app.services import booking_service
+from tooket_ther.app.core.jwt_tokens import create_ticket_token
 
-router = APIRouter(prefix="/bookings", tags=["bookings"])
+router = APIRouter(tags=["bookings"])
 
 
 def verify_admission(
@@ -80,6 +84,47 @@ def my_bookings(
     )
     bookings = db.scalars(stmt).all()
     return list(bookings)
+
+
+@router.get("/{booking_id}", response_model=BookingDetailResponse)
+def get_booking_detail(
+    booking_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> BookingDetailResponse:
+    stmt = (
+        select(Booking)
+        .where(Booking.id == booking_id)
+        .options(
+            joinedload(Booking.concert),
+            joinedload(Booking.seat).joinedload(Seat.zone),
+        )
+    )
+    booking = db.execute(stmt).unique().scalar_one_or_none()
+    if booking is None or booking.user_id != user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Booking not found")
+
+    seat = booking.seat
+    zone = seat.zone
+    ticket_token = None
+    if booking.status == BookingStatus.PAID.value:
+        ticket_token = create_ticket_token(booking.id, booking.seat_id, user.id)
+
+    return BookingDetailResponse(
+        id=booking.id,
+        concert_id=booking.concert_id,
+        seat_id=booking.seat_id,
+        status=booking.status,
+        locked_until=booking.locked_until,
+        created_at=booking.created_at,
+        holder_name=booking.holder_name,
+        delivery_method=booking.delivery_method,
+        concert_title=booking.concert.title,
+        zone_name=zone.name,
+        seat_row=seat.row_label,
+        seat_no=seat.seat_no,
+        ticket_token=ticket_token,
+    )
 
 
 @router.patch("/{booking_id}", response_model=BookingResponse)

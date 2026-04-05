@@ -41,6 +41,8 @@ class Concert(Base):
     sales_starts_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     # ISO 3166-1 alpha-2 host country (MVP: local priority if user.province set for TH concerts).
     host_country_code: Mapped[str] = mapped_column(String(2), nullable=False, server_default="TH")
+    poster_url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
+    lineup: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(
         String(32), nullable=False, server_default=ConcertStatus.DRAFT.value
     )

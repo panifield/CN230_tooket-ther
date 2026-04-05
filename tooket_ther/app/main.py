@@ -18,6 +18,10 @@ TAGS_METADATA: list[dict[str, Any]] = [
         "description": "การยืนยันตัวตนผู้ใช้ผ่าน OAuth (LINE / Facebook) และการจัดการ Access Token",
     },
     {
+        "name": "Concerts",
+        "description": "🎭 **Public** — รายการคอนเสิร์ตและรายละเอียดโซน/ราคา (ไม่ต้องล็อกอิน)",
+    },
+    {
         "name": "Queue",
         "description": "🙋 **Role: User** — เข้าคิวและดูสถานะคิวก่อนเข้าเลือกที่นั่ง",
     },

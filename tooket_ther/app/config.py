@@ -32,8 +32,8 @@ class Settings(BaseSettings):
     oauth_line_channel_secret: str = Field("", alias="OAUTH_LINE_CHANNEL_SECRET")
     oauth_facebook_app_id: str = Field("", alias="OAUTH_FACEBOOK_APP_ID")
     oauth_facebook_app_secret: str = Field("", alias="OAUTH_FACEBOOK_APP_SECRET")
-    oauth_redirect_uri_line: str = Field("http://localhost:3000/auth/line/callback", alias="OAUTH_REDIRECT_URI_LINE")
-    oauth_redirect_uri_facebook: str = Field("http://localhost:3000/auth/facebook/callback", alias="OAUTH_REDIRECT_URI_FACEBOOK")
+    oauth_redirect_uri_line: str = Field("http://localhost:3000/auth/callback", alias="OAUTH_REDIRECT_URI_LINE")
+    oauth_redirect_uri_facebook: str = Field("http://localhost:3000/auth/callback", alias="OAUTH_REDIRECT_URI_FACEBOOK")
 
     @property
     def cors_origin_list(self) -> list[str]:

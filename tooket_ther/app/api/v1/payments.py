@@ -1,14 +1,18 @@
 import uuid
 from typing import Any
+
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from sqlalchemy.orm import Session
 from redis import Redis
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from tooket_ther.app.api.deps import get_db, get_current_user, get_redis
-from tooket_ther.app.models.user import User
+from tooket_ther.app.config import settings
 from tooket_ther.app.integrations.payment import StubPaymentGateway
-from tooket_ther.app.services.payment_service import PaymentService
+from tooket_ther.app.models.booking import Booking, Payment
+from tooket_ther.app.models.user import User
 from tooket_ther.app.schemas.payment import PaymentResponse, WebhookResponse
+from tooket_ther.app.services.payment_service import PaymentService, _stub_qr_url
 
 router = APIRouter()
 
@@ -32,6 +36,63 @@ async def create_payment(
         return payment_response
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/bookings/{booking_id}", response_model=PaymentResponse)
+def get_payment_by_booking(
+    booking_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> PaymentResponse:
+    booking = db.get(Booking, booking_id)
+    if booking is None or booking.user_id != current_user.id:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Booking not found")
+    pay = db.scalar(
+        select(Payment)
+        .where(Payment.booking_id == booking_id)
+        .order_by(Payment.created_at.desc())
+        .limit(1)
+    )
+    if pay is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    return PaymentResponse(
+        id=pay.id,
+        booking_id=pay.booking_id,
+        amount=float(pay.amount),
+        method=pay.method,
+        status=pay.status,
+        external_ref=pay.external_ref,
+        created_at=pay.created_at,
+        qr_code_url=_stub_qr_url(pay.external_ref),
+    )
+
+
+@router.post("/{payment_id}/stub-complete", response_model=WebhookResponse)
+def payment_stub_complete(
+    payment_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    payment_service: PaymentService = Depends(get_payment_service),
+) -> WebhookResponse:
+    """Dev-only: simulate gateway success for local UX testing."""
+    if not settings.debug:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Not found")
+    pay = db.get(Payment, payment_id)
+    if pay is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, detail="Payment not found")
+    booking = db.get(Booking, pay.booking_id)
+    if booking is None or booking.user_id != current_user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Forbidden")
+    payload_dict = {
+        "transaction_id": pay.external_ref or str(pay.id),
+        "reference_id": str(pay.id),
+        "amount": float(pay.amount),
+        "status": "success",
+        "signature": "stub",
+        "event_type": "payment.success",
+    }
+    payment_service.process_webhook(payload_dict=payload_dict, signature="stub")
+    return WebhookResponse(success=True, message="Payment marked succeeded (stub)")
 
 
 @router.post("/webhook", response_model=WebhookResponse)
