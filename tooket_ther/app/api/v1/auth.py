@@ -22,6 +22,8 @@ def oauth_authorize_url(
         )
     except ValueError as e:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    
+    print(f"\n[DEBUG] Created {provider} Auth URL: {url}\n")
     return AuthorizeUrlResponse(authorization_url=url, state=state)
 
 

@@ -32,3 +32,11 @@ class BookingUpdate(BaseModel):
 
 class HoldResponse(BaseModel):
     bookings: list[BookingResponse]
+
+
+class BookingDetailResponse(BookingResponse):
+    concert_title: str
+    zone_name: str
+    seat_row: str
+    seat_no: str
+    ticket_token: Optional[str] = None

@@ -1,0 +1,149 @@
+.page {
+  min-height: calc(100vh - var(--header-height));
+  padding: var(--space-12) 0 var(--space-20);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  padding: var(--space-10);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  margin-bottom: var(--space-2);
+  letter-spacing: 0.04em;
+}
+
+.sub {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  margin-bottom: var(--space-8);
+}
+
+.amount {
+  font-family: var(--font-display);
+  font-size: 2rem;
+  color: var(--color-gold);
+  margin-bottom: var(--space-6);
+}
+
+.qrWrap {
+  display: inline-block;
+  padding: var(--space-4);
+  background: #fff;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-6);
+}
+
+.qrWrap img {
+  display: block;
+  width: 220px;
+  height: 220px;
+}
+
+.countdown {
+  padding: var(--space-4);
+  margin-bottom: var(--space-6);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  font-size: 0.875rem;
+}
+
+.countdown strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  margin-top: var(--space-2);
+  color: var(--color-gold-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.status {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.pulse {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-success);
+  margin-right: 8px;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.error {
+  color: var(--color-error);
+  font-size: 0.9rem;
+}
+
+.stubBtn {
+  margin-top: var(--space-4);
+  font-size: 0.8125rem;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.35s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.burst {
+  text-align: center;
+  animation: burstPop 0.65s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+@keyframes burstPop {
+  from {
+    transform: scale(0.85);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.burstIcon {
+  font-size: 4rem;
+  line-height: 1;
+  margin-bottom: var(--space-4);
+  filter: drop-shadow(0 0 20px rgba(74, 222, 128, 0.5));
+}
+
+.burst h2 {
+  font-family: var(--font-display);
+  color: var(--color-success);
+  font-size: 1.75rem;
+  letter-spacing: 0.08em;
+}

@@ -13,6 +13,7 @@ from tooket_ther.app.config import settings
 
 TOKEN_TYPE_ACCESS = "access"
 TOKEN_TYPE_ADMISSION = "admission"
+TOKEN_TYPE_TICKET = "ticket"
 
 
 def _exp_unix(*, minutes: int) -> int:
@@ -45,6 +46,25 @@ def create_admission_token(
         "queue_entry_id": str(queue_entry_id),
         "iat": now,
         "exp": _exp_unix(minutes=settings.jwt_admission_expire_minutes),
+    }
+    return jwt.encode(
+        payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm
+    )
+
+
+def create_ticket_token(
+    booking_id: uuid.UUID,
+    seat_id: uuid.UUID,
+    user_id: uuid.UUID
+) -> str:
+    now = int(time.time())
+    payload: dict[str, Any] = {
+        "sub": str(user_id),
+        "type": TOKEN_TYPE_TICKET,
+        "booking_id": str(booking_id),
+        "seat_id": str(seat_id),
+        "iat": now,
+        "exp": _exp_unix(minutes=60 * 24 * 365), # Long lived till concert day
     }
     return jwt.encode(
         payload, settings.jwt_secret_key, algorithm=settings.jwt_algorithm

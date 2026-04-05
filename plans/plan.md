@@ -134,33 +134,84 @@ tooket_ther/
 
 ### Phase 3 — Payment (QR) + webhook
 
-- [ ] **T3.1** `PaymentGateway` interface + **stub** สร้าง QR ref + simulate success (สำหรับ dev)  
-- [ ] **T3.2** `PaymentService.create_payment_for_booking`  
-- [ ] **T3.3** Webhook endpoint: verify signature (ถ้ามี) + **idempotent** ด้วย `external_ref`  
-- [ ] **T3.3b** Transaction เดียว: `payment succeeded` → `booking paid` → `seat sold`  
-- [ ] **T3.4** (Optional) คิวชำระเงินตามลำดับ — ถ้า requirement บังคับ ให้เชื่อมกับ `QueueService` หรือล็อก “checkout slot”
+- [x] **T3.1** `PaymentGateway` interface + **stub** สร้าง QR ref + simulate success (สำหรับ dev)  
+- [x] **T3.2** `PaymentService.create_payment_for_booking`  
+- [x] **T3.3** Webhook endpoint: verify signature (ถ้ามี) + **idempotent** ด้วย `external_ref`  
+- [x] **T3.3b** Transaction เดียว: `payment succeeded` → `booking paid` → `seat sold`  
+- [x] **T3.4** (Optional) คิวชำระเงินตามลำดับ — ถ้า requirement บังคับ ให้เชื่อมกับ `QueueService` หรือล็อก “checkout slot”
 
 ### Phase 4 — Refund + ปิดโซน (Organizer)
 
-- [ ] **T4.1** `refund_policy` ใน `domain/`: ตรวจ 7 วันก่อนคอนเสิร์ต + สถานะบัตร  
-- [ ] **T4.2** API user: สร้าง `refund_request` + เก็บบัญชี (เข้ารหัส/placeholder ใน MVP)  
-- [ ] **T4.3** API organizer: อนุมัติ refund → transaction คืน seat + อัปเดต booking  
-- [ ] **T4.4** `OrganizerService.close_zone`: ตรวจ threshold → ปิด zone + สร้างงานย้าย/คืนเงิน + **zone_closure_events**  
-- [ ] **T4.5** Flow ย้ายที่นั่งฟรี: hold ใหม่ในโซนเป้าหมายโดยไม่คิดเงิน (state machine ชัด)
+- [x] **T4.1** `refund_policy` ใน `domain/`: ตรวจ 7 วันก่อนคอนเสิร์ต + สถานะบัตร  
+- [x] **T4.2** API user: สร้าง `refund_request` + เก็บบัญชี (เข้ารหัส/placeholder ใน MVP)  
+- [x] **T4.3** API organizer: อนุมัติ refund → transaction คืน seat + อัปเดต booking  
+- [x] **T4.4** `OrganizerService.close_zone`: ตรวจ threshold → ปิด zone + สร้างงานย้าย/คืนเงิน + **zone_closure_events**  
+- [x] **T4.5** Flow ย้ายที่นั่งฟรี: hold ใหม่ในโซนเป้าหมายโดยไม่คิดเงิน (state machine ชัด)
 
 ### Phase 5 — Checker + Reporting
 
-- [ ] **T5.1** สร้าง **signed ticket payload** (JWT/HMAC) สำหรับ QR  
-- [ ] **T5.2** `CheckinService.verify_and_checkin` — one-time `check_in_at`  
-- [ ] **T5.3** Organizer dashboard: aggregate รายรับ/รายจ่ายจาก `payments` + `organizer_ledger`  
-- [ ] **T5.4** รายงานจองต่อโซน (สำหรับตัดสินใจปิดโซน)
+- [x] **T5.1** สร้าง **signed ticket payload** (JWT/HMAC) สำหรับ QR  
+- [x] **T5.2** `CheckinService.verify_and_checkin` — one-time `check_in_at`  
+- [x] **T5.3** Organizer dashboard: aggregate รายรับ/รายจ่ายจาก `payments` + `organizer_ledger`  
+- [x] **T5.4** รายงานจองต่อโซน (สำหรับตัดสินใจปิดโซน)
 
 ### Phase 6 — คุณภาพและความพร้อม production
 
-- [ ] **T6.1** pytest: unit สำหรับ `PriorityStrategy`, `refund_policy`  
-- [ ] **T6.2** integration: จองที่นั่งพร้อมกัน 2 client → assert ไม่ double book  
-- [ ] **T6.3** OpenAPI tag แยก role (user / organizer / checker) + security scheme  
-- [ ] **T6.4** เอกสารสั้น ๆ วิธีรัน docker-compose (Postgres + Redis)
+- [x] **T6.1** pytest: unit สำหรับ `PriorityStrategy`, `refund_policy`  
+- [x] **T6.2** integration: จองที่นั่งพร้อมกัน 2 client → assert ไม่ double book  
+- [x] **T6.3** OpenAPI tag แยก role (user / organizer / checker) + security scheme  
+- [x] **T6.4** เอกสารสั้น ๆ วิธีรัน docker-compose (Postgres + Redis)
+
+### Phase 7 — Frontend (React/Next.js)
+
+> อิงตาม `Skill_frontend.md` — ดีไซน์ต้องมี **aesthetic direction ชัด**, Production-grade, ไม่ใช้งาน AI slop/generic  
+> **Theme:** Dark luxury concert hall — deep blacks, warm gold accents, cinematic typography
+
+#### T7.0 — Project Bootstrap & Design System
+- [x] **T7.0.1** Bootstrap Next.js 15 (App Router) + TypeScript  
+- [x] **T7.0.2** สร้าง Design System: CSS variables (colors, spacing, radius), Google Fonts (pairing ระหว่าง display font + body font ที่ไม่ generic)  
+- [x] **T7.0.3** สร้าง base components: `Button`, `Card`, `Badge`, `Modal`, `Spinner`, `Input`  
+- [ ] **T7.0.4** Generate OpenAPI client จาก `/docs` ของ FastAPI ด้วย `openapi-typescript` หรือ `axios` + Zod schema  
+
+#### T7.1 — Auth Flow (OAuth + JWT)
+- [x] **T7.1.1** หน้า Landing Page — hero section เชิญชวน login, แสดงคอนเสิร์ตที่กำลังจะมาถึง  
+- [x] **T7.1.2** ปุ่ม "Login with LINE" / "Login with Facebook" → เรียก `/auth/oauth/{provider}/authorize-url` → redirect  
+- [x] **T7.1.3** หน้า `/auth/callback` รับ `code` → ส่ง backend → เก็บ JWT ใน `httpOnly cookie` หรือ `localStorage`  
+- [x] **T7.1.4** `AuthContext` / `useAuth()` hook + Middleware ป้องกัน protected routes  
+
+#### T7.2 — Concert Discovery
+- [x] **T7.2.1** หน้า `/concerts` — grid แสดงคอนเสิร์ตทั้งหมด, filter ตามวันที่/venue (ใช้ animation stagger เมื่อ card โหลด)  
+- [x] **T7.2.2** หน้า `/concerts/[id]` — Concert detail: โปสเตอร์ใหญ่, lineup, ข้อมูล zone + ราคา  
+- [x] **T7.2.3** Component `CountdownTimer` แสดงเวลาก่อนเปิดขาย  
+
+#### T7.3 — Queue & Waiting Room
+- [x] **T7.3.1** หน้า `/concerts/[id]/queue` — กดเข้าคิว + แสดงตำแหน่ง real-time (polling หรือ WebSocket)  
+- [x] **T7.3.2** UI "Waiting Room" — animated queue position, estimated wait time (micro-animation สำคัญมากตรงนี้)  
+- [x] **T7.3.3** Auto-redirect ไปหน้าเลือกที่นั่งเมื่อได้รับ Admission Token  
+
+#### T7.4 — Seat Selection & Booking
+- [x] **T7.4.1** หน้า `/concerts/[id]/seats` — interactive seat map แสดงทุก zone/seat (SVG หรือ CSS grid)  
+- [x] **T7.4.2** สถานะที่นั่ง: Available (สีที่เลือก), Locked (เทา + dim), Sold (เส้นทับ)  
+- [x] **T7.4.3** Sidebar สรุปที่นั่งที่เลือก + countdown ของ hold time  
+- [x] **T7.4.4** เรียก `POST /bookings` → navigate ไปหน้าชำระเงิน  
+
+#### T7.5 — Payment & QR
+- [x] **T7.5.1** หน้า `/bookings/[id]/payment` — แสดง QR code ที่ได้จาก backend, จำนวนเงิน, countdown  
+- [x] **T7.5.2** Polling สถานะ payment → transition อัตโนมัติเมื่อชำระสำเร็จ (success animation)  
+- [x] **T7.5.3** หน้า `/bookings/[id]/ticket` — แสดง e-Ticket: QR code สำหรับสแกนเข้างาน, รายละเอียด seat  
+
+#### T7.6 — User Dashboard
+- [x] **T7.6.1** หน้า `/profile` — ประวัติการจอง, สถานะตั๋วแต่ละใบ  
+- [x] **T7.6.2** ยื่นขอ Refund — form + validation (เช็คเงื่อนไข 7 วัน)  
+
+#### T7.7 — Organizer Dashboard
+- [x] **T7.7.1** หน้า `/organizer/[concertId]` — สรุปยอดขาย, chart รายรับ/รายจ่าย  
+- [x] **T7.7.2** ตาราง zone occupancy — แสดง % ที่นั่งขายแล้ว พร้อมปุ่ม "ปิดโซน"  
+- [x] **T7.7.3** รายการ Refund Request — อนุมัติ/ปฏิเสธ  
+
+#### T7.8 — Checker (Gate Scanner)
+- [x] **T7.8.1** หน้า `/checker` — ออกแบบ mobile-first สำหรับ staff ถือโทรศัพท์หน้าประตู  
+- [x] **T7.8.2** Scan QR (ใช้ `react-qr-reader`) → ส่ง token ไปยัง `POST /checker/checkin` → แสดงผล PASS/FAIL ชัดเจน  
 
 ---
 
