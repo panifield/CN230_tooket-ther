@@ -134,33 +134,33 @@ tooket_ther/
 
 ### Phase 3 — Payment (QR) + webhook
 
-- [ ] **T3.1** `PaymentGateway` interface + **stub** สร้าง QR ref + simulate success (สำหรับ dev)  
-- [ ] **T3.2** `PaymentService.create_payment_for_booking`  
-- [ ] **T3.3** Webhook endpoint: verify signature (ถ้ามี) + **idempotent** ด้วย `external_ref`  
-- [ ] **T3.3b** Transaction เดียว: `payment succeeded` → `booking paid` → `seat sold`  
-- [ ] **T3.4** (Optional) คิวชำระเงินตามลำดับ — ถ้า requirement บังคับ ให้เชื่อมกับ `QueueService` หรือล็อก “checkout slot”
+- [x] **T3.1** `PaymentGateway` interface + **stub** สร้าง QR ref + simulate success (สำหรับ dev)  
+- [x] **T3.2** `PaymentService.create_payment_for_booking`  
+- [x] **T3.3** Webhook endpoint: verify signature (ถ้ามี) + **idempotent** ด้วย `external_ref`  
+- [x] **T3.3b** Transaction เดียว: `payment succeeded` → `booking paid` → `seat sold`  
+- [x] **T3.4** (Optional) คิวชำระเงินตามลำดับ — ถ้า requirement บังคับ ให้เชื่อมกับ `QueueService` หรือล็อก “checkout slot”
 
 ### Phase 4 — Refund + ปิดโซน (Organizer)
 
-- [ ] **T4.1** `refund_policy` ใน `domain/`: ตรวจ 7 วันก่อนคอนเสิร์ต + สถานะบัตร  
-- [ ] **T4.2** API user: สร้าง `refund_request` + เก็บบัญชี (เข้ารหัส/placeholder ใน MVP)  
-- [ ] **T4.3** API organizer: อนุมัติ refund → transaction คืน seat + อัปเดต booking  
-- [ ] **T4.4** `OrganizerService.close_zone`: ตรวจ threshold → ปิด zone + สร้างงานย้าย/คืนเงิน + **zone_closure_events**  
-- [ ] **T4.5** Flow ย้ายที่นั่งฟรี: hold ใหม่ในโซนเป้าหมายโดยไม่คิดเงิน (state machine ชัด)
+- [x] **T4.1** `refund_policy` ใน `domain/`: ตรวจ 7 วันก่อนคอนเสิร์ต + สถานะบัตร  
+- [x] **T4.2** API user: สร้าง `refund_request` + เก็บบัญชี (เข้ารหัส/placeholder ใน MVP)  
+- [x] **T4.3** API organizer: อนุมัติ refund → transaction คืน seat + อัปเดต booking  
+- [x] **T4.4** `OrganizerService.close_zone`: ตรวจ threshold → ปิด zone + สร้างงานย้าย/คืนเงิน + **zone_closure_events**  
+- [x] **T4.5** Flow ย้ายที่นั่งฟรี: hold ใหม่ในโซนเป้าหมายโดยไม่คิดเงิน (state machine ชัด)
 
 ### Phase 5 — Checker + Reporting
 
-- [ ] **T5.1** สร้าง **signed ticket payload** (JWT/HMAC) สำหรับ QR  
-- [ ] **T5.2** `CheckinService.verify_and_checkin` — one-time `check_in_at`  
-- [ ] **T5.3** Organizer dashboard: aggregate รายรับ/รายจ่ายจาก `payments` + `organizer_ledger`  
-- [ ] **T5.4** รายงานจองต่อโซน (สำหรับตัดสินใจปิดโซน)
+- [x] **T5.1** สร้าง **signed ticket payload** (JWT/HMAC) สำหรับ QR  
+- [x] **T5.2** `CheckinService.verify_and_checkin` — one-time `check_in_at`  
+- [x] **T5.3** Organizer dashboard: aggregate รายรับ/รายจ่ายจาก `payments` + `organizer_ledger`  
+- [x] **T5.4** รายงานจองต่อโซน (สำหรับตัดสินใจปิดโซน)
 
 ### Phase 6 — คุณภาพและความพร้อม production
 
-- [ ] **T6.1** pytest: unit สำหรับ `PriorityStrategy`, `refund_policy`  
-- [ ] **T6.2** integration: จองที่นั่งพร้อมกัน 2 client → assert ไม่ double book  
-- [ ] **T6.3** OpenAPI tag แยก role (user / organizer / checker) + security scheme  
-- [ ] **T6.4** เอกสารสั้น ๆ วิธีรัน docker-compose (Postgres + Redis)
+- [x] **T6.1** pytest: unit สำหรับ `PriorityStrategy`, `refund_policy`  
+- [x] **T6.2** integration: จองที่นั่งพร้อมกัน 2 client → assert ไม่ double book  
+- [x] **T6.3** OpenAPI tag แยก role (user / organizer / checker) + security scheme  
+- [x] **T6.4** เอกสารสั้น ๆ วิธีรัน docker-compose (Postgres + Redis)
 
 ---
 
