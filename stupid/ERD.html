@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>Tooket-ther ER Diagram</title>
+<style>
+  body { font-family: sans-serif; background: #f8f8f6; margin: 0; padding: 24px; }
+  h1 { font-size: 20px; font-weight: 500; margin: 0 0 4px; color: #1a1a18; }
+  p  { font-size: 13px; color: #6b6a63; margin: 0 0 20px; }
+  #erd { background: #fff; border: 1px solid #e0dfd8; border-radius: 12px; padding: 24px; }
+</style>
+</head>
+<body>
+<h1>Tooket-ther — Entity Relationship Diagram</h1>
+<p>CN230 Database Systems · ภาคเรียนที่ 2 ปีการศึกษา 2567 · มหาวิทยาลัยธรรมศาสตร์</p>
+<div id="erd"></div>
+
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: 'sans-serif',
+  themeVariables: {
+    fontSize: '13px',
+    fontFamily: 'sans-serif',
+    lineColor: '#73726c',
+    textColor: '#3d3d3a',
+  },
+});
+
+const diagram = `erDiagram
+  ORGANIZERS {
+    int  organizer_id PK
+    string name
+    string email
+    string company_name
+    string auth_provider
+    string auth_id
+  }
+
+  CONCERTS {
+    int    concert_id PK
+    int    organizer_id FK
+    string title
+    string artist
+    string venue
+    date   concert_date
+    time   concert_time
+    timestamp sale_open_at
+    string status
+  }
+
+  ZONES {
+    int     zone_id PK
+    int     concert_id FK
+    string  zone_name
+    decimal price
+    int     total_seats
+    int     available_seats
+    int     min_threshold
+    boolean is_active
+  }
+
+  SEATS {
+    int    seat_id PK
+    int    zone_id FK
+    string seat_number
+    string row_label
+    string status
+  }
+
+  USERS {
+    int    user_id PK
+    string name
+    string email
+    string domicile
+    int    priority_status
+    string auth_provider
+    string auth_id
+  }
+
+  QUEUE_SESSIONS {
+    int       queue_id PK
+    int       user_id FK
+    int       concert_id FK
+    int       priority_score
+    timestamp entered_at
+    timestamp admitted_at
+    string    status
+  }
+
+  BOOKINGS {
+    int       booking_id PK
+    int       user_id FK
+    int       seat_id FK
+    string    status
+    timestamp booked_at
+    timestamp expiry_time
+    timestamp confirmed_at
+    string    ticket_qr
+    string    delivery_method
+  }
+
+  PAYMENTS {
+    int       payment_id PK
+    int       booking_id FK
+    decimal   amount
+    string    method
+    string    status
+    string    transaction_ref
+    timestamp paid_at
+    decimal   refund_amount
+    string    bank_account
+  }
+
+  TICKET_CHECKS {
+    int       check_id PK
+    int       booking_id FK
+    string    checked_by
+    timestamp checked_at
+    string    result
+  }
+
+  ORGANIZERS     ||--o{ CONCERTS       : "จัดงาน"
+  CONCERTS       ||--o{ ZONES          : "มีโซน"
+  CONCERTS       ||--o{ QUEUE_SESSIONS : "มีคิว"
+  ZONES          ||--o{ SEATS          : "มีที่นั่ง"
+  USERS          ||--o{ QUEUE_SESSIONS : "เข้าคิว"
+  USERS          ||--o{ BOOKINGS       : "จอง"
+  SEATS          ||--|| BOOKINGS       : "ถูกจอง"
+  BOOKINGS       ||--o{ PAYMENTS       : "ชำระเงิน"
+  BOOKINGS       ||--o{ TICKET_CHECKS  : "ตรวจบัตร"
+`;
+
+const { svg } = await mermaid.render('erd-svg', diagram);
+document.getElementById('erd').innerHTML = svg;
+</script>
+</body>
+</html>
