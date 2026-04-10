@@ -1,13 +1,7 @@
-fastapi>=0.115.0
-uvicorn[standard]>=0.32.0
-sqlalchemy>=2.0.36
-alembic>=1.14.0
-pydantic-settings>=2.6.0
-psycopg[binary]>=3.2.0
+Flask>=3.1.0
+python-dotenv>=1.0.1
+psycopg2-binary>=2.9.10
 PyJWT>=2.9.0
-httpx>=0.28.0
-redis>=5.2.0
-
-# dev/test
+requests>=2.32.3
 pytest>=8.3.0
 ruff>=0.8.0
