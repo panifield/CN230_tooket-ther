@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOOKET-THER | Booking</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .seat {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sharp);
+            border: 1px solid rgba(1, 1, 32, 0.1);
+            background: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        .seat:hover { border-color: var(--brand-blue); }
+        .seat.selected { background: var(--brand-blue); border-color: var(--brand-blue); transform: scale(1.1); }
+        .seat.occupied { background: rgba(1, 1, 32, 0.05); cursor: not-allowed; border: none; }
+        .seat-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+        .row-label { width: 24px; font-family: 'Space Mono', monospace; font-size: 10px; color: rgba(1, 1, 32, 0.3); text-align: center; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container nav-content">
+            <a href="{{ url_for('root') }}" class="logo">
+                <div class="logo-icon gradient-coastal">
+                    <i data-lucide="ticket"></i>
+                </div>
+                <span class="logo-text">TOOKET-THER</span>
+            </a>
+            <div id="timer-display" class="card-coastal" style="padding: 8px 16px; display: flex; align-items: center; gap: 12px; grid-column: 2;">
+                <div style="width: 8px; height: 8px; border-radius: 50%; background: var(--brand-blue); animation: pulse 2s infinite;"></div>
+                <span class="mono-label" style="font-size: 10px;" id="timer-text">TIME REMAINING: 10:00</span>
+            </div>
+            <div class="nav-actions">
+                </div>
+        </div>
+    </header>
+
+    <main class="container" style="padding-top: 80px; padding-bottom: 80px;">
+        <a href="{{ url_for('root') }}" class="nav-link mb-8" style="display: inline-flex; align-items: center; gap: 8px;">
+            <i data-lucide="arrow-left" size="14"></i> BACK TO EVENTS
+        </a>
+
+        <div class="grid" style="grid-template-columns: 2fr 1fr;">
+            <div>
+                <div class="mb-12 flex justify-between items-end">
+                    <div>
+                        <span class="mono-label" style="color: var(--brand-blue); margin-bottom: 8px; display: block;">SELECT SEATS / ZONE A</span>
+                        <h1 style="font-size: 32px; font-weight: 500; letter-spacing: -0.05em;">Coastal Tech Summit 2026</h1>
+                    </div>
+                    <div class="card-coastal" style="padding: 16px; display: flex; align-items: center; gap: 16px; background: rgba(224, 242, 254, 0.3);">
+                        <div style="width: 40px; height: 40px; background: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: var(--brand-blue);">#124</div>
+                        <div>
+                            <div class="mono-label" style="font-size: 10px; color: var(--brand-blue);">QUEUE STATUS</div>
+                            <div style="font-size: 10px; color: rgba(1, 1, 32, 0.6);" id="queue-status">LOCAL PRIORITY ACTIVE</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="background: rgba(1, 1, 32, 0.05); height: 16px; border-radius: 20px; margin-bottom: 80px; position: relative; overflow: hidden;">
+                    <div class="gradient-coastal" style="position: absolute; inset: 0; opacity: 0.3; filter: blur(4px);"></div>
+                    <div style="position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;">
+                        <span class="mono-label" style="font-size: 10px; color: rgba(1, 1, 32, 0.4);">STAGE / SCREEN</span>
+                    </div>
+                </div>
+
+                <div id="seat-grid" style="display: flex; flex-direction: column; align-items: center;">
+                    </div>
+
+                <div class="flex justify-center gap-8 mt-12 pt-8" style="border-top: 1px solid rgba(1, 1, 32, 0.05);">
+                    <div class="flex items-center gap-2">
+                        <div class="seat" style="cursor: default;"></div>
+                        <span class="mono-label" style="font-size: 10px;">AVAILABLE</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="seat selected" style="cursor: default;"></div>
+                        <span class="mono-label" style="font-size: 10px;">SELECTED</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="seat occupied" style="cursor: default;"></div>
+                        <span class="mono-label" style="font-size: 10px;">OCCUPIED</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <div class="card-coastal" style="padding: 32px; position: sticky; top: 120px;">
+                    <h3 class="mono-label" style="color: var(--brand-blue); margin-bottom: 24px;">ORDER SUMMARY</h3>
+                    
+                    <div id="selected-seats-list" style="margin-bottom: 32px;">
+                        <p style="text-align: center; color: rgba(1, 1, 32, 0.4); font-size: 14px; padding: 40px 0; border: 2px dashed rgba(1, 1, 32, 0.05); border-radius: var(--radius-card);">No seats selected yet</p>
+                    </div>
+
+                    <div style="margin-bottom: 32px;">
+                        <div class="flex justify-between mb-2" style="font-size: 14px; color: rgba(1, 1, 32, 0.6);">
+                            <span>Subtotal</span>
+                            <span id="subtotal">$0.00</span>
+                        </div>
+                        <div class="flex justify-between mb-4" style="font-size: 14px; color: rgba(1, 1, 32, 0.6);">
+                            <span>Service Fee</span>
+                            <span id="service-fee">$0.00</span>
+                        </div>
+                        <div class="flex justify-between pt-4" style="border-top: 1px solid rgba(1, 1, 32, 0.1); font-size: 20px; font-weight: 500;">
+                            <span>Total</span>
+                            <span id="total-price">$0.00</span>
+                        </div>
+                    </div>
+
+                    <button id="checkout-btn" class="btn-primary" style="width: 100%; justify-content: center;" disabled onclick="window.location.href='{{ url_for('payment') }}'">
+                        PROCEED TO PAYMENT <i data-lucide="arrow-right"></i>
+                    </button>
+                    
+                    <p style="margin-top: 16px; font-size: 10px; color: rgba(1, 1, 32, 0.4); text-align: center; line-height: 1.6;">
+                        By proceeding, you agree to our Terms of Service and Privacy Policy. Tickets are non-refundable after purchase.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        lucide.createIcons();
+        
+        // Timer Logic
+        let timeLeft = 600;
+        const timerText = document.getElementById('timer-text');
+        const timerDisplay = document.getElementById('timer-display');
+        
+        const timerInterval = setInterval(() => {
+            timeLeft--;
+            const mins = Math.floor(timeLeft / 60);
+            const secs = timeLeft % 60;
+            timerText.innerText = `TIME REMAINING: ${mins}:${secs < 10 ? '0' : ''}${secs}`;
+            
+            if (timeLeft < 60) {
+                timerDisplay.style.background = '#FEF2F2';
+                timerDisplay.style.borderColor = '#FECACA';
+                timerText.style.color = '#DC2626';
+            }
+            
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                alert('Session expired. Please restart your booking.');
+                // CHANGED: Redirect to Flask Route
+                window.location.href = "{{ url_for('root') }}";
+            }
+        }, 1000);
+
+        // Seat Map Logic
+        const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+        const grid = document.getElementById('seat-grid');
+        let selectedSeats = [];
+
+        rows.forEach(row => {
+            const rowDiv = document.createElement('div');
+            rowDiv.className = 'seat-row';
+            
+            const label1 = document.createElement('span');
+            label1.className = 'row-label';
+            label1.innerText = row;
+            rowDiv.appendChild(label1);
+
+            for (let i = 1; i <= 12; i++) {
+                const seat = document.createElement('button');
+                seat.className = 'seat';
+                const isOccupied = Math.random() < 0.2;
+                if (isOccupied) seat.classList.add('occupied');
+                seat.innerText = i;
+                
+                seat.onclick = () => {
+                    if (isOccupied) return;
+                    const seatId = `${row}${i}`;
+                    if (seat.classList.contains('selected')) {
+                        seat.classList.remove('selected');
+                        selectedSeats = selectedSeats.filter(s => s !== seatId);
+                    } else {
+                        seat.classList.add('selected');
+                        selectedSeats.push(seatId);
+                    }
+                    updateSummary();
+                };
+                rowDiv.appendChild(seat);
+            }
+
+            const label2 = document.createElement('span');
+            label2.className = 'row-label';
+            label2.innerText = row;
+            rowDiv.appendChild(label2);
+            
+            grid.appendChild(rowDiv);
+        });
+
+        function updateSummary() {
+            const list = document.getElementById('selected-seats-list');
+            const subtotalEl = document.getElementById('subtotal');
+            const feeEl = document.getElementById('service-fee');
+            const totalEl = document.getElementById('total-price');
+            const btn = document.getElementById('checkout-btn');
+
+            if (selectedSeats.length === 0) {
+                list.innerHTML = '<p style="text-align: center; color: rgba(1, 1, 32, 0.4); font-size: 14px; padding: 40px 0; border: 2px dashed rgba(1, 1, 32, 0.05); border-radius: var(--radius-card);">No seats selected yet</p>';
+                subtotalEl.innerText = '$0.00';
+                feeEl.innerText = '$0.00';
+                totalEl.innerText = '$0.00';
+                btn.disabled = true;
+                return;
+            }
+
+            btn.disabled = false;
+            list.innerHTML = selectedSeats.map(id => `
+                <div class="flex justify-between items-center mb-4 pb-4" style="border-bottom: 1px solid rgba(1, 1, 32, 0.05);">
+                    <div>
+                        <div style="font-weight: 500;">Seat ${id}</div>
+                        <div class="mono-label" style="font-size: 10px; color: rgba(1, 1, 32, 0.4);">STANDARD ZONE</div>
+                    </div>
+                    <div style="font-weight: 500;">$150.00</div>
+                </div>
+            `).join('');
+
+            const subtotal = selectedSeats.length * 150;
+            const fee = 15;
+            subtotalEl.innerText = `$${subtotal.toFixed(2)}`;
+            feeEl.innerText = `$${fee.toFixed(2)}`;
+            totalEl.innerText = `$${(subtotal + fee).toFixed(2)}`;
+            
+            localStorage.setItem('selectedSeatsCount', selectedSeats.length);
+        }
+
+        const isLocal = localStorage.getItem('isLocal') === 'true';
+        document.getElementById('queue-status').innerText = isLocal ? 'LOCAL PRIORITY ACTIVE' : 'STANDARD QUEUE';
+    </script>
+</body>
+</html>
