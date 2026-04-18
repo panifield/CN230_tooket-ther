@@ -20,9 +20,9 @@ DROP TABLE IF EXISTS seat CASCADE;
 DROP TABLE IF EXISTS zone CASCADE;
 DROP TABLE IF EXISTS concert CASCADE;
 DROP TABLE IF EXISTS staff_profile CASCADE;
+DROP TABLE IF EXISTS customer_profile CASCADE;
 DROP TABLE IF EXISTS organizer_profile CASCADE;
 DROP TABLE IF EXISTS social_account CASCADE;
-DROP TABLE IF EXISTS bank_account CASCADE;
 DROP TABLE IF EXISTS finance CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
@@ -37,8 +37,9 @@ CREATE TABLE users (
     name             VARCHAR(100)    NOT NULL,
     email            VARCHAR(150)    UNIQUE NOT NULL,
     role             VARCHAR(20)     NOT NULL CHECK (role IN ('customer','organizer','staff')),
-    address          TEXT,
-    password         TEXT,
+    phone            VARCHAR(20)     NOT NULL,
+    address          TEXT            NOT NULL,
+    password         TEXT            NOT NULL,
     created_at       TIMESTAMP       NOT NULL DEFAULT NOW()
 );
 
@@ -50,8 +51,19 @@ CREATE TABLE social_account (
     user_id          INT             NOT NULL REFERENCES users(id),
     social_user_id   VARCHAR(100)    NOT NULL,
     type_social      VARCHAR(20)     NOT NULL CHECK (type_social IN ('line','facebook','email')),
-    UNIQUE ( social_user_id)
+    UNIQUE (social_user_id, type_social)
 );
+
+
+-- =========================
+-- CUSTOMER PROFILE
+-- =========================
+CREATE TABLE customer_profile (
+    id              SERIAL PRIMARY KEY,
+    user_id         INT             UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    location_score  INT             NOT NULL DEFAULT 0
+);
+
 
 -- =========================
 -- ORGANIZER PROFILE
@@ -73,8 +85,9 @@ CREATE TABLE staff_profile (
     shift_start      TIMESTAMP,
     shift_close      TIMESTAMP,
     staff_code       VARCHAR(50)     UNIQUE NOT NULL,
-    status           VARCHAR(20)     NOT NULL CHECK (status IN ('active', 'inactive', 'suspended')) 
-                                     --status: ทำงาน, เลิกงานหรือไม่ทำงานแล้ว, ถูกระงับ(ทำผิด)                       
+    status           VARCHAR(20)     NOT NULL CHECK (status IN ('active', 'inactive', 'suspended')),
+                                     --status: ทำงาน, เลิกงานหรือไม่ทำงานแล้ว, ถูกระงับ(ทำผิด)
+    UNIQUE (user_id)                       
 );
 
 -- =========================
@@ -118,25 +131,24 @@ CREATE TABLE seat (
     seat_row         VARCHAR(10),
     status           VARCHAR(20)     NOT NULL DEFAULT 'available'
                                      CHECK (status IN ('available','locked','sold')),
-
     CONSTRAINT unique_seat_in_zone UNIQUE (zone_id, seat_row, seat_number)
-);
+); 
 
 -- =========================
 -- QUEUE SESSION
 -- =========================
 CREATE TABLE queue_session (
     id               SERIAL PRIMARY KEY,
-    user_id          INT             NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    customer_profile_id          INT             NOT NULL REFERENCES customer_profile(id) ON DELETE CASCADE,
     concert_id       INT             NOT NULL REFERENCES concert(id) ON DELETE CASCADE,
-    priority_score   INT             NOT NULL DEFAULT 0,
     entered_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
     admitted_at      TIMESTAMP,
     expired_at       TIMESTAMP,
+    priority_score   INT             NOT NULL DEFAULT 0,
     status           VARCHAR(20)     NOT NULL DEFAULT 'waiting',
                                      CHECK (status IN('waiting', 'admitted', 'expired', 'completed')),
-
-    CONSTRAINT unique_user_concert_queue UNIQUE (user_id, concert_id)
+                                     
+    CONSTRAINT unique_customer_concert_queue UNIQUE (customer_profile_id, concert_id)
 );
 
 -- =========================
@@ -144,7 +156,7 @@ CREATE TABLE queue_session (
 -- =========================
 CREATE TABLE booking (
     id               SERIAL PRIMARY KEY,
-    user_id          INT             NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    customer_profile_id  INT             NOT NULL REFERENCES customer_profile(id) ON DELETE RESTRICT,
     concert_id       INT             NOT NULL REFERENCES concert(id) ON DELETE RESTRICT,
     created_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
     expired_at       TIMESTAMP,
@@ -179,19 +191,11 @@ CREATE TABLE payment (
     expired_at       TIMESTAMP,
     paid_at          TIMESTAMP,
     transaction_ref  VARCHAR(100)    UNIQUE,
+    method           VARCHAR(20)     NOT NULL DEFAULT 'qr_code'
+                                     CHECK (method IN ('qr_code', 'credit_card', 'bank_transfer')),
     status           VARCHAR(20)     NOT NULL CHECK (status IN ('pending','paid','failed','expired'))
 );
 
--- =========================
--- BANK ACCOUNT
--- =========================
-CREATE TABLE bank_account (
-    id               SERIAL PRIMARY KEY,
-    user_id          INT             NOT NULL REFERENCES users(id),
-    bank_name        VARCHAR(100)    NOT NULL,
-    account_no       VARCHAR(50)     ,
-    UNIQUE (account_no)
-);
 
 -- =========================
 -- REFUND
@@ -199,8 +203,6 @@ CREATE TABLE bank_account (
 CREATE TABLE refund (
     id               SERIAL PRIMARY KEY,
     payment_id       INT             NOT NULL REFERENCES payment(id),
-    user_id          INT             NOT NULL REFERENCES users(id),
-    bank_account_id  INT             REFERENCES bank_account(id),
     amount           NUMERIC(10,2)   NOT NULL CHECK (amount > 0),
     requested_at     TIMESTAMP       NOT NULL DEFAULT NOW(),
     approved_at      TIMESTAMP,
@@ -218,7 +220,7 @@ CREATE TABLE ticket_checkin (
     staff_id         INT             NOT NULL REFERENCES staff_profile(id),
     ticket_id        INT             NOT NULL REFERENCES ticket(id),
     checked_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
-    status           VARCHAR(20)     NOT NULL DEFAULT 'not_checked'
+    status           VARCHAR(20)     NOT NULL DEFAULT 'checked'
                                      CHECK (status IN ('checked','duplicate','rejected')),
     UNIQUE (ticket_id)
 );
@@ -252,13 +254,18 @@ CREATE INDEX idx_ticket_booking ON ticket(booking_id);
 
 --- queuery_session ---
 CREATE INDEX idx_queue_concert_status ON queue_session(concert_id, status);
-CREATE INDEX idx_queue_priority ON queue_session(concert_id, priority_score DESC);
+CREATE INDEX idx_queue_priority_score
+ON queue_session(concert_id, priority_score DESC, entered_at ASC);
+
+CREATE INDEX idx_queue_waiting_only
+ON queue_session(concert_id, priority_score DESC, entered_at)
+WHERE status = 'waiting';
 
 --- Zone ---
 CREATE INDEX idx_zone_concert ON zone(concert_id);
 
 --- Booking ---
-CREATE INDEX idx_booking_user_status ON booking(user_id, status);
+CREATE INDEX idx_booking_customer_status ON booking(customer_profile_id, status);
 CREATE INDEX idx_booking_status ON booking(status);
 CREATE INDEX idx_booking_concert ON booking(concert_id);
 CREATE INDEX idx_booking_expired_pending 
@@ -275,7 +282,6 @@ CREATE INDEX idx_finance_type ON finance(type);
 
 --- refund ---
 CREATE INDEX idx_refund_status ON refund(status);
-CREATE INDEX idx_refund_user ON refund(user_id);
 
 -- ============================================================
 -- VIEWS — Query 
@@ -292,7 +298,8 @@ SELECT
     b.status,
     b.created_at
 FROM booking b
-JOIN users u ON b.user_id = u.id
+JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN users u ON cp.user_id = u.id
 JOIN concert c ON b.concert_id = c.id;
 
 -- View: ticket detail : ใช้แสดง ticket + seat
@@ -312,7 +319,7 @@ JOIN seat s ON t.seat_id = s.id
 JOIN zone z ON s.zone_id = z.id;
 
 -- View: available seats : ใช้หน้าเลือกที่นั่ง
-CREATE VIEW vw_available_seats AS
+CREATE VIEW vw_available_seat AS
 SELECT 
     s.id AS seat_id,
     z.zone_name,
@@ -338,7 +345,8 @@ SELECT
     p.paid_at
 FROM payment p
 JOIN booking b ON p.booking_id = b.id
-JOIN users u ON b.user_id = u.id;
+JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN users u ON cp.user_id = u.id;
 
 -- View: concert sales summary : ใช้dashboard organizer
 CREATE VIEW vw_concert_sales AS
@@ -372,7 +380,8 @@ SELECT
     q.status,
     q.entered_at
 FROM queue_session q
-JOIN users u ON q.user_id = u.id
+JOIN customer_profile cp ON q.customer_profile_id = cp.id
+JOIN users u ON cp.user_id = u.id
 JOIN concert c ON q.concert_id = c.id;
 
 -- View: refund tracking : admin ใช้ดู
@@ -386,8 +395,11 @@ SELECT
     r.requested_at,
     r.completed_at
 FROM refund r
-JOIN users u ON r.user_id = u.id
-JOIN payment p ON r.payment_id = p.id;
+JOIN payment p ON r.payment_id = p.id
+JOIN booking b ON p.booking_id = b.id
+JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN users u ON cp.user_id = u.id;
+
 
 -- View: check-in status :ใช้หน้างานจริง
 CREATE VIEW vw_checkin_status AS
@@ -400,5 +412,6 @@ SELECT
 FROM ticket_checkin tc
 JOIN ticket t ON tc.ticket_id = t.id
 JOIN booking b ON t.booking_id = b.id
-JOIN users u ON b.user_id = u.id
+JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN users u ON cp.user_id = u.id
 JOIN concert c ON b.concert_id = c.id;
