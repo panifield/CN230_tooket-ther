@@ -133,7 +133,7 @@ INSERT INTO seat (id, zone_id, seat_number, seat_row, status) VALUES
 -- 7. QUEUE SESSION
 -- ============================================================
 INSERT INTO queue_session 
-(id, customer_profile_id, concert_id, priority_score, entered_at, admitted_at, expired_at, status) 
+(id, customer_id, concert_id, priority_score, entered_at, admitted_at, expired_at, status) 
 VALUES
 (1, 1, 1, 51, '2025-05-01 10:00:10', '2025-05-01 10:02:00', NULL, 'admitted'),
 (2, 2, 1, 62, '2025-05-01 10:00:15', NULL, '2025-05-01 11:10:00', 'waiting'),
@@ -144,7 +144,7 @@ VALUES
 -- 8. BOOKING
 -- ============================================================
 INSERT INTO booking
-(id, customer_profile_id, concert_id, created_at, expired_at, total_amount, total_tickets, status, delivery_type)
+(id, customer_id, concert_id, created_at, expired_at, total_amount, total_tickets, status, delivery_type)
 VALUES
 -- paid แล้ว (มีการจ่ายเงินสำเร็จ)
 (1, 1, 1, '2025-05-01 10:01:00', NULL,                 13000, 2, 'paid',     'digital'),
@@ -244,5 +244,3 @@ UNION ALL
 SELECT 'ticket_checkin',    COUNT(*) FROM ticket_checkin
 UNION ALL
 SELECT 'finance',           COUNT(*) FROM finance;
-
-ROLLBACK;
