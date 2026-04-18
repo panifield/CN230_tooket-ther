@@ -139,7 +139,7 @@ CREATE TABLE seat (
 -- =========================
 CREATE TABLE queue_session (
     id               SERIAL PRIMARY KEY,
-    customer_profile_id          INT             NOT NULL REFERENCES customer_profile(id) ON DELETE CASCADE,
+    customer_id      INT             NOT NULL REFERENCES customer_profile(id) ON DELETE CASCADE,
     concert_id       INT             NOT NULL REFERENCES concert(id) ON DELETE CASCADE,
     entered_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
     admitted_at      TIMESTAMP,
@@ -148,7 +148,7 @@ CREATE TABLE queue_session (
     status           VARCHAR(20)     NOT NULL DEFAULT 'waiting',
                                      CHECK (status IN('waiting', 'admitted', 'expired', 'completed')),
                                      
-    CONSTRAINT unique_customer_concert_queue UNIQUE (customer_profile_id, concert_id)
+    CONSTRAINT unique_customer_concert_queue UNIQUE (customer_id, concert_id)
 );
 
 -- =========================
@@ -156,7 +156,7 @@ CREATE TABLE queue_session (
 -- =========================
 CREATE TABLE booking (
     id               SERIAL PRIMARY KEY,
-    customer_profile_id  INT             NOT NULL REFERENCES customer_profile(id) ON DELETE RESTRICT,
+    customer_id      INT             NOT NULL REFERENCES customer_profile(id) ON DELETE RESTRICT,
     concert_id       INT             NOT NULL REFERENCES concert(id) ON DELETE RESTRICT,
     created_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
     expired_at       TIMESTAMP,
@@ -265,7 +265,7 @@ WHERE status = 'waiting';
 CREATE INDEX idx_zone_concert ON zone(concert_id);
 
 --- Booking ---
-CREATE INDEX idx_booking_customer_status ON booking(customer_profile_id, status);
+CREATE INDEX idx_booking_customer_status ON booking(customer_id, status);
 CREATE INDEX idx_booking_status ON booking(status);
 CREATE INDEX idx_booking_concert ON booking(concert_id);
 CREATE INDEX idx_booking_expired_pending 
@@ -298,7 +298,7 @@ SELECT
     b.status,
     b.created_at
 FROM booking b
-JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN customer_profile cp ON b.customer_id = cp.id
 JOIN users u ON cp.user_id = u.id
 JOIN concert c ON b.concert_id = c.id;
 
@@ -345,7 +345,7 @@ SELECT
     p.paid_at
 FROM payment p
 JOIN booking b ON p.booking_id = b.id
-JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN customer_profile cp ON b.customer_id = cp.id
 JOIN users u ON cp.user_id = u.id;
 
 -- View: concert sales summary : ใช้dashboard organizer
@@ -380,7 +380,7 @@ SELECT
     q.status,
     q.entered_at
 FROM queue_session q
-JOIN customer_profile cp ON q.customer_profile_id = cp.id
+JOIN customer_profile cp ON q.customer_id = cp.id
 JOIN users u ON cp.user_id = u.id
 JOIN concert c ON q.concert_id = c.id;
 
@@ -397,7 +397,7 @@ SELECT
 FROM refund r
 JOIN payment p ON r.payment_id = p.id
 JOIN booking b ON p.booking_id = b.id
-JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN customer_profile cp ON b.customer_id = cp.id
 JOIN users u ON cp.user_id = u.id;
 
 
@@ -412,6 +412,6 @@ SELECT
 FROM ticket_checkin tc
 JOIN ticket t ON tc.ticket_id = t.id
 JOIN booking b ON t.booking_id = b.id
-JOIN customer_profile cp ON b.customer_profile_id = cp.id
+JOIN customer_profile cp ON b.customer_id = cp.id
 JOIN users u ON cp.user_id = u.id
 JOIN concert c ON b.concert_id = c.id;
