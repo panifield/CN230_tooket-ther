@@ -12,18 +12,18 @@ BEGIN;
 -- ============================================================
 -- 1. USERS (Organizer + Staff + Customer)
 -- ============================================================
-INSERT INTO users (id, id_card, name, email, role, address, password) VALUES
+INSERT INTO users (id, id_card, name, email, role, phone, address, password) VALUES
 -- Organizer
-(1, '94038203838', 'สุพรัตน์ วงศวาง' ,'Suparat_t@gmail.com'    ,'organizer'    ,'Bangkok'  ,'Suprarut45.'),
-(2, '17283737282', 'Anunda Sery'  ,'Anunda_se@gmail.com'    ,'organizer'    ,'England'  ,'Anunda_organiz3.'),
+(1, '94038203838', 'สุพรัตน์ วงศวาง' ,'Suparat_t@gmail.com'    ,'organizer'    , '0648763092'        ,'Bangkok'  ,'Suprarut45.'),
+(2, '17283737282', 'Anunda Sery'  ,'Anunda_se@gmail.com'    ,'organizer'    , '0648745091'        ,'England'  ,'Anunda_organiz3.'),
 
 -- Staff
-(3, '11110987172', 'กิติรัตน์ มีนาสวย' ,'gitiratt@gmail.com'     ,'staff'        ,'Bangkok'  ,'Gitt7.68G'),
+(3, '11110987172', 'กิติรัตน์ มีนาสวย' ,'gitiratt@gmail.com'     ,'staff'        , '0647563092'         ,'Bangkok'  ,'Gitt7.68G'),
 
 -- Customer
-(4, '12382938491', 'อนันต์ ใจดี'     ,'anunda_d@gmail.com'     ,'customer'     ,'Bangkok'  ,'Anunnnn23.'),
-(5, '29384719182', 'สุดา รักดนตรี'   ,'suda_s@gmail.com'       ,'customer'     ,'Chiangmai','sudarat123.'),
-(6, '19191919191', 'Akira Tanaka' ,'akira@gmail.com',       'customer'      ,'Japan'    ,'Akira_ra8.');
+(4, '12382938491', 'อนันต์ ใจดี'     ,'anunda_d@gmail.com'     ,'customer'     , '0548763088'         ,'Bangkok'  ,'Anunnnn23.'),
+(5, '29384719182', 'สุดา รักดนตรี'   ,'suda_s@gmail.com'       ,'customer'     , '0888763066'         ,'Chiangmai','sudarat123.'),
+(6, '19191919191', 'Akira Tanaka' ,'akira@gmail.com'        ,'customer'      , '0647763097'         ,'Japan'    ,'Akira_ra8.');
 
 -- ============================================================
 -- SOCIAL ACCOUNT
@@ -35,6 +35,14 @@ INSERT INTO social_account(user_id, type_social, social_user_id) VALUES
 (4, 'facebook',  '1023456759123456'),
 (5, 'email',     'suda_s@gmail.com'),
 (6, 'email',     'akira@gmail.com');
+
+-- ============================================================
+-- 2. customer PROFILE
+-- ============================================================
+INSERT INTO customer_profile(id, user_id, location_score) VALUES
+(1, 4,  1),
+(2, 5,  2),
+(3, 6,  3);
 
 
 -- ============================================================
@@ -125,30 +133,30 @@ INSERT INTO seat (id, zone_id, seat_number, seat_row, status) VALUES
 -- 7. QUEUE SESSION
 -- ============================================================
 INSERT INTO queue_session 
-(id, user_id, concert_id, priority_score, entered_at, admitted_at, expired_at, status) 
+(id, customer_profile_id, concert_id, priority_score, entered_at, admitted_at, expired_at, status) 
 VALUES
-(1, 4, 1, 70, '2025-05-01 10:00:10', '2025-05-01 10:02:00', NULL, 'admitted'),
-(2, 5, 1, 60, '2025-05-01 10:00:15', NULL, '2025-05-01 11:10:00', 'waiting'),
-(3, 6, 1, 50, '2025-05-01 10:00:40', NULL, '2025-05-01 11:10:00', 'waiting');
+(1, 1, 1, 51, '2025-05-01 10:00:10', '2025-05-01 10:02:00', NULL, 'admitted'),
+(2, 2, 1, 62, '2025-05-01 10:00:15', NULL, '2025-05-01 11:10:00', 'waiting'),
+(3, 3, 1, 73, '2025-05-01 10:00:40', NULL, '2025-05-01 11:10:00', 'waiting');
 
 
 -- ============================================================
 -- 8. BOOKING
 -- ============================================================
 INSERT INTO booking
-(id, user_id, concert_id, created_at, expired_at, total_amount, total_tickets, status, delivery_type)
+(id, customer_profile_id, concert_id, created_at, expired_at, total_amount, total_tickets, status, delivery_type)
 VALUES
 -- paid แล้ว (มีการจ่ายเงินสำเร็จ)
-(1, 4, 1, '2025-05-01 10:01:00', NULL,                 13000, 2, 'paid',     'digital'),
+(1, 1, 1, '2025-05-01 10:01:00', NULL,                 13000, 2, 'paid',     'digital'),
 
 -- pending (กำลังรอจ่ายเงิน)
-(2, 5, 1, '2025-05-01 10:03:00', '2025-05-01 10:18:00', 2500,  1, 'pending',  'digital'), -- expire 15 minute ต้องไปกำหนดเวลาใน logic แทนนะ
+(2, 2, 1, '2025-05-01 10:03:00', '2025-05-01 10:18:00', 2500,  1, 'pending',  'digital'), -- expire 15 minute ต้องไปกำหนดเวลาใน logic แทนนะ
 
 -- expired (จองแล้วไม่จ่าย)
-(3, 6, 1, '2025-05-01 10:05:00', '2025-05-01 10:20:00', 4000,  1, 'expired',  'pickup'),
+(3, 3, 1, '2025-05-01 10:05:00', '2025-05-01 10:20:00', 4000,  1, 'expired',  'pickup'),
 
 -- cancelled (ผู้ใช้ยกเลิก)
-(4, 5, 1, '2025-05-01 10:20:00', NULL,                  6500,  1, 'cancelled','postal'); -- ตัดสินใจไม่ไปแล้ว
+(4, 1, 1, '2025-05-01 10:20:00', NULL,                  6500,  1, 'cancelled','postal'); -- ตัดสินใจไม่ไปแล้ว
 
 
 -- ============================================================
@@ -167,32 +175,25 @@ VALUES
 -- ============================================================
 -- 10. PAYMENT
 -- ============================================================
-INSERT INTO payment(id, booking_id, amount, created_at, expired_at, paid_at, transaction_ref, status) VALUES
+INSERT INTO payment(id, booking_id, amount, created_at, expired_at, paid_at, transaction_ref,  method, status) VALUES
 -- paid แล้ว
-(1, 1, 13000, '2025-05-01 10:01:10', NULL, '2025-05-01 10:01:25', 'QR20260416TH00012345', 'paid'),
+(1, 1, 13000, '2025-05-01 10:01:10', NULL, '2025-05-01 10:01:25', 'QR20260416TH00012345', 'qr_code', 'paid'),
 
 -- pending 
-(2, 2, 2500, '2025-05-01 10:03:40', '2025-05-01 10:18:40', NULL, NULL, 'pending'),
+(2, 2, 2500, '2025-05-01 10:03:40', '2025-05-01 10:18:40', NULL, NULL, 'qr_code', 'pending'),
 
 -- expired (หมดเวลาแล้ว)
-(3, 3, 4000, '2025-05-01 10:05:45', '2025-05-01 10:20:45', NULL, NULL, 'expired'),
+(3, 3, 4000, '2025-05-01 10:05:45', '2025-05-01 10:20:45', NULL, NULL, 'qr_code', 'expired'),
 
-(4, 4, 6500,  '2025-05-01 10:20:10', NULL, '2025-05-01 10:20:35', 'QR20232416TH00012345', 'paid'); --- ที่จะคืนตัง
-
-
--- ============================================================
--- 11. BANK ACCOUNT
--- ============================================================
-INSERT INTO bank_account (id, user_id, bank_name, account_no)
-VALUES (1, 5, 'SCB', '123-456');
+(4, 4, 6500,  '2025-05-01 10:20:10', NULL, '2025-05-01 10:20:35', 'QR20232416TH00012345', 'bank_transfer', 'paid'); --- ที่จะคืนตัง
 
 
 -- ============================================================
 -- 12. REFUND
 -- ============================================================
-INSERT INTO refund (id, payment_id, user_id, bank_account_id, requested_at, approved_at, completed_at, amount, status)
+INSERT INTO refund (id, payment_id, requested_at, approved_at, completed_at, amount, status)
 VALUES
-(1, 4, 1, 1, '2025-05-03 09:40:00', NULL, NULL, 2500, 'requested');
+(1, 4, '2025-05-03 09:40:00', NULL, NULL, 2500, 'requested');
 
 
 -- ============================================================
@@ -218,6 +219,8 @@ SELECT 'users' AS tbl,      COUNT(*) FROM users
 UNION ALL
 SELECT 'social_account',    COUNT(*) FROM social_account
 UNION ALL
+SELECT 'customer_profile',  COUNT(*) FROM customer_profile
+UNION ALL
 SELECT 'organizer_profile', COUNT(*) FROM organizer_profile
 UNION ALL
 SELECT 'staff_profile',     COUNT(*) FROM staff_profile
@@ -236,10 +239,10 @@ SELECT 'ticket',            COUNT(*) FROM ticket
 UNION ALL
 SELECT 'payment',           COUNT(*) FROM payment
 UNION ALL
-SELECT 'bank_account',      COUNT(*) FROM bank_account
-UNION ALL
 SELECT 'refund',            COUNT(*) FROM refund
 UNION ALL
 SELECT 'ticket_checkin',    COUNT(*) FROM ticket_checkin
 UNION ALL
 SELECT 'finance',           COUNT(*) FROM finance;
+
+ROLLBACK;
