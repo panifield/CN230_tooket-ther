@@ -1,255 +1,418 @@
 -- ============================================================
--- Tooket-ther Database Schema
+-- Tooket-ther Seed Data
 -- CN230 Database Systems · ภาคเรียนที่ 2 ปีการศึกษา 2567
--- มหาวิทยาลัยธรรมศาสตร์ ศูนย์รังสิต
 -- ============================================================
 -- วิธีรัน:
---   createdb tooket_ther
---   psql tooket_ther < database/schema.sql
+--   psql tooket_ther < database/seed.sql
+-- (ต้องรัน schema.sql ก่อน)
 -- ============================================================
 
--- ล้างข้อมูลเก่า (สำหรับรันซ้ำ)
-DROP TABLE IF EXISTS ticket_checks   CASCADE;
-DROP TABLE IF EXISTS payments        CASCADE;
-DROP TABLE IF EXISTS bookings        CASCADE;
-DROP TABLE IF EXISTS queue_sessions  CASCADE;
-DROP TABLE IF EXISTS seats           CASCADE;
-DROP TABLE IF EXISTS zones           CASCADE;
-DROP TABLE IF EXISTS concerts        CASCADE;
-DROP TABLE IF EXISTS organizers      CASCADE;
-DROP TABLE IF EXISTS users           CASCADE;
+-- WARNING: use only in development
+BEGIN;
 
--- ============================================================
--- 1. USERS
---    เก็บข้อมูลลูกค้าทั่วไป
---    priority_status คำนวณจาก domicile เพื่อใช้จัดลำดับคิว
--- ============================================================
+DROP TABLE IF EXISTS ticket_checkin CASCADE;
+DROP TABLE IF EXISTS refund CASCADE;
+DROP TABLE IF EXISTS payment CASCADE;
+DROP TABLE IF EXISTS ticket CASCADE;
+DROP TABLE IF EXISTS booking CASCADE;
+DROP TABLE IF EXISTS queue_session CASCADE;
+DROP TABLE IF EXISTS seat CASCADE;
+DROP TABLE IF EXISTS zone CASCADE;
+DROP TABLE IF EXISTS concert CASCADE;
+DROP TABLE IF EXISTS staff_profile CASCADE;
+DROP TABLE IF EXISTS customer_profile CASCADE;
+DROP TABLE IF EXISTS organizer_profile CASCADE;
+DROP TABLE IF EXISTS social_account CASCADE;
+DROP TABLE IF EXISTS finance CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+COMMIT;
+
+-- =========================
+-- USERS
+-- =========================
 CREATE TABLE users (
-    user_id         SERIAL          PRIMARY KEY,
-    name            VARCHAR(100)    NOT NULL,
-    email           VARCHAR(150)    UNIQUE NOT NULL,
-    phone           VARCHAR(20),
-    domicile        VARCHAR(100),                       -- ภูมิลำเนา (จังหวัด/ประเทศ)
-    address         TEXT,
-    priority_status SMALLINT        NOT NULL DEFAULT 0  -- 1 = ในประเทศ, 0 = ต่างประเทศ
-                    CHECK (priority_status IN (0, 1)),
-    auth_provider   VARCHAR(20)     NOT NULL DEFAULT 'local'
-                    CHECK (auth_provider IN ('local', 'line', 'facebook')),
-    auth_id         VARCHAR(200)    UNIQUE,             -- ID จาก OAuth provider
-    created_at      TIMESTAMP       NOT NULL DEFAULT NOW(),
-    updated_at      TIMESTAMP       NOT NULL DEFAULT NOW()
+    id               SERIAL PRIMARY KEY,
+    id_card          VARCHAR(20)     UNIQUE NOT NULL,
+    name             VARCHAR(100)    NOT NULL,
+    email            VARCHAR(150)    UNIQUE NOT NULL,
+    role             VARCHAR(20)     NOT NULL CHECK (role IN ('customer','organizer','staff')),
+    phone            VARCHAR(20)     NOT NULL,
+    address          TEXT            NOT NULL,
+    password         TEXT            NOT NULL,
+    created_at       TIMESTAMP       NOT NULL DEFAULT NOW()
 );
 
--- ============================================================
--- 2. ORGANIZERS
---    ผู้จัดงาน (แยกจาก users เพื่อสิทธิ์ต่างกัน)
--- ============================================================
-CREATE TABLE organizers (
-    organizer_id    SERIAL          PRIMARY KEY,
-    name            VARCHAR(100)    NOT NULL,
-    email           VARCHAR(150)    UNIQUE NOT NULL,
-    phone           VARCHAR(20),
-    company_name    VARCHAR(200),
-    auth_provider   VARCHAR(20)     NOT NULL DEFAULT 'local'
-                    CHECK (auth_provider IN ('local', 'line', 'facebook')),
-    auth_id         VARCHAR(200)    UNIQUE,
-    created_at      TIMESTAMP       NOT NULL DEFAULT NOW()
+-- =========================
+-- SOCIAL ACCOUNT
+-- =========================
+CREATE TABLE social_account (
+    id               SERIAL PRIMARY KEY,
+    user_id          INT             NOT NULL REFERENCES users(id),
+    social_user_id   VARCHAR(100)    NOT NULL,
+    type_social      VARCHAR(20)     NOT NULL CHECK (type_social IN ('line','facebook','email')),
+    UNIQUE (social_user_id, type_social)
 );
 
--- ============================================================
--- 3. CONCERTS
---    ข้อมูลงานคอนเสิร์ต
--- ============================================================
-CREATE TABLE concerts (
-    concert_id      SERIAL          PRIMARY KEY,
-    organizer_id    INT             NOT NULL REFERENCES organizers(organizer_id)
-                    ON DELETE RESTRICT,
-    title           VARCHAR(200)    NOT NULL,
-    artist          VARCHAR(200)    NOT NULL,
-    venue           VARCHAR(200)    NOT NULL,
-    concert_date    DATE            NOT NULL,
-    concert_time    TIME            NOT NULL,
-    sale_open_at    TIMESTAMP       NOT NULL,           -- วันเวลาเปิดขายบัตร
-    description     TEXT,
-    poster_url      TEXT,
-    status          VARCHAR(20)     NOT NULL DEFAULT 'upcoming'
-                    CHECK (status IN ('upcoming', 'on_sale', 'sold_out', 'cancelled', 'completed')),
-    created_at      TIMESTAMP       NOT NULL DEFAULT NOW()
+
+-- =========================
+-- CUSTOMER PROFILE
+-- =========================
+CREATE TABLE customer_profile (
+    id              SERIAL PRIMARY KEY,
+    user_id         INT             UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    location_score  INT             NOT NULL DEFAULT 0
 );
 
--- ============================================================
--- 4. ZONES
---    โซนที่นั่งภายในงานคอนเสิร์ต (One concert → Many zones)
--- ============================================================
-CREATE TABLE zones (
-    zone_id         SERIAL          PRIMARY KEY,
-    concert_id      INT             NOT NULL REFERENCES concerts(concert_id)
-                    ON DELETE CASCADE,
-    zone_name       VARCHAR(50)     NOT NULL,           -- เช่น A, B, VIP, GOLDEN CIRCLE
-    price           DECIMAL(10,2)   NOT NULL CHECK (price >= 0),
-    total_seats     INT             NOT NULL CHECK (total_seats > 0),
-    available_seats INT             NOT NULL CHECK (available_seats >= 0),
-    min_threshold   INT             NOT NULL DEFAULT 10, -- ขั้นต่ำก่อนพิจารณาปิดโซน
-    is_active       BOOLEAN         NOT NULL DEFAULT TRUE,
-    CONSTRAINT available_lte_total CHECK (available_seats <= total_seats)
+
+-- =========================
+-- ORGANIZER PROFILE
+-- =========================
+CREATE TABLE organizer_profile (
+    id               SERIAL PRIMARY KEY,
+    user_id          INT UNIQUE      NOT NULL REFERENCES users(id),
+    tax_id           VARCHAR(50),
+    company_name     VARCHAR(150)
 );
 
--- ============================================================
--- 5. SEATS
---    ที่นั่งรายบุคคล (One zone → Many seats)
--- ============================================================
-CREATE TABLE seats (
-    seat_id         SERIAL          PRIMARY KEY,
-    zone_id         INT             NOT NULL REFERENCES zones(zone_id)
-                    ON DELETE CASCADE,
-    seat_number     VARCHAR(20)     NOT NULL,           -- เช่น A01, B12
-    row_label       VARCHAR(5),                         -- เช่น A, B, C
-    status          VARCHAR(20)     NOT NULL DEFAULT 'available'
-                    CHECK (status IN ('available', 'locked', 'sold', 'disabled')),
-    CONSTRAINT unique_seat_in_zone UNIQUE (zone_id, seat_number)
+-- =========================
+-- STAFF PROFILE
+-- =========================
+CREATE TABLE staff_profile (
+    id               SERIAL PRIMARY KEY,
+    organizer_id     INT             NOT NULL REFERENCES organizer_profile(id),
+    user_id          INT             NOT NULL REFERENCES users(id),
+    shift_start      TIMESTAMP,
+    shift_close      TIMESTAMP,
+    staff_code       VARCHAR(50)     UNIQUE NOT NULL,
+    status           VARCHAR(20)     NOT NULL CHECK (status IN ('active', 'inactive', 'suspended')),
+                                     --status: ทำงาน, เลิกงานหรือไม่ทำงานแล้ว, ถูกระงับ(ทำผิด)
+    UNIQUE (user_id)                       
 );
 
--- ============================================================
--- 6. QUEUE_SESSIONS
---    จัดการลำดับคิวก่อนเข้าเลือกที่นั่ง
---    เรียงตาม priority_status DESC แล้ว entered_at ASC
--- ============================================================
-CREATE TABLE queue_sessions (
-    queue_id        SERIAL          PRIMARY KEY,
-    user_id         INT             NOT NULL REFERENCES users(user_id)
-                    ON DELETE CASCADE,
-    concert_id      INT             NOT NULL REFERENCES concerts(concert_id)
-                    ON DELETE CASCADE,
-    priority_score  INT             NOT NULL DEFAULT 0, -- copy มาจาก users.priority_status
-    entered_at      TIMESTAMP       NOT NULL DEFAULT NOW(),
-    admitted_at     TIMESTAMP,                          -- เวลาที่ได้เข้าเลือกที่นั่ง
-    status          VARCHAR(20)     NOT NULL DEFAULT 'waiting'
-                    CHECK (status IN ('waiting', 'admitted', 'expired', 'done')),
-    CONSTRAINT unique_user_concert_queue UNIQUE (user_id, concert_id)
+-- =========================
+-- CONCERT
+-- =========================
+CREATE TABLE concert (
+    id               SERIAL PRIMARY KEY,
+    organizer_id     INT             NOT NULL REFERENCES organizer_profile(id),
+    title            VARCHAR(200)    NOT NULL,
+    artist           VARCHAR(200),
+    venue            VARCHAR(200),
+    address          TEXT            NOT NULL,
+    concert_datetime TIMESTAMP       NOT NULL,
+    sale_open_at     TIMESTAMP,
+    sale_close_at    TIMESTAMP,
+    status           VARCHAR(20)     NOT NULL CHECK (status IN ('draft','on_sale','closed','cancelled'))
+                                     -- status: draft คือ ยังไม่เปิดให้ user เห็นมีแค่ organizer ที่ไปแก้ไขข้อมูลได้
 );
 
--- ============================================================
--- 7. BOOKINGS
---    การจองที่นั่ง พร้อม Soft Lock และ expiry time
--- ============================================================
-CREATE TABLE bookings (
-    booking_id      SERIAL          PRIMARY KEY,
-    user_id         INT             NOT NULL REFERENCES users(user_id)
-                    ON DELETE RESTRICT,
-    seat_id         INT             NOT NULL REFERENCES seats(seat_id)
-                    ON DELETE RESTRICT,
-    status          VARCHAR(20)     NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'confirmed', 'cancelled', 'refunded')),
-    booked_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
-    expiry_time     TIMESTAMP       NOT NULL
-                    DEFAULT (NOW() + INTERVAL '15 minutes'),
-    confirmed_at    TIMESTAMP,
-    ticket_qr       TEXT            UNIQUE,             -- QR Code string สำหรับเข้างาน
-    delivery_method VARCHAR(20)     NOT NULL DEFAULT 'digital'
-                    CHECK (delivery_method IN ('digital', 'postal', 'pickup')),
-    CONSTRAINT unique_seat_booking UNIQUE (seat_id)    -- ป้องกัน double booking
-    -- หมายเหตุ: constraint นี้ใช้กับ status = 'confirmed' เท่านั้น
-    -- ในทางปฏิบัติให้จัดการ logic ผ่าน Transaction + FOR UPDATE
+-- =========================
+-- ZONE
+-- =========================
+CREATE TABLE zone (
+    id                       SERIAL PRIMARY KEY,
+    concert_id               INT             NOT NULL REFERENCES concert(id),
+    zone_name                VARCHAR(100)    NOT NULL,
+    total_seats              INT             NOT NULL CHECK (total_seats > 0), 
+    min_booking_threshold    INT             NOT NULL DEFAULT 10,  --จำนวนขั้นต่ำก่อนปิดโซน
+                                             CHECK (min_booking_threshold >= 0),
+    price                    NUMERIC(10,2)   NOT NULL CHECK (price >= 0),
+    is_active                BOOLEAN         NOT NULL DEFAULT TRUE,
+    UNIQUE (concert_id, zone_name)
 );
 
--- ============================================================
--- 8. PAYMENTS
---    หลักฐานการชำระเงิน เชื่อมกับ Booking
--- ============================================================
-CREATE TABLE payments (
-    payment_id      SERIAL          PRIMARY KEY,
-    booking_id      INT             NOT NULL REFERENCES bookings(booking_id)
-                    ON DELETE RESTRICT,
-    amount          DECIMAL(10,2)   NOT NULL CHECK (amount > 0),
-    method          VARCHAR(30)     NOT NULL DEFAULT 'qr_code'
-                    CHECK (method IN ('qr_code', 'credit_card', 'bank_transfer')),
-    status          VARCHAR(20)     NOT NULL DEFAULT 'pending'
-                    CHECK (status IN ('pending', 'paid', 'refunded', 'failed')),
-    transaction_ref VARCHAR(100)    UNIQUE,             -- reference จาก payment gateway
-    paid_at         TIMESTAMP,
-    refund_amount   DECIMAL(10,2)   DEFAULT 0,
-    refund_at       TIMESTAMP,
-    bank_account    VARCHAR(20),                        -- บัญชีรับเงินคืน
-    bank_name       VARCHAR(100),
-    created_at      TIMESTAMP       NOT NULL DEFAULT NOW()
+-- =========================
+-- SEAT
+-- =========================
+CREATE TABLE seat (
+    id               SERIAL PRIMARY KEY,
+    zone_id          INT             NOT NULL REFERENCES zone(id),
+    seat_number      VARCHAR(20)     NOT NULL,
+    seat_row         VARCHAR(10),
+    status           VARCHAR(20)     NOT NULL DEFAULT 'available'
+                                     CHECK (status IN ('available','locked','sold')),
+    CONSTRAINT unique_seat_in_zone UNIQUE (zone_id, seat_row, seat_number)
+); 
+
+-- =========================
+-- QUEUE SESSION
+-- =========================
+CREATE TABLE queue_session (
+    id               SERIAL PRIMARY KEY,
+    customer_id      INT             NOT NULL REFERENCES customer_profile(id) ON DELETE CASCADE,
+    concert_id       INT             NOT NULL REFERENCES concert(id) ON DELETE CASCADE,
+    entered_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
+    admitted_at      TIMESTAMP,
+    expired_at       TIMESTAMP,
+    priority_score   INT             NOT NULL DEFAULT 0,
+    status           VARCHAR(20)     NOT NULL DEFAULT 'waiting',
+                                     CHECK (status IN('waiting', 'admitted', 'expired', 'completed')),
+                                     
+    CONSTRAINT unique_customer_concert_queue UNIQUE (customer_id, concert_id)
 );
 
--- ============================================================
--- 9. TICKET_CHECKS
---    บันทึกการตรวจบัตรหน้างาน (Ticket Checker)
--- ============================================================
-CREATE TABLE ticket_checks (
-    check_id        SERIAL          PRIMARY KEY,
-    booking_id      INT             NOT NULL REFERENCES bookings(booking_id)
-                    ON DELETE RESTRICT,
-    checked_by      VARCHAR(100),                       -- ชื่อ/ID พนักงาน
-    checked_at      TIMESTAMP       NOT NULL DEFAULT NOW(),
-    result          VARCHAR(20)     NOT NULL
-                    CHECK (result IN ('valid', 'invalid', 'already_used')),
-    note            TEXT
+-- =========================
+-- BOOKING
+-- =========================
+CREATE TABLE booking (
+    id               SERIAL PRIMARY KEY,
+    customer_id      INT             NOT NULL REFERENCES customer_profile(id) ON DELETE RESTRICT,
+    concert_id       INT             NOT NULL REFERENCES concert(id) ON DELETE RESTRICT,
+    created_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
+    expired_at       TIMESTAMP,
+    total_amount     NUMERIC(10,2)   NOT NULL,
+    total_tickets    INT,
+    status           VARCHAR(20)     NOT NULL DEFAULT 'pending'
+                                     CHECK (status IN ('pending','paid','cancelled','expired')),
+    delivery_type    VARCHAR(20)     NOT NULL DEFAULT 'digital'
+                                     CHECK (delivery_type IN ('digital','pickup','postal'))
+);
+
+-- =========================
+-- TICKET
+-- =========================
+CREATE TABLE ticket (
+    id               SERIAL PRIMARY KEY,
+    seat_id          INT             NOT NULL REFERENCES seat(id),
+    booking_id       INT             NOT NULL REFERENCES booking(id),
+    qr_hash          TEXT,
+    is_used        BOOLEAN           NOT NULL DEFAULT FALSE,
+    UNIQUE (seat_id)  -- กัน double booking
+);
+
+-- =========================
+-- PAYMENT
+-- =========================
+CREATE TABLE payment (
+    id               SERIAL PRIMARY KEY,
+    booking_id       INT             NOT NULL REFERENCES booking(id) ON DELETE RESTRICT,
+    amount           NUMERIC(10,2)   NOT NULL CHECK (amount > 0),
+    created_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
+    expired_at       TIMESTAMP,
+    paid_at          TIMESTAMP,
+    transaction_ref  VARCHAR(100)    UNIQUE,
+    method           VARCHAR(20)     NOT NULL DEFAULT 'qr_code'
+                                     CHECK (method IN ('qr_code', 'credit_card', 'bank_transfer')),
+    status           VARCHAR(20)     NOT NULL CHECK (status IN ('pending','paid','failed','expired'))
+);
+
+
+-- =========================
+-- REFUND
+-- =========================
+CREATE TABLE refund (
+    id               SERIAL PRIMARY KEY,
+    payment_id       INT             NOT NULL REFERENCES payment(id),
+    amount           NUMERIC(10,2)   NOT NULL CHECK (amount > 0),
+    requested_at     TIMESTAMP       NOT NULL DEFAULT NOW(),
+    approved_at      TIMESTAMP,
+    completed_at     TIMESTAMP,
+    status           VARCHAR(20)     NOT NULL 
+                                     CHECK (status IN ('requested','approved', 'rejected', 'processing', 'completed')),
+    UNIQUE (payment_id)
+);
+
+-- =========================
+-- TICKET CHECKIN
+-- =========================
+CREATE TABLE ticket_checkin (
+    id               SERIAL PRIMARY KEY,
+    staff_id         INT             NOT NULL REFERENCES staff_profile(id),
+    ticket_id        INT             NOT NULL REFERENCES ticket(id),
+    checked_at       TIMESTAMP       NOT NULL DEFAULT NOW(),
+    status           VARCHAR(20)     NOT NULL DEFAULT 'checked'
+                                     CHECK (status IN ('checked','duplicate','rejected')),
+    UNIQUE (ticket_id)
+);
+
+-- =========================
+-- FINANCE
+-- =========================
+CREATE TABLE finance (
+    id               SERIAL PRIMARY KEY,
+    concert_id       INT             REFERENCES concert(id),
+    booking_id       INT             REFERENCES booking(id),
+    type             VARCHAR(20)     NOT NULL
+                                     CHECK (type IN ('income','expense','refund','payout')),
+    amount           NUMERIC(10,2)   NOT NULL,
+    description      TEXT
 );
 
 -- ============================================================
 -- INDEXES — เพิ่มความเร็วใน Query ที่ใช้บ่อย
 -- ============================================================
 
--- ค้นหาที่นั่งตามสถานะ (ใช้บ่อยมากตอนเลือกที่นั่ง)
-CREATE INDEX idx_seats_status        ON seats(status);
-CREATE INDEX idx_seats_zone_status   ON seats(zone_id, status);
+--- Seat ---
+CREATE INDEX idx_seat_zone_status ON seat(zone_id, status);
 
--- ดูประวัติการจองของ user
-CREATE INDEX idx_bookings_user       ON bookings(user_id);
-CREATE INDEX idx_bookings_status     ON bookings(status);
-CREATE INDEX idx_bookings_expiry     ON bookings(expiry_time) WHERE status = 'pending';
+--- concert ---
+CREATE INDEX idx_concert_status ON concert(status);
+CREATE INDEX idx_concert_datetime ON concert(concert_datetime);
 
--- ดึงข้อมูลคิวตาม concert
-CREATE INDEX idx_queue_concert       ON queue_sessions(concert_id, status);
-CREATE INDEX idx_queue_priority      ON queue_sessions(concert_id, priority_score DESC, entered_at ASC);
+--- Ticket ---
+CREATE INDEX idx_ticket_booking ON ticket(booking_id);
 
--- ดึงข้อมูลโซนตาม concert
-CREATE INDEX idx_zones_concert       ON zones(concert_id) WHERE is_active = TRUE;
+--- queuery_session ---
+CREATE INDEX idx_queue_concert_status ON queue_session(concert_id, status);
+CREATE INDEX idx_queue_priority_score
+ON queue_session(concert_id, priority_score DESC, entered_at ASC);
 
--- ตรวจสอบ payment โดย booking
-CREATE INDEX idx_payments_booking    ON payments(booking_id);
-CREATE INDEX idx_payments_status     ON payments(status);
+CREATE INDEX idx_queue_waiting_only
+ON queue_session(concert_id, priority_score DESC, entered_at)
+WHERE status = 'waiting';
+
+--- Zone ---
+CREATE INDEX idx_zone_concert ON zone(concert_id);
+
+--- Booking ---
+CREATE INDEX idx_booking_customer_status ON booking(customer_id, status);
+CREATE INDEX idx_booking_status ON booking(status);
+CREATE INDEX idx_booking_concert ON booking(concert_id);
+CREATE INDEX idx_booking_expired_pending 
+ON booking(expired_at) 
+WHERE status = 'pending';
+
+--- Payment ---
+CREATE INDEX idx_payment_booking ON payment(booking_id);
+CREATE INDEX idx_payment_status ON payment(status);
+
+--- Finance ---
+CREATE INDEX idx_finance_concert ON finance(concert_id);
+CREATE INDEX idx_finance_type ON finance(type);
+
+--- refund ---
+CREATE INDEX idx_refund_status ON refund(status);
 
 -- ============================================================
--- VIEWS — Query ที่ใช้บ่อย บันทึกไว้เรียกง่าย
+-- VIEWS — Query 
 -- ============================================================
+-- View: booking summary : ใช้หน้า “ประวัติการจอง”
+CREATE VIEW vw_booking_summary AS
+SELECT 
+    b.id AS booking_id,
+    u.name AS user_name,
+    c.title AS concert_title,
+    c.concert_datetime,
+    b.total_tickets,
+    b.total_amount,
+    b.status,
+    b.created_at
+FROM booking b
+JOIN customer_profile cp ON b.customer_id = cp.id
+JOIN users u ON cp.user_id = u.id
+JOIN concert c ON b.concert_id = c.id;
 
--- View: ที่นั่งว่างพร้อมราคา
-CREATE VIEW v_available_seats AS
-SELECT
-    s.seat_id,
+-- View: ticket detail : ใช้แสดง ticket + seat
+CREATE VIEW vw_ticket_detail AS
+SELECT 
+    t.id AS ticket_id,
+    b.id AS booking_id,
+    c.title AS concert_title,
+    z.zone_name,
+    s.seat_row,
     s.seat_number,
-    s.row_label,
-    s.status,
-    z.zone_id,
-    z.zone_name,
-    z.price,
-    c.concert_id,
-    c.title        AS concert_title,
-    c.concert_date
-FROM seats s
-JOIN zones    z ON s.zone_id    = z.zone_id
-JOIN concerts c ON z.concert_id = c.concert_id
-WHERE s.status   = 'available'
-  AND z.is_active = TRUE
-  AND c.status   IN ('on_sale', 'upcoming');
+    t.is_used
+FROM ticket t
+JOIN booking b ON t.booking_id = b.id
+JOIN concert c ON b.concert_id = c.id
+JOIN seat s ON t.seat_id = s.id
+JOIN zone z ON s.zone_id = z.id;
 
--- View: สรุปรายรับแยกโซน
-CREATE VIEW v_revenue_by_zone AS
-SELECT
-    c.concert_id,
-    c.title        AS concert_title,
-    z.zone_id,
+-- View: available seats : ใช้หน้าเลือกที่นั่ง
+CREATE VIEW vw_available_seat AS
+SELECT 
+    s.id AS seat_id,
     z.zone_name,
-    COUNT(p.payment_id)          AS tickets_sold,
-    COALESCE(SUM(p.amount), 0)   AS total_revenue,
-    COALESCE(SUM(p.refund_amount), 0) AS total_refunded
-FROM concerts c
-JOIN zones    z ON z.concert_id  = c.concert_id
-LEFT JOIN seats    s ON s.zone_id     = z.zone_id
-LEFT JOIN bookings b ON b.seat_id     = s.seat_id AND b.status = 'confirmed'
-LEFT JOIN payments p ON p.booking_id  = b.booking_id AND p.status = 'paid'
-GROUP BY c.concert_id, c.title, z.zone_id, z.zone_name;
+    s.seat_row,
+    s.seat_number,
+    z.price,
+    c.id AS concert_id
+FROM seat s
+JOIN zone z ON s.zone_id = z.id
+JOIN concert c ON z.concert_id = c.id
+WHERE s.status = 'available'
+AND z.is_active = TRUE;
+
+-- View: payment status : ใช้เช็คประวัติการจ่ายเงิน
+CREATE VIEW vw_payment_status AS
+SELECT 
+    p.id AS payment_id,
+    b.id AS booking_id,
+    u.name AS user_name,
+    p.amount,
+    p.status,
+    p.created_at,
+    p.paid_at
+FROM payment p
+JOIN booking b ON p.booking_id = b.id
+JOIN customer_profile cp ON b.customer_id = cp.id
+JOIN users u ON cp.user_id = u.id;
+
+-- View: concert sales summary : ใช้dashboard organizer
+CREATE VIEW vw_concert_sales AS
+SELECT 
+    c.id AS concert_id,
+    c.title,
+    COUNT(DISTINCT b.id) AS total_bookings,
+    SUM(b.total_tickets) AS total_tickets_sold,
+    SUM(b.total_amount) AS total_revenue
+FROM concert c
+LEFT JOIN booking b 
+    ON c.id = b.concert_id 
+    AND b.status = 'paid'
+GROUP BY c.id, c.title;
+
+-- View: pending booking (หมดเวลา)
+CREATE VIEW vw_expired_bookings AS
+SELECT *
+FROM booking
+WHERE status = 'pending'
+AND expired_at < NOW();
+
+-- View: queue monitoring
+CREATE VIEW vw_queue_status AS
+SELECT 
+    q.id,
+    q.concert_id,
+    c.title,
+    u.name,
+    q.priority_score,
+    q.status,
+    q.entered_at
+FROM queue_session q
+JOIN customer_profile cp ON q.customer_id = cp.id
+JOIN users u ON cp.user_id = u.id
+JOIN concert c ON q.concert_id = c.id;
+
+-- View: refund tracking : admin ใช้ดู
+CREATE VIEW vw_refund_status AS
+SELECT 
+    r.id,
+    u.name AS user_name,
+    p.id AS payment_id,
+    r.amount,
+    r.status,
+    r.requested_at,
+    r.completed_at
+FROM refund r
+JOIN payment p ON r.payment_id = p.id
+JOIN booking b ON p.booking_id = b.id
+JOIN customer_profile cp ON b.customer_id = cp.id
+JOIN users u ON cp.user_id = u.id;
+
+
+-- View: check-in status :ใช้หน้างานจริง
+CREATE VIEW vw_checkin_status AS
+SELECT 
+    t.id AS ticket_id,
+    c.title,
+    u.name AS user_name,
+    tc.status,
+    tc.checked_at
+FROM ticket_checkin tc
+JOIN ticket t ON tc.ticket_id = t.id
+JOIN booking b ON t.booking_id = b.id
+JOIN customer_profile cp ON b.customer_id = cp.id
+JOIN users u ON cp.user_id = u.id
+JOIN concert c ON b.concert_id = c.id;
