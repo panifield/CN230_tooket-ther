@@ -1,54 +1,40 @@
-from flask import Flask, render_template
+import uvicorn
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
-def create_app():
-    # Flask looks for the 'templates' folder by default
-    app = Flask(__name__)
+from config import Config
+from models import close_db_pool, get_db_connection, init_db_pool
+from routes.auth import auth_router
+from routes.booking import booking_router
 
-    @app.get("/")
-    def root():
-        return render_template("index.html")
 
-    @app.get("/login")
-    def login():
-        return render_template("login.html")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db_pool()
+    yield
+    close_db_pool()
 
-    @app.get("/booking")
-    def book_now():
-        return render_template("booking.html")
+app = FastAPI(title="Tooket-ther API", lifespan=lifespan)
 
-    @app.get("/my-tickets")
-    def my_tickets():
-        # Using the singular 'my_ticket.html' as seen in your sidebar
-        return render_template("my_ticket.html")
+app.include_router(auth_router)
+app.include_router(booking_router)
 
-    @app.get("/organizer")
-    def organizer():
-        # CHANGED: Now renders your actual dashboard file
-        return render_template("organizer/dashboard.html")
+@app.get("/")
+def root():
+    return {"message": "Tooket-ther FastAPI is running"}
 
-    @app.get("/checker")
-    def checker():
-        # CHANGED: Now renders your checker file
-        return render_template("checker.html")
-    
-    @app.get("/payment")
-    def payment():
-        return render_template("payment.html")
-    
-    @app.get("/zones")
-    def zones():
-        # IMPORTANT: If zones.html is inside the 'organizer' folder, 
-        # you must include the folder name like this:
-        return render_template("organizer/zones.html")
+@app.get("/health")
+def health_check():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+                _ = cur.fetchone()
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
 
-    @app.get("/post-purchase")
-    def post_purchase():
-        return render_template("post_purchase.html")
-
-    return app
-
-app = create_app()
+    return {"app": "ok", "database": db_status}
 
 if __name__ == "__main__":
-    # debug=True is your best friend for catching errors early!
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=Config.PORT, reload=Config.DEBUG)
