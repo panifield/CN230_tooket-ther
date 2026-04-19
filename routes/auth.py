@@ -1,8 +1,7 @@
-from flask import Blueprint, jsonify
+from fastapi import APIRouter
 
-auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
-
-@auth_bp.get("/health")
+@auth_router.get("/health")
 def auth_health():
-    return jsonify({"service": "auth", "status": "ok"}), 200
+    return {"service": "auth", "status": "ok"}

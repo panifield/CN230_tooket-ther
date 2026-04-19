@@ -1,44 +1,40 @@
-import atexit
-
-from flask import Flask, jsonify
+import uvicorn
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
 
 from config import Config
 from models import close_db_pool, get_db_connection, init_db_pool
-from routes.auth import auth_bp
-from routes.booking import booking_bp
+from routes.auth import auth_router
+from routes.booking import booking_router
 
 
-def create_app() -> Flask:
-    app = Flask(__name__)
-    app.config.from_object(Config)
-
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db_pool()
-    app.register_blueprint(auth_bp)
-    app.register_blueprint(booking_bp)
+    yield
+    close_db_pool()
 
-    @app.get("/")
-    def root():
-        return jsonify({"message": "Tooket-ther Flask API is running"}), 200
+app = FastAPI(title="Tooket-ther API", lifespan=lifespan)
 
-    @app.get("/health")
-    def health_check():
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("SELECT 1;")
-                    _ = cur.fetchone()
-            db_status = "ok"
-        except Exception:
-            db_status = "error"
+app.include_router(auth_router)
+app.include_router(booking_router)
 
-        return jsonify({"app": "ok", "database": db_status}), 200
+@app.get("/")
+def root():
+    return {"message": "Tooket-ther FastAPI is running"}
 
-    return app
+@app.get("/health")
+def health_check():
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1;")
+                _ = cur.fetchone()
+        db_status = "ok"
+    except Exception:
+        db_status = "error"
 
-
-app = create_app()
-atexit.register(close_db_pool)
-
+    return {"app": "ok", "database": db_status}
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=Config.PORT, debug=Config.DEBUG)
+    uvicorn.run("app:app", host="0.0.0.0", port=Config.PORT, reload=Config.DEBUG)

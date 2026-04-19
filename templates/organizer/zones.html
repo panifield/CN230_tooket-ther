@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOOKET-THER | Zone Management</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <header>
+        <div class="container nav-content">
+            <a href="{{ url_for('root') }}" class="logo">
+                <div class="logo-icon gradient-coastal">
+                    <i data-lucide="ticket"></i>
+                </div>
+                <span class="logo-text">TOOKET-THER</span>
+            </a>
+            <nav class="nav-links">
+                <a href="{{ url_for('organizer') }}" class="nav-link">Dashboard</a>
+                <a href="{{ url_for('zones') }}" class="nav-link active">Zones</a>
+            </nav>
+            <div class="nav-actions">
+                <button class="btn-secondary" onclick="logout()">LOGOUT</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="padding-top: 80px; padding-bottom: 80px;">
+        <div class="mb-12">
+            <span class="mono-label" style="color: var(--brand-blue);">ORGANIZER / CONFIGURATION</span>
+            <h1 style="font-size: 40px; font-weight: 500; letter-spacing: -0.05em;">Zone Management</h1>
+        </div>
+
+        <div class="grid grid-cols-3">
+            <div class="card-coastal" style="padding: 32px;">
+                <h3 style="font-size: 20px; font-weight: 500; margin-bottom: 16px;">VIP FRONT</h3>
+                <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-bottom: 24px;">Premium seating with direct stage view and lounge access.</p>
+                <div class="form-group">
+                    <label>PRICE ($)</label>
+                    <input type="text" value="500.00">
+                </div>
+                <button class="btn-primary" style="width: 100%; justify-content: center;">UPDATE ZONE</button>
+            </div>
+            
+            <div class="card-coastal" style="padding: 32px;">
+                <h3 style="font-size: 20px; font-weight: 500; margin-bottom: 16px;">PREMIUM MID</h3>
+                <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-bottom: 24px;">Excellent visibility with comfortable seating and fast-track entry.</p>
+                <div class="form-group">
+                    <label>PRICE ($)</label>
+                    <input type="text" value="300.00">
+                </div>
+                <button class="btn-primary" style="width: 100%; justify-content: center;">UPDATE ZONE</button>
+            </div>
+
+            <div class="card-coastal" style="padding: 32px;">
+                <h3 style="font-size: 20px; font-weight: 500; margin-bottom: 16px;">STANDARD</h3>
+                <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-bottom: 24px;">General admission seating with great acoustics and atmosphere.</p>
+                <div class="form-group">
+                    <label>PRICE ($)</label>
+                    <input type="text" value="150.00">
+                </div>
+                <button class="btn-primary" style="width: 100%; justify-content: center;">UPDATE ZONE</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        lucide.createIcons();
+        function logout() {
+            localStorage.clear();
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

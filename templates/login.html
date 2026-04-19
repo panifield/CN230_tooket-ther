@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOOKET-THER | Login</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <header>
+        <div class="container nav-content">
+            <a href="{{ url_for('root') }}" class="logo">
+                <div class="logo-icon gradient-coastal">
+                    <i data-lucide="ticket"></i>
+                </div>
+                <span class="logo-text">TOOKET-THER</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="container" style="padding-top: 120px; padding-bottom: 80px;">
+        <div style="max-width: 400px; margin: 0 auto;">
+            <div class="text-center mb-12">
+                <div class="logo-icon gradient-coastal" style="width: 64px; height: 64px; margin: 0 auto 24px;">
+                    <i data-lucide="shield" size="32"></i>
+                </div>
+                <h1 style="font-size: 32px; font-weight: 500; letter-spacing: -0.05em; margin-bottom: 8px;">Access Portal</h1>
+                <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6);">Select your role and provide domicile for queue priority.</p>
+            </div>
+
+            <div class="card-coastal" style="padding: 32px;">
+                <div class="form-group">
+                    <label>FULL NAME</label>
+                    <div style="position: relative;">
+                        <input type="text" id="full-name" placeholder="ENTER YOUR FULL NAME">
+                        <i data-lucide="user" style="position: absolute; right: 12px; top: 12px; color: rgba(1, 1, 32, 0.2);" size="16"></i>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>ID OR PASSPORT NUMBER</label>
+                    <div style="position: relative;">
+                        <input type="text" id="id-number" placeholder="ENTER ID OR PASSPORT NO.">
+                        <i data-lucide="credit-card" style="position: absolute; right: 12px; top: 12px; color: rgba(1, 1, 32, 0.2);" size="16"></i>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>DOMICILE / LOCATION</label>
+                    <div style="position: relative;">
+                        <input type="text" id="domicile" placeholder="CITY, COUNTRY">
+                        <i data-lucide="map-pin" style="position: absolute; right: 12px; top: 12px; color: rgba(1, 1, 32, 0.2);" size="16"></i>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-4 mb-8" style="background: rgba(224, 242, 254, 0.3); padding: 16px; border-radius: var(--radius-sharp); border: 1px solid rgba(170, 214, 250, 0.3);">
+                    <input type="checkbox" id="is-local" style="width: 18px; height: 18px;">
+                    <label for="is-local" style="margin-bottom: 0; color: var(--midnight); font-size: 12px; font-weight: 500; cursor: pointer;">
+                        I am a local resident (Priority Queue Access)
+                    </label>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <button onclick="login('user')" class="btn-primary" style="justify-content: center; font-size: 14px;">
+                        LOGIN AS USER <i data-lucide="arrow-right"></i>
+                    </button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                        <button onclick="login('organizer')" class="btn-secondary" style="justify-content: center; font-size: 10px;">ORGANIZER</button>
+                        <button onclick="login('checker')" class="btn-secondary" style="justify-content: center; font-size: 10px;">CHECKER</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex items-start gap-4 mt-8" style="background: rgba(252, 230, 169, 0.1); padding: 16px; border-radius: var(--radius-sharp); border: 1px solid rgba(1, 1, 32, 0.05);">
+                <i data-lucide="info" style="color: rgba(1, 1, 32, 0.4); margin-top: 2px;" size="14"></i>
+                <p style="font-size: 10px; color: rgba(1, 1, 32, 0.6); line-height: 1.6;">
+                    Queue position is calculated based on domicile proximity and residency status. Local residents receive a 15% boost in queue velocity.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        lucide.createIcons();
+        function login(role) {
+            const fullName = document.getElementById('full-name').value;
+            const idNumber = document.getElementById('id-number').value;
+            const domicile = document.getElementById('domicile').value;
+            const isLocal = document.getElementById('is-local').checked;
+            
+            if (!fullName || !idNumber || !domicile) {
+                alert('Please fill in all fields.');
+                return;
+            }
+
+            localStorage.setItem('userRole', role);
+            localStorage.setItem('userName', fullName);
+            localStorage.setItem('userIdNumber', idNumber);
+            localStorage.setItem('userDomicile', domicile);
+            localStorage.setItem('isLocal', isLocal);
+            
+            // CHANGED: Redirects now use Flask url_for
+            if (role === 'organizer') window.location.href = "{{ url_for('organizer') }}";
+            else if (role === 'checker') window.location.href = "{{ url_for('checker') }}";
+            else window.location.href = "{{ url_for('root') }}";
+        }
+    </script>
+</body>
+</html>
