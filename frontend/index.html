@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <title>Tooket-ther Platform</title>
@@ -14,6 +15,7 @@
       --white: #ffffff;
       --border: #333;
     }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       background-color: var(--bg);
@@ -24,6 +26,7 @@
       flex-direction: column;
       align-items: center;
     }
+
     header {
       width: 100%;
       background-color: var(--surface);
@@ -34,16 +37,18 @@
       box-sizing: border-box;
       border-bottom: 1px solid var(--border);
     }
+
     header h1 {
       margin: 0;
       color: var(--primary);
       font-size: 1.5rem;
     }
+
     .user-info {
       font-size: 0.9rem;
       color: var(--secondary);
     }
-    
+
     .container {
       max-width: 1000px;
       width: 100%;
@@ -61,12 +66,15 @@
       padding: 20px;
       border: 1px solid var(--border);
     }
+
     .card h2 {
       margin-top: 0;
       color: var(--secondary);
     }
 
-    input, select, button {
+    input,
+    select,
+    button {
       padding: 10px;
       margin-bottom: 10px;
       border-radius: 4px;
@@ -75,11 +83,13 @@
       color: var(--white);
       font-size: 14px;
     }
-    input:focus, select:focus {
+
+    input:focus,
+    select:focus {
       outline: none;
       border-color: var(--primary);
     }
-    
+
     button {
       background-color: var(--primary);
       color: #000;
@@ -88,20 +98,31 @@
       cursor: pointer;
       width: 100%;
     }
-    button:hover { background-color: #9965f4; }
+
+    button:hover {
+      background-color: #9965f4;
+    }
+
     button.secondary {
       background-color: transparent;
       border: 1px solid var(--primary);
       color: var(--primary);
     }
-    button.secondary:hover { background-color: rgba(187, 134, 252, 0.1); }
+
+    button.secondary:hover {
+      background-color: rgba(187, 134, 252, 0.1);
+    }
+
     button.danger {
       background-color: var(--error);
       color: #fff;
     }
 
     /* Panels Configuration */
-    #authPanel, #customerPanel, #organizerPanel, #staffPanel {
+    #authPanel,
+    #customerPanel,
+    #organizerPanel,
+    #staffPanel {
       display: none;
     }
 
@@ -112,6 +133,7 @@
       gap: 10px;
       margin: 20px 0;
     }
+
     .seat {
       padding: 10px;
       text-align: center;
@@ -120,10 +142,28 @@
       font-size: 12px;
       font-weight: bold;
     }
-    .seat.available { background-color: var(--secondary); color: #000; }
-    .seat.locked { background-color: #fbc02d; color: #000; cursor: not-allowed;}
-    .seat.sold { background-color: var(--error); cursor: not-allowed; }
-    .seat.selected { border: 2px solid var(--white); transform: scale(1.1); box-shadow: 0 0 10px var(--white); }
+
+    .seat.available {
+      background-color: var(--secondary);
+      color: #000;
+    }
+
+    .seat.locked {
+      background-color: #fbc02d;
+      color: #000;
+      cursor: not-allowed;
+    }
+
+    .seat.sold {
+      background-color: var(--error);
+      cursor: not-allowed;
+    }
+
+    .seat.selected {
+      border: 2px solid var(--white);
+      transform: scale(1.1);
+      box-shadow: 0 0 10px var(--white);
+    }
 
     /* Tables */
     table {
@@ -131,15 +171,29 @@
       border-collapse: collapse;
       margin-top: 15px;
     }
-    th, td {
+
+    th,
+    td {
       text-align: left;
       padding: 10px;
       border-bottom: 1px solid var(--border);
     }
-    th { color: var(--primary); }
 
-    .flex-row { display: flex; gap: 10px; align-items: center; }
-    .flex-row > * { margin-bottom: 0; width: auto; flex: 1;}
+    th {
+      color: var(--primary);
+    }
+
+    .flex-row {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .flex-row>* {
+      margin-bottom: 0;
+      width: auto;
+      flex: 1;
+    }
 
     .logs {
       background-color: #000;
@@ -155,6 +209,7 @@
     }
   </style>
 </head>
+
 <body>
 
   <header>
@@ -163,7 +218,7 @@
   </header>
 
   <div class="container">
-    
+
     <!-- 1. AUTH PANEL -->
     <div id="authPanel" class="card" style="display: block;">
       <h2>Authentication</h2>
@@ -172,6 +227,15 @@
         <input type="password" id="loginPassword" placeholder="Password" value="Test1234.">
         <button onclick="login()">Login</button>
       </div>
+      <div style="margin: 10px 0; text-align: center; color: #888;">OR</div>
+      <button onclick="loginWithLine()"
+        style="background-color: #00B900; color: white; width: 100%; border: none; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
+        <span style="font-size: 1.2rem;">🟢</span> Login with LINE
+      </button>
+      <button onclick="loginWithGoogle()"
+        style="background-color: #ffffff; color: #757575; width: 100%; border: 1px solid #ddd; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px;">
+        <span style="font-size: 1.2rem;">G</span> Login with Google
+      </button>
       <hr style="border-color:var(--border);">
       <div class="flex-row">
         <input type="text" id="regName" placeholder="Name" value="New Staff">
@@ -202,17 +266,22 @@
           <button onclick="joinQueue()">1. Join Queue</button>
           <button onclick="checkQueueStatus()" class="secondary">2. Check Status</button>
         </div>
-        <p id="queueStatusDisplay" style="background:#222; padding:10px; border-radius:4px; font-size:14px; margin-top:10px;">Queue: -</p>
+        <p id="queueStatusDisplay"
+          style="background:#222; padding:10px; border-radius:4px; font-size:14px; margin-top:10px;">Queue: -</p>
       </div>
 
       <div class="card">
         <h2>Reserve Seats</h2>
         <div class="flex-row">
           <button onclick="loadZones()">1. Load Zones</button>
-          <select id="zoneSelect" onchange="loadSeats()"><option value="">-- Select Zone --</option></select>
+          <select id="zoneSelect" onchange="loadSeats()">
+            <option value="">-- Select Zone --</option>
+          </select>
           <button onclick="loadSeats()" class="secondary">2. Load Seats</button>
         </div>
-        <div id="seatContainer" class="seat-grid"><div style="color:#666;">Waiting for zone selection...</div></div>
+        <div id="seatContainer" class="seat-grid">
+          <div style="color:#666;">Waiting for zone selection...</div>
+        </div>
         <div style="background:#222; padding:15px; border-radius:5px;">
           Selected: <span id="selectedSeatsDisplay" style="color:var(--secondary);">None</span>
           <button onclick="bookSeats()" style="margin-top:10px;">3. Book Selected</button>
@@ -246,7 +315,8 @@
         <h2>Organizer Dashboard</h2>
         <div class="flex-row">
           <select id="orgConcertSelect"></select>
-          <button onclick="fetchConcertsForOrganizer()" style="max-width:150px;" class="secondary">Load Concerts</button>
+          <button onclick="fetchConcertsForOrganizer()" style="max-width:150px;" class="secondary">Load
+            Concerts</button>
           <button onclick="fetchOrganizerQueues()" style="max-width:150px;">Load Queues</button>
           <button onclick="autoSortQueues()" style="max-width:150px;" class="secondary">Auto Sort Queue</button>
         </div>
@@ -265,7 +335,11 @@
               <th>Actions</th>
             </tr>
           </thead>
-          <tbody><tr><td colspan="6" style="text-align:center; color:#666;">No data. Click "Load Queues" first.</td></tr></tbody>
+          <tbody>
+            <tr>
+              <td colspan="6" style="text-align:center; color:#666;">No data. Click "Load Queues" first.</td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
@@ -289,18 +363,18 @@
     let token = null;
     let currentUser = null;
     let selectedSeatIds = new Set();
-    
+
     // ----------- Common Logs & API Fetch -----------
-    function log(msg, err=false) {
+    function log(msg, err = false) {
       const logs = document.getElementById("logs");
       const div = document.createElement("div");
       div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
-      if(err) div.style.color = "var(--error)";
+      if (err) div.style.color = "var(--error)";
       logs.appendChild(div);
       logs.scrollTop = logs.scrollHeight;
     }
 
-    async function api(path, options={}) {
+    async function api(path, options = {}) {
       const hdrs = { "Content-Type": "application/json" };
       if (token) hdrs["Authorization"] = `Bearer ${token}`;
       try {
@@ -317,27 +391,27 @@
     // ----------- Auth -----------
     function switchRoleUI(role) {
       const p = { authPanel: 0, customerPanel: 0, organizerPanel: 0, staffPanel: 0 };
-      if(!role) p.authPanel = 1;
-      else if(role === 'customer') p.customerPanel = 1;
-      else if(role === 'organizer') p.organizerPanel = 1;
-      else if(role === 'staff') p.staffPanel = 1;
+      if (!role) p.authPanel = 1;
+      else if (role === 'customer') p.customerPanel = 1;
+      else if (role === 'organizer') p.organizerPanel = 1;
+      else if (role === 'staff') p.staffPanel = 1;
 
       Object.keys(p).forEach(k => {
         document.getElementById(k).style.display = p[k] ? 'block' : 'none';
       });
 
-      if(role === 'customer') fetchConcertsForCustomer();
-      if(role === 'organizer') fetchConcertsForOrganizer();
+      if (role === 'customer') fetchConcertsForCustomer();
+      if (role === 'organizer') fetchConcertsForOrganizer();
     }
 
     async function login() {
       try {
         const email = document.getElementById("loginEmail").value;
         const password = document.getElementById("loginPassword").value;
-        const res = await api("/auth/login", { method: "POST", body: JSON.stringify({email, password}) });
+        const res = await api("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
         token = res.access_token;
         log("Login success.");
-        
+
         currentUser = await api("/auth/me");
         document.getElementById("userInfo").textContent = `Logged in: ${currentUser.email} (${currentUser.role}) | `;
         const logoutBtn = document.createElement('a');
@@ -348,13 +422,74 @@
         document.getElementById("userInfo").appendChild(logoutBtn);
 
         switchRoleUI(currentUser.role);
-      } catch(e) {}
+      } catch (e) { }
     }
+    // ฟังก์ชันสำหรับส่งผู้ใช้ไปที่หน้า LINE Login
+    async function loginWithLine() {
+      try {
+        localStorage.setItem("oauth_provider", "line");
+        const res = await api("/auth/oauth/line/authorize-url");
+        // ระบบจะพาผู้ใช้ไปยัง URL ของ LINE ที่ Backend สร้างมาให้
+        window.location.href = res.authorize_url;
+      } catch (e) {
+        log("Failed to get LINE Authorize URL", true);
+      }
+    }
+
+    async function loginWithGoogle() {
+      try {
+        localStorage.setItem("oauth_provider", "google");
+        const res = await api("/auth/oauth/google/authorize-url");
+        window.location.href = res.authorize_url;
+      } catch (e) {
+        log("Failed to get Google Authorize URL", true);
+      }
+    }
+
+    // ฟังก์ชันสำหรับจัดการรหัส (Code) หลังจาก Login สำเร็จแล้วดีดกลับมาที่หน้าเว็บ
+    async function handleOAuthCallback() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const provider = localStorage.getItem("oauth_provider") || "line";
+
+      if (code) {
+        log(`Processing ${provider.toUpperCase()} Callback...`);
+
+        // ล้าง Parameter code ออกจาก URL เพื่อความสวยงามและความปลอดภัย
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        try {
+          // ส่ง code ไปแลก JWT Token ที่ Backend
+          const res = await api(`/auth/oauth/${provider}/callback?code=${code}`);
+          token = res.access_token;
+          log(`${provider.toUpperCase()} Login successful.`);
+
+          // ดึงข้อมูล User และสลับหน้าจอ UI
+          currentUser = await api("/auth/me");
+          document.getElementById("userInfo").textContent = `Logged in: ${currentUser.email} (${currentUser.role}) | `;
+
+          const logoutBtn = document.createElement('a');
+          logoutBtn.innerText = "Logout";
+          logoutBtn.style.color = "var(--error)";
+          logoutBtn.style.cursor = "pointer";
+          logoutBtn.onclick = logout;
+          document.getElementById("userInfo").appendChild(logoutBtn);
+
+          switchRoleUI(currentUser.role);
+          localStorage.removeItem("oauth_provider");
+        } catch (e) {
+          log(`${provider.toUpperCase()} Login failed: ` + e.message, true);
+        }
+      }
+    }
+
+    // เพิ่มคำสั่งให้ตรวจสอบ Callback ทุกครั้งที่โหลดหน้าเว็บ
+    window.addEventListener('load', handleOAuthCallback);
 
     async function register() {
       try {
         const body = {
-          id_card: "UID-" + Math.floor(Math.random()*10000),
+          id_card: "UID-" + Math.floor(Math.random() * 10000),
           name: document.getElementById("regName").value,
           email: document.getElementById("regEmail").value,
           phone: "0000000000", address: "Local",
@@ -363,7 +498,7 @@
         };
         await api("/auth/register", { method: "POST", body: JSON.stringify(body) });
         log("Registered successfully.");
-      } catch(e) {}
+      } catch (e) { }
     }
 
     function logout() {
@@ -385,9 +520,9 @@
           opt.textContent = `${c.title} (ID: ${c.concert_id})`;
           select.appendChild(opt);
         });
-        if(concerts.length === 0) select.innerHTML = "<option>No active concerts found</option>";
+        if (concerts.length === 0) select.innerHTML = "<option>No active concerts found</option>";
         log(`Loaded ${concerts.length} concerts.`);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     // ----------- Customer -----------
@@ -398,7 +533,7 @@
       document.getElementById("zoneSelect").innerHTML = "<option value=''>-- Select Zone --</option>";
       selectedSeatIds.clear(); updateSeatDisplay();
     }
-    
+
     function getCustConcert() { return document.getElementById("customerConcertSelect").value; }
 
     async function joinQueue() {
@@ -406,15 +541,15 @@
         const cId = getCustConcert();
         const res = await api(`/booking/concerts/${cId}/queue/join`, { method: "POST" });
         log(res.message); checkQueueStatus();
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function checkQueueStatus() {
       try {
         const res = await api(`/booking/concerts/${getCustConcert()}/queue/status`);
-        document.getElementById("queueStatusDisplay").textContent = `Queue ID: ${res.queue_id} | Status: ${res.status} | Priority: ${res.priority_score} | Pos: ${res.position_in_queue||'-'} / ${res.total_waiting}`;
+        document.getElementById("queueStatusDisplay").textContent = `Queue ID: ${res.queue_id} | Status: ${res.status} | Priority: ${res.priority_score} | Pos: ${res.position_in_queue || '-'} / ${res.total_waiting}`;
         log(`Status is ${res.status}`);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function loadZones() {
@@ -423,12 +558,12 @@
         const sel = document.getElementById("zoneSelect");
         sel.innerHTML = "<option value=''>-- Select Zone --</option>";
         zones.forEach(z => sel.innerHTML += `<option value='${z.zone_id}'>${z.zone_name} (฿${z.price}) - ${z.available_count} left</option>`);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function loadSeats() {
       const zId = document.getElementById("zoneSelect").value;
-      if(!zId) return;
+      if (!zId) return;
       try {
         const seats = await api(`/booking/concerts/${getCustConcert()}/zones/${zId}/seats`);
         const con = document.getElementById("seatContainer");
@@ -437,14 +572,14 @@
           const d = document.createElement("div");
           d.className = `seat ${s.status}`; d.textContent = s.seat_number;
           d.onclick = () => {
-            if(s.status!=='available') { log("Cannot select.", true); return; }
-            if(selectedSeatIds.has(s.seat_id)) { selectedSeatIds.delete(s.seat_id); d.classList.remove('selected'); }
+            if (s.status !== 'available') { log("Cannot select.", true); return; }
+            if (selectedSeatIds.has(s.seat_id)) { selectedSeatIds.delete(s.seat_id); d.classList.remove('selected'); }
             else { selectedSeatIds.add(s.seat_id); d.classList.add('selected'); }
             updateSeatDisplay();
           }
           con.appendChild(d);
         });
-      } catch(e) {}
+      } catch (e) { }
     }
     function updateSeatDisplay() {
       document.getElementById("selectedSeatsDisplay").textContent = selectedSeatIds.size > 0 ? Array.from(selectedSeatIds).join(", ") : "None";
@@ -452,19 +587,19 @@
 
     async function bookSeats() {
       try {
-        const res = await api("/booking/book", { method:"POST", body:JSON.stringify({ concert_id: getCustConcert(), seat_ids: Array.from(selectedSeatIds) }) });
+        const res = await api("/booking/book", { method: "POST", body: JSON.stringify({ concert_id: getCustConcert(), seat_ids: Array.from(selectedSeatIds) }) });
         log(`Success! ID: ${res.booking_id}`);
         document.getElementById("mockBookingId").value = res.booking_id;
         loadSeats();
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function confirmBooking() {
       try {
         const id = document.getElementById("mockBookingId").value;
-        await api(`/booking/${id}/confirm`, { method:"POST" });
+        await api(`/booking/${id}/confirm`, { method: "POST" });
         log("Confirmed Payment!"); loadSeats();
-      } catch(e) {}
+      } catch (e) { }
     }
 
     // ----------- Organizer -----------
@@ -472,12 +607,12 @@
 
     async function fetchOrganizerQueues() {
       const cId = document.getElementById("orgConcertSelect").value;
-      if(!cId) return;
+      if (!cId) return;
       try {
         const queues = await api(`/organizer/concerts/${cId}/queues`);
         const tbody = document.getElementById("orgQueueTable").querySelector("tbody");
         tbody.innerHTML = "";
-        if(queues.length === 0) tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;'>No queues found.</td></tr>";
+        if (queues.length === 0) tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;'>No queues found.</td></tr>";
 
         queues.forEach(q => {
           const tr = document.createElement("tr");
@@ -491,13 +626,13 @@
             <td>${q.entered_at?.split('T')[1].split('.')[0] || '-'}</td>
             <td><strong>${q.status}</strong></td>
             <td>
-              ${ q.status === 'waiting' ? `<button onclick="admitQueueFromOrg(${q.queue_id})" style="padding:5px; background:var(--secondary); width:auto;">Admit</button>` : `<span style="color:#666;">-</span>` }
+              ${q.status === 'waiting' ? `<button onclick="admitQueueFromOrg(${q.queue_id})" style="padding:5px; background:var(--secondary); width:auto;">Admit</button>` : `<span style="color:#666;">-</span>`}
             </td>
           `;
           tbody.appendChild(tr);
         });
         log(`Loaded ${queues.length} queue records.`);
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function admitQueueFromOrg(qId) {
@@ -505,7 +640,7 @@
         await api(`/organizer/queues/${qId}/admit`, { method: "POST" });
         log(`Queue ${qId} Admitted!`);
         fetchOrganizerQueues();
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function updateQueuePriority(qId) {
@@ -514,7 +649,7 @@
         await api(`/organizer/queues/${qId}/priority`, { method: "PATCH", body: JSON.stringify({ priority_score: parseInt(score) }) });
         log(`Updated priority score for Queue ${qId}.`);
         fetchOrganizerQueues();
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function createConcert() {
@@ -532,19 +667,20 @@
         await api("/organizer/concerts", { method: "POST", body: JSON.stringify(data) });
         log("Concert Created successfully!");
         fetchConcertsForOrganizer();
-      } catch(e) {}
+      } catch (e) { }
     }
 
     async function autoSortQueues() {
       const cId = document.getElementById("orgConcertSelect").value;
-      if(!cId) { log("No concert selected.", true); return; }
+      if (!cId) { log("No concert selected.", true); return; }
       try {
         const res = await api(`/organizer/concerts/${cId}/queues/auto_sort`, { method: "POST" });
         log(res.message);
         fetchOrganizerQueues();
-      } catch(e) {}
+      } catch (e) { }
     }
 
   </script>
 </body>
+
 </html>
