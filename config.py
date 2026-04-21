@@ -28,3 +28,9 @@ class Config:
     FACEBOOK_CLIENT_ID = os.getenv("FACEBOOK_CLIENT_ID", "")
     FACEBOOK_CLIENT_SECRET = os.getenv("FACEBOOK_CLIENT_SECRET", "")
     FACEBOOK_REDIRECT_URI = os.getenv("FACEBOOK_REDIRECT_URI", "http://localhost:8000/auth/oauth/facebook/callback")
+
+    # Payment webhook — HMAC-SHA256 shared secret กับ Payment Gateway
+    PAYMENT_WEBHOOK_SECRET = os.getenv("PAYMENT_WEBHOOK_SECRET", "dev-webhook-secret")
+
+    # PromptPay merchant ID (mobile number หรือ National ID) สำหรับ QR payload
+    PROMPTPAY_ID = os.getenv("PROMPTPAY_ID", "0899999999")

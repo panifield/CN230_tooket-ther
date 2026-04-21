@@ -131,12 +131,13 @@ CREATE TABLE seat (
     seat_number      VARCHAR(20)     NOT NULL,
     seat_row         VARCHAR(10),
     status           VARCHAR(20)     NOT NULL DEFAULT 'available'
-                                     CHECK (status IN ('available','locked','sold')),
+                                     CHECK (status IN ('available','locked','sold','closed')),
     CONSTRAINT unique_seat_in_zone UNIQUE (zone_id, seat_row, seat_number)
 ); 
 
 -- =========================
 -- QUEUE SESSION
+
 -- =========================
 CREATE TABLE queue_session (
     id               SERIAL PRIMARY KEY,
@@ -164,7 +165,7 @@ CREATE TABLE booking (
     total_amount     NUMERIC(10,2)   NOT NULL,
     total_tickets    INT,
     status           VARCHAR(20)     NOT NULL DEFAULT 'pending'
-                                     CHECK (status IN ('pending','paid','cancelled','expired')),
+                                     CHECK (status IN ('pending','paid','cancelled','expired','zone_closed_action_required','refund_pending')),
     delivery_type    VARCHAR(20)     NOT NULL DEFAULT 'digital'
                                      CHECK (delivery_type IN ('digital','pickup','postal'))
 );
@@ -208,8 +209,12 @@ CREATE TABLE refund (
     requested_at     TIMESTAMP       NOT NULL DEFAULT NOW(),
     approved_at      TIMESTAMP,
     completed_at     TIMESTAMP,
-    status           VARCHAR(20)     NOT NULL 
-                                     CHECK (status IN ('requested','approved', 'rejected', 'processing', 'completed')),
+    status           VARCHAR(20)     NOT NULL
+                                     CHECK (status IN ('pending_transfer','requested','approved', 'rejected', 'processing', 'completed')),
+    bank_name        VARCHAR(100),
+    account_number   VARCHAR(30),
+    account_name     VARCHAR(150),
+    reason           TEXT,
     UNIQUE (payment_id)
 );
 

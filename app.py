@@ -17,6 +17,8 @@ from models import close_db_pool, get_db_connection, init_db_pool
 from routes.auth import auth_router
 from routes.booking import booking_router
 from routes.organizer import organizer_router
+from routes.payment import payment_router
+from routes.refund import refund_router
 
 logger = logging.getLogger("tooket-ther")
 
@@ -78,6 +80,15 @@ async def _expire_bookings_loop():
                             expired_ids,
                         )
 
+                        # payment → expired (pending rows ที่ผูกกับ booking ที่หมดเวลา)
+                        cur.execute(
+                            f"""
+                            UPDATE payment SET status = 'expired'
+                            WHERE booking_id IN ({placeholders}) AND status = 'pending'
+                            """,
+                            expired_ids,
+                        )
+
                     conn.commit()
 
                 if expired_ids:
@@ -131,6 +142,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(booking_router)
 app.include_router(organizer_router)
+app.include_router(payment_router)
+app.include_router(refund_router)
 
 
 @app.get("/")
