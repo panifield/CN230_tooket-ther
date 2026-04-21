@@ -71,7 +71,7 @@ CREATE TABLE customer_profile (
 CREATE TABLE organizer_profile (
     id               SERIAL PRIMARY KEY,
     user_id          INT UNIQUE      NOT NULL REFERENCES users(id),
-    tax_id           VARCHAR(50),
+    tax_id           VARCHAR(50 ),
     company_name     VARCHAR(150)
 );
 
@@ -130,7 +130,7 @@ CREATE TABLE seat (
     seat_number      VARCHAR(20)     NOT NULL,
     seat_row         VARCHAR(10),
     status           VARCHAR(20)     NOT NULL DEFAULT 'available'
-                                     CHECK (status IN ('available','locked','sold')),
+                                     CHECK (status IN ('available','locked','reserved','sold')),
     CONSTRAINT unique_seat_in_zone UNIQUE (zone_id, seat_row, seat_number)
 ); 
 
@@ -162,9 +162,9 @@ CREATE TABLE booking (
     expired_at       TIMESTAMP,
     total_amount     NUMERIC(10,2)   NOT NULL,
     total_tickets    INT,
-    status           VARCHAR(20)     NOT NULL DEFAULT 'pending'
-                                     CHECK (status IN ('pending','paid','cancelled','expired')),
-    delivery_type    VARCHAR(20)     NOT NULL DEFAULT 'digital'
+    status           VARCHAR(20)     NOT NULL DEFAULT 'pending',
+                                     CHECK (status IN ('pending','paid','cancelled','expired','refund')),
+    delivery_type    VARCHAR(20)     NOT NULL DEFAULT 'digital',
                                      CHECK (delivery_type IN ('digital','pickup','postal'))
 );
 
@@ -191,8 +191,6 @@ CREATE TABLE payment (
     expired_at       TIMESTAMP,
     paid_at          TIMESTAMP,
     transaction_ref  VARCHAR(100)    UNIQUE,
-    method           VARCHAR(20)     NOT NULL DEFAULT 'qr_code'
-                                     CHECK (method IN ('qr_code', 'credit_card', 'bank_transfer')),
     status           VARCHAR(20)     NOT NULL CHECK (status IN ('pending','paid','failed','expired'))
 );
 
@@ -208,8 +206,7 @@ CREATE TABLE refund (
     approved_at      TIMESTAMP,
     completed_at     TIMESTAMP,
     status           VARCHAR(20)     NOT NULL 
-                                     CHECK (status IN ('requested','approved', 'rejected', 'processing', 'completed')),
-    UNIQUE (payment_id)
+                                     CHECK (status IN ('requested','approved', 'rejected', 'processing', 'completed'))
 );
 
 -- =========================
@@ -225,6 +222,7 @@ CREATE TABLE ticket_checkin (
     UNIQUE (ticket_id)
 );
 
+
 -- =========================
 -- FINANCE
 -- =========================
@@ -235,7 +233,7 @@ CREATE TABLE finance (
     type             VARCHAR(20)     NOT NULL
                                      CHECK (type IN ('income','expense','refund','payout')),
     amount           NUMERIC(10,2)   NOT NULL,
-    description      TEXT
+    description      TEXT            NOT NULL
 );
 
 -- ============================================================
@@ -384,7 +382,7 @@ JOIN customer_profile cp ON q.customer_id = cp.id
 JOIN users u ON cp.user_id = u.id
 JOIN concert c ON q.concert_id = c.id;
 
--- View: refund tracking : admin ใช้ดู
+
 CREATE VIEW vw_refund_status AS
 SELECT 
     r.id,
