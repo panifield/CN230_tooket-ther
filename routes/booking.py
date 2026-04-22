@@ -13,6 +13,7 @@ Phase 4 — Seat Soft Lock & Booking:
   GET  /booking/my                                           ประวัติการจองของตัวเอง
   POST /booking/{booking_id}/confirm                         ยืนยันชำระ (stub สำหรับ A3)
 """
+
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -29,6 +30,7 @@ booking_router = APIRouter(prefix="/booking", tags=["booking"])
 # Health
 # ---------------------------------------------------------------------------
 
+
 @booking_router.get("/health")
 def booking_health():
     return {"service": "booking", "status": "ok"}
@@ -38,7 +40,10 @@ def booking_health():
 # Phase 3 — Priority Queue
 # ---------------------------------------------------------------------------
 
-@booking_router.post("/concerts/{concert_id}/queue/join", status_code=status.HTTP_201_CREATED)
+
+@booking_router.post(
+    "/concerts/{concert_id}/queue/join", status_code=status.HTTP_201_CREATED
+)
 def queue_join(concert_id: int, current_user: CurrentUser):
     """
     เข้าคิวของ concert
@@ -63,7 +68,9 @@ def queue_join(concert_id: int, current_user: CurrentUser):
         with conn.cursor() as cur:
             fix_all_sequences(cur)
             # ดึง address ของผู้ใช้
-            cur.execute("SELECT address FROM users WHERE id = %s", (current_user["user_id"],))
+            cur.execute(
+                "SELECT address FROM users WHERE id = %s", (current_user["user_id"],)
+            )
             u_addr_row = cur.fetchone()
             u_addr = u_addr_row[0] if u_addr_row else ""
             u_addr_lower = u_addr.strip().lower()
@@ -86,21 +93,23 @@ def queue_join(concert_id: int, current_user: CurrentUser):
             concert = cur.fetchone()
             if not concert:
                 raise HTTPException(status_code=404, detail="ไม่พบ concert นี้")
-            
+
             dynamic_status = concert[2]
             if dynamic_status != "on_sale":
                 msg = {
                     "upcoming": "ยังไม่ถึงเวลาเปิดขาย (Upcoming)",
                     "closed": "ปิดการขายแล้ว (Closed)",
                     "cancelled": "คอนเสิร์ตถูกยกเลิก (Cancelled)",
-                    "draft": "คอนเสิร์ตยังไม่พร้อมใช้งาน (Draft)"
+                    "draft": "คอนเสิร์ตยังไม่พร้อมใช้งาน (Draft)",
                 }.get(dynamic_status, "ไม่สามารถจองได้ในขณะนี้")
                 raise HTTPException(status_code=400, detail=msg)
 
             # กำหนด priority score จาก address (100 ถ้า address ตรงกัน, 10 ถ้าไม่ตรง)
             c_addr = concert[1] or ""
             c_addr_lower = c_addr.strip().lower()
-            priority_score = 100 if (c_addr_lower and c_addr_lower in u_addr_lower) else 10
+            priority_score = (
+                100 if (c_addr_lower and c_addr_lower in u_addr_lower) else 10
+            )
 
             # เช็กว่าเคยเข้าคิวไปแล้ว
             cur.execute(
@@ -111,7 +120,7 @@ def queue_join(concert_id: int, current_user: CurrentUser):
                 (customer_profile_id, concert_id),
             )
             existing = cur.fetchone()
-            
+
             expired_at = datetime.now(timezone.utc) + timedelta(hours=1)
 
             if existing:
@@ -130,7 +139,7 @@ def queue_join(concert_id: int, current_user: CurrentUser):
                         WHERE id = %s
                         RETURNING id, priority_score, entered_at
                         """,
-                        (expired_at, priority_score, existing[0])
+                        (expired_at, priority_score, existing[0]),
                     )
                     row = cur.fetchone()
             else:
@@ -210,6 +219,8 @@ def queue_status(concert_id: int, current_user: CurrentUser):
         "position_in_queue": position if my_queue[3] == "waiting" else None,
         "total_waiting": total_waiting,
     }
+
+
 @booking_router.get("/concerts")
 def get_concerts():
     """
@@ -241,7 +252,7 @@ def get_concerts():
             "venue": r[3],
             "address": r[4],
             "concert_datetime": r[5].isoformat() if r[5] else None,
-            "status": r[6]
+            "status": r[6],
         }
         for r in rows
     ]
@@ -250,6 +261,7 @@ def get_concerts():
 # ---------------------------------------------------------------------------
 # Phase 4 — Seat Selection & Booking
 # ---------------------------------------------------------------------------
+
 
 @booking_router.get("/concerts/{concert_id}/zones")
 def get_zones(concert_id: int):
@@ -314,9 +326,10 @@ def get_seats(concert_id: int, zone_id: int):
 # POST /booking/book — Seat Soft Lock + Create Booking (Transaction)
 # ---------------------------------------------------------------------------
 
+
 class BookBody(BaseModel):
     concert_id: int
-    seat_ids: list[int]          # ที่นั่งที่ต้องการจอง
+    seat_ids: list[int]  # ที่นั่งที่ต้องการจอง
     delivery_type: str = "digital"  # digital | pickup | postal
 
 
@@ -384,7 +397,9 @@ def book_seats(body: BookBody, current_user: CurrentUser):
                 total_amount = 0.0
                 for seat in seats:
                     if seat[3] != body.concert_id:
-                        raise HTTPException(status_code=400, detail=f"seat {seat[0]} ไม่ใช่ของ concert นี้")
+                        raise HTTPException(
+                            status_code=400, detail=f"seat {seat[0]} ไม่ใช่ของ concert นี้"
+                        )
                     if seat[1] != "available":
                         unavailable.append(seat[0])
                     total_amount += float(seat[2])
@@ -424,6 +439,7 @@ def book_seats(body: BookBody, current_user: CurrentUser):
                 # INSERT ticket per seat
                 for seat_id in body.seat_ids:
                     import hashlib, secrets
+
                     qr_hash = hashlib.sha256(
                         f"TKT-{booking_id}-{seat_id}-{secrets.token_hex(8)}".encode()
                     ).hexdigest()
@@ -439,7 +455,9 @@ def book_seats(body: BookBody, current_user: CurrentUser):
             raise
         except Exception as e:
             conn.rollback()
-            raise HTTPException(status_code=500, detail=f"เกิดข้อผิดพลาดในการจอง: {str(e)}")
+            raise HTTPException(
+                status_code=500, detail=f"เกิดข้อผิดพลาดในการจอง: {str(e)}"
+            )
 
     return {
         "message": "จองสำเร็จ กรุณาชำระเงินภายใน 15 นาที",
@@ -502,7 +520,7 @@ def confirm_booking(booking_id: int, current_user: CurrentUser):
             with conn.cursor() as cur:
                 # ดึง booking + ตรวจสิทธิ์
                 cur.execute(
-                    "SELECT customer_id, status FROM booking WHERE id = %s",
+                    "SELECT customer_id, concert_id, status, total_amount FROM booking WHERE id = %s FOR UPDATE",
                     (booking_id,),
                 )
                 booking = cur.fetchone()
@@ -510,11 +528,62 @@ def confirm_booking(booking_id: int, current_user: CurrentUser):
                     raise HTTPException(status_code=404, detail="ไม่พบ booking")
                 if booking[0] != customer_profile_id:
                     raise HTTPException(status_code=403, detail="ไม่ใช่ booking ของคุณ")
-                if booking[1] != "pending":
+                if booking[2] not in ["pending", "locked"]:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"booking สถานะ '{booking[1]}' ไม่สามารถ confirm ได้",
+                        detail=f"booking สถานะ '{booking[2]}' ไม่สามารถ confirm ได้",
                     )
+
+                concert_id = booking[1]
+                total_amount = booking[3]
+
+                cur.execute(
+                    """
+                    SELECT id, transaction_ref
+                    FROM payment
+                    WHERE booking_id = %s AND status = 'pending'
+                    ORDER BY created_at DESC LIMIT 1
+                    """,
+                    (booking_id,),
+                )
+                pending_payment = cur.fetchone()
+
+                if pending_payment:
+                    payment_id, transaction_ref = pending_payment
+                    cur.execute(
+                        """
+                        UPDATE payment
+                        SET status = %s,
+                            method = %s,
+                            paid_at = NOW(),
+                            expired_at = NULL
+                        WHERE id = %s
+                        RETURNING id, transaction_ref
+                        """,
+                        ("paid", "qr_code", payment_id),
+                    )
+                    payment_id, transaction_ref = cur.fetchone()
+                else:
+                    transaction_ref = f"TX-MANUAL-{booking_id}-{int(datetime.now(timezone.utc).timestamp())}-{secrets.token_hex(4)}"
+                    cur.execute(
+                        """
+                        INSERT INTO payment
+                          (booking_id, amount, transaction_ref, method, status, expired_at, paid_at)
+                        VALUES (%s, %s, %s, 'qr_code', 'paid', NULL, NOW())
+                        RETURNING id, transaction_ref
+                        """,
+                        (booking_id, total_amount, transaction_ref),
+                    )
+                    payment_id, transaction_ref = cur.fetchone()
+
+                cur.execute(
+                    """
+                    INSERT INTO finance
+                      (concert_id, booking_id, type, amount, description)
+                    VALUES (%s, %s, 'income', %s, 'manual confirm stub')
+                    """,
+                    (concert_id, booking_id, total_amount),
+                )
 
                 # อัปเดต booking → paid
                 cur.execute(
@@ -537,10 +606,10 @@ def confirm_booking(booking_id: int, current_user: CurrentUser):
                 cur.execute(
                     """
                     UPDATE queue_session SET status = 'completed'
-                    WHERE customer_id = %s
-                      AND concert_id = (SELECT concert_id FROM booking WHERE id = %s)
-                      AND status = 'admitted'
-                    """,
+                     WHERE customer_id = %s
+                       AND concert_id = (SELECT concert_id FROM booking WHERE id = %s)
+                       AND status = 'admitted'
+                     """,
                     (customer_profile_id, booking_id),
                 )
 
@@ -553,19 +622,28 @@ def confirm_booking(booking_id: int, current_user: CurrentUser):
             conn.rollback()
             raise HTTPException(status_code=500, detail=str(e))
 
-    return {"message": "ยืนยันการจองสำเร็จ", "booking_id": booking_id, "status": "paid"}
+    return {
+        "message": "ยืนยันการจองสำเร็จ",
+        "booking_id": booking_id,
+        "status": "paid",
+        "payment_id": payment_id,
+        "transaction_ref": transaction_ref,
+    }
 
 
 # ---------------------------------------------------------------------------
 # Zone-closure voucher: Free upgrade (rebook) into an active zone
 # ---------------------------------------------------------------------------
 
+
 class RebookRequestBody(BaseModel):
     new_seat_ids: list[int] = Field(..., min_length=1, max_length=20)
 
 
 @booking_router.post("/{booking_id}/rebook")
-def rebook_zone_closure(booking_id: int, body: RebookRequestBody, current_user: CurrentUser):
+def rebook_zone_closure(
+    booking_id: int, body: RebookRequestBody, current_user: CurrentUser
+):
     """
     ใช้ voucher จาก zone closure เพื่อย้ายไปนั่งโซนอื่นแบบฟรี.
     - booking ต้องเป็น 'zone_closed_action_required' และเป็นของ user เอง
@@ -614,7 +692,9 @@ def rebook_zone_closure(booking_id: int, body: RebookRequestBody, current_user: 
                 )
                 old_seat_ids = [r[0] for r in cur.fetchall()]
                 if not old_seat_ids:
-                    raise HTTPException(status_code=409, detail="ไม่พบ ticket เดิมของ booking นี้")
+                    raise HTTPException(
+                        status_code=409, detail="ไม่พบ ticket เดิมของ booking นี้"
+                    )
                 if len(new_seat_ids) != len(old_seat_ids):
                     raise HTTPException(
                         status_code=409,
@@ -706,7 +786,9 @@ def rebook_zone_closure(booking_id: int, body: RebookRequestBody, current_user: 
                     (b_id,),
                 )
                 if cur.rowcount != 1:
-                    raise HTTPException(status_code=409, detail="booking ถูกเปลี่ยนสถานะไปแล้ว")
+                    raise HTTPException(
+                        status_code=409, detail="booking ถูกเปลี่ยนสถานะไปแล้ว"
+                    )
 
             conn.commit()
 

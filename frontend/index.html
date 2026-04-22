@@ -536,8 +536,10 @@
           <input type="text" id="profName" placeholder="Full Name" style="width:100%; box-sizing: border-box;">
         </div>
         <div style="flex:1">
-          <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">Email (Read-only)</label>
-          <input type="text" id="profEmail" readonly style="width:100%; box-sizing: border-box; opacity:0.6; cursor:not-allowed;">
+          <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">Email
+            (Read-only)</label>
+          <input type="text" id="profEmail" readonly
+            style="width:100%; box-sizing: border-box; opacity:0.6; cursor:not-allowed;">
         </div>
       </div>
       <div class="flex-row" style="margin-top:10px;">
@@ -546,7 +548,8 @@
           <input type="text" id="profPhone" placeholder="Phone" style="width:100%; box-sizing: border-box;">
         </div>
         <div style="flex:1">
-          <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">ID Card Number</label>
+          <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">ID Card
+            Number</label>
           <input type="text" id="profIdCard" placeholder="ID Card" style="width:100%; box-sizing: border-box;">
         </div>
       </div>
@@ -566,15 +569,18 @@
       <p style="color:#888; font-size:0.9rem;">Please verify your identity using your Email and ID Card Number.</p>
       <div>
         <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">Email Address</label>
-        <input type="email" id="forgotEmail" placeholder="email@example.com" style="width:100%; box-sizing: border-box;">
+        <input type="email" id="forgotEmail" placeholder="email@example.com"
+          style="width:100%; box-sizing: border-box;">
       </div>
       <div style="margin-top:10px;">
-        <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">ID Card Number (13 digits)</label>
+        <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">ID Card Number (13
+          digits)</label>
         <input type="text" id="forgotIdCard" placeholder="1100100123456" style="width:100%; box-sizing: border-box;">
       </div>
       <div style="margin-top:10px;">
         <label style="display:block; margin-bottom:5px; font-size:0.8rem; color:var(--primary);">New Password</label>
-        <input type="password" id="forgotNewPassword" placeholder="Minimum 8 characters" style="width:100%; box-sizing: border-box;">
+        <input type="password" id="forgotNewPassword" placeholder="Minimum 8 characters"
+          style="width:100%; box-sizing: border-box;">
       </div>
       <div class="flex-row" style="margin-top:30px;">
         <button onclick="resetPassword()" class="success">Update Password</button>
@@ -600,9 +606,8 @@
       <h2 style="color:var(--primary); margin-top:0;">Payment</h2>
       <p>Scan this QR code to pay ฿<span id="paymentAmountDisplay">0.00</span></p>
       <div id="qrContainer">
-        <!-- In real app, we'd use qrcode.js. Here we mock it -->
-        <div style="text-align:center; color:#000;">[QR CODE PAYLOAD]<br><br><small id="qrPayloadDisplay"
-            style="word-break:break-all;"></small></div>
+        <div id="qrCodeCanvas" style="display:flex; justify-content:center; margin-bottom:12px;"></div>
+
       </div>
       <p style="text-align:center; font-weight:bold;" id="paymentTimer">Expires in: --:--</p>
       <button onclick="closePaymentModal()" class="secondary">Cancel Payment</button>
@@ -628,6 +633,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <script>
     const API_URL = "http://127.0.0.1:8000";
     let token = null;
@@ -635,6 +641,7 @@
     let selectedSeatIds = new Set();
     let queueStatusInterval = null;
     let paymentPollingInterval = null;
+    let paymentTimerInterval = null;
 
     // ----------- Utils -----------
     function log(msg, err = false) {
@@ -979,12 +986,37 @@
     let currentPaymentRef = null;
     let paymentBookingId = null;
 
+    function resetPaymentModalState() {
+      clearInterval(paymentPollingInterval);
+      clearInterval(paymentTimerInterval);
+      paymentPollingInterval = null;
+      paymentTimerInterval = null;
+      currentPaymentRef = null;
+      paymentBookingId = null;
+      document.getElementById("paymentTimer").textContent = "Expires in: --:--";
+      document.getElementById("qrCodeCanvas").innerHTML = "";
+    }
+
+    function renderPaymentQr(qrPayload) {
+      const qrCodeCanvas = document.getElementById("qrCodeCanvas");
+      qrCodeCanvas.innerHTML = "";
+      new QRCode(qrCodeCanvas, {
+        text: qrPayload,
+        width: 220,
+        height: 220,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.M,
+      });
+    }
+
     async function startPaymentFlow(bookingId, amount) {
       try {
         const res = await api("/api/v1/payments/generate-qr", { method: "POST", body: JSON.stringify({ booking_id: bookingId, method: "qr_code" }) });
 
+        resetPaymentModalState();
         document.getElementById("paymentAmountDisplay").textContent = parseFloat(res.amount).toFixed(2);
-        document.getElementById("qrPayloadDisplay").textContent = res.qr_payload;
+        renderPaymentQr(res.qr_payload);
         document.getElementById("paymentModal").style.display = 'flex';
 
         currentPaymentRef = res.transaction_ref;
@@ -995,16 +1027,18 @@
 
         // Simple timer mock
         const expiry = new Date(res.expired_at).getTime();
-        const timerInt = setInterval(() => {
+        paymentTimerInterval = setInterval(() => {
           const now = new Date().getTime();
           const diff = expiry - now;
           if (diff <= 0) {
-            clearInterval(timerInt);
+            clearInterval(paymentTimerInterval);
+            paymentTimerInterval = null;
             document.getElementById("paymentTimer").textContent = "EXPIRED";
             return;
           }
           const m = Math.floor(diff / 60000);
           const s = Math.floor((diff % 60000) / 1000);
+
           document.getElementById("paymentTimer").textContent = `Expires in: ${m}:${s.toString().padStart(2, '0')}`;
         }, 1000);
       } catch (e) { }
@@ -1032,7 +1066,7 @@
 
     function closePaymentModal() {
       document.getElementById("paymentModal").style.display = 'none';
-      clearInterval(paymentPollingInterval);
+      resetPaymentModalState();
     }
 
     async function manualConfirmStub() {
