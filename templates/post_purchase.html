@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOOKET-THER | Post Purchase</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <header>
+        <div class="container nav-content">
+            <a href="{{ url_for('root') }}" class="logo">
+                <div class="logo-icon gradient-coastal">
+                    <i data-lucide="ticket"></i>
+                </div>
+                <span class="logo-text">TOOKET-THER</span>
+            </a>
+            <nav class="nav-links">
+                <!-- Links if needed -->
+            </nav>
+            <div class="nav-actions">
+                <button class="btn-secondary" onclick="logout()">LOGOUT</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="padding-top: 80px; padding-bottom: 80px; max-width: 600px;">
+        <div class="mb-12">
+            <span class="mono-label" style="color: var(--brand-blue);">COMPLIANCE / DETAILS</span>
+            <h1 style="font-size: 32px; font-weight: 500; letter-spacing: -0.05em;">Finalize Your Booking</h1>
+            <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-top: 8px;">Please complete these details within 7 days to avoid ticket cancellation.</p>
+        </div>
+
+        <div class="card-coastal" style="padding: 32px;">
+            <div class="mb-12">
+                <span class="mono-label" style="color: var(--brand-blue); margin-bottom: 16px; display: block;">DELIVERY METHOD</span>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <label class="card-coastal" style="padding: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 12px; border-color: var(--brand-blue); background: rgba(170, 214, 250, 0.1);">
+                        <input type="radio" name="delivery" value="shipment" checked style="display: none;">
+                        <i data-lucide="truck" size="24"></i>
+                        <span class="mono-label" style="font-size: 10px;">HOME SHIPMENT</span>
+                    </label>
+                    <label class="card-coastal" style="padding: 20px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 12px;">
+                        <input type="radio" name="delivery" value="venue" style="display: none;">
+                        <i data-lucide="package" size="24"></i>
+                        <span class="mono-label" style="font-size: 10px;">VENUE PICKUP</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="mb-12" id="shipment-address">
+                <span class="mono-label" style="color: var(--brand-blue); margin-bottom: 16px; display: block;">SHIPPING ADDRESS</span>
+                <div class="form-group">
+                    <label>STREET ADDRESS</label>
+                    <input type="text" placeholder="123 COASTAL WAY">
+                </div>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group">
+                        <label>CITY</label>
+                        <input type="text" placeholder="SAN FRANCISCO">
+                    </div>
+                    <div class="form-group">
+                        <label>POSTAL CODE</label>
+                        <input type="text" placeholder="94105">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mb-12">
+                <div class="flex justify-between items-center mb-4">
+                    <span class="mono-label" style="color: var(--brand-blue);">ATTENDEE DETAILS</span>
+                    <button class="btn-secondary" style="padding: 4px 12px; font-size: 9px;" onclick="addFriend()">+ ADD FRIEND</button>
+                </div>
+                <div id="friends-list">
+                    <div class="card-coastal" style="padding: 16px; background: rgba(1, 1, 32, 0.02); border: none; margin-bottom: 12px;">
+                        <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>FULL NAME</label>
+                                <input type="text" placeholder="FRIEND NAME">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label>COASTAL ID</label>
+                                <input type="text" placeholder="CID-000000">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <button class="btn-primary" style="width: 100%; justify-content: center;" onclick="submitDetails()">
+                SAVE DETAILS & FINALIZE
+            </button>
+        </div>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>
+        lucide.createIcons();
+        
+        document.querySelectorAll('input[name="delivery"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const labels = document.querySelectorAll('label.card-coastal');
+                labels.forEach(l => {
+                    l.style.borderColor = 'rgba(1, 1, 32, 0.08)';
+                    l.style.background = 'white';
+                });
+                const label = e.target.closest('label');
+                label.style.borderColor = 'var(--brand-blue)';
+                label.style.background = 'rgba(170, 214, 250, 0.1)';
+                
+                document.getElementById('shipment-address').style.display = e.target.value === 'shipment' ? 'block' : 'none';
+            });
+        });
+
+        function addFriend() {
+            const list = document.getElementById('friends-list');
+            const div = document.createElement('div');
+            div.className = 'card-coastal';
+            div.style.padding = '16px';
+            div.style.background = 'rgba(1, 1, 32, 0.02)';
+            div.style.border = 'none';
+            div.style.marginBottom = '12px';
+            div.innerHTML = `
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>FULL NAME</label>
+                        <input type="text" placeholder="FRIEND NAME">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label>COASTAL ID</label>
+                        <input type="text" placeholder="CID-000000">
+                    </div>
+                </div>
+            `;
+            list.appendChild(div);
+        }
+
+        function submitDetails() {
+            alert('Details saved successfully!');
+            window.location.href = 'my-tickets.html';
+        }
+    </script>
+</body>
+</html>

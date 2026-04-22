@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TOOKET-THER | Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <header>
+        <div class="container nav-content">
+            <a href="{{ url_for('root') }}" class="logo">
+                <div class="logo-icon gradient-coastal">
+                    <i data-lucide="ticket"></i>
+                </div>
+                <span class="logo-text">TOOKET-THER</span>
+            </a>
+            
+            <nav class="nav-links">
+                <a href="{{ url_for('root') }}" class="nav-link active">Home</a>
+                <a href="{{ url_for('my_tickets') }}" class="nav-link" id="nav-my-tickets">My Tickets</a>
+                <a href="{{ url_for('organizer') }}" class="nav-link" id="nav-organizer">Organizer</a>
+                <a href="{{ url_for('checker') }}" class="nav-link" id="nav-checker">Checker</a>
+            </nav>
+
+            <div class="nav-actions">
+                <a href="{{ url_for('login') }}" class="btn-secondary" id="auth-btn">
+                    <i data-lucide="user"></i> LOGIN
+                </a>
+                <a href="{{ url_for('book_now') }}" class="btn-primary">BOOK NOW</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="padding-top: 80px; padding-bottom: 80px;">
+        <div class="mb-12">
+            <span class="mono-label" style="color: #007bff;">FEATURED EVENTS / APRIL 2026</span>
+            <h1 style="font-size: 48px; font-weight: 500; letter-spacing: -0.05em; margin-top: 8px;">Discover Coastal Experiences</h1>
+        </div>
+
+        <div class="grid grid-cols-3">
+            <div class="card-coastal overflow-hidden">
+                <img src="https://picsum.photos/seed/tech/600/400" alt="Tech Summit" style="width: 100%; height: 200px; object-fit: cover;">
+                <div style="padding: 24px;">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono-label" style="font-size: 10px; color: rgba(1, 1, 32, 0.4);">CONFERENCE</span>
+                        <span style="font-weight: 600; color: #007bff;">$150.00+</span>
+                    </div>
+                    <h3 style="font-size: 20px; font-weight: 500; margin-bottom: 8px;">Coastal Tech Summit 2026</h3>
+                    <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-bottom: 24px;">The intelligence infrastructure for modern event experiences.</p>
+                    <a href="{{ url_for('book_now') }}" class="btn-primary" style="width: 100%; justify-content: center;">SELECT SEATS</a>
+                </div>
+            </div>
+
+            <div class="card-coastal overflow-hidden">
+                <img src="https://picsum.photos/seed/music/600/400" alt="Music Fest" style="width: 100%; height: 200px; object-fit: cover;">
+                <div style="padding: 24px;">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono-label" style="font-size: 10px; color: rgba(1, 1, 32, 0.4);">FESTIVAL</span>
+                        <span style="font-weight: 600; color: #007bff;">$89.00+</span>
+                    </div>
+                    <h3 style="font-size: 20px; font-weight: 500; margin-bottom: 8px;">Neon Nights Music Festival</h3>
+                    <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-bottom: 24px;">Unremarkable performances in an electrifying atmosphere.</p>
+                    <a href="{{ url_for('book_now') }}" class="btn-primary" style="width: 100%; justify-content: center;">SELECT SEATS</a>
+                </div>
+            </div>
+
+            <div class="card-coastal overflow-hidden">
+                <img src="https://picsum.photos/seed/art/600/400" alt="Art Expo" style="width: 100%; height: 200px; object-fit: cover;">
+                <div style="padding: 24px;">
+                    <div class="flex justify-between items-start mb-4">
+                        <span class="mono-label" style="font-size: 10px; color: rgba(1, 1, 32, 0.4);">EXHIBITION</span>
+                        <span style="font-weight: 600; color: #007bff;">$45.00+</span>
+                    </div>
+                    <h3 style="font-size: 20px; font-weight: 500; margin-bottom: 8px;">Aqueous Art Expo</h3>
+                    <p style="font-size: 14px; color: rgba(1, 1, 32, 0.6); margin-bottom: 24px;">Showcasing the intersection of water and art in a unique exhibition.</p>
+                    <a href="{{ url_for('book_now') }}" class="btn-primary" style="width: 100%; justify-content: center;">SELECT SEATS</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer style="background: #010120; color: white; padding: 80px 0;">
+        <div class="container grid grid-cols-3">
+            <div style="grid-column: span 2;">
+                <span class="logo-text">COASTAL TICKETS</span>
+                <p style="color: rgba(255, 255, 255, 0.6); max-width: 400px;">Seamless booking and secure verification.</p>
+            </div>
+            <div>
+                <h4 class="mono-label" style="color: rgba(255, 255, 255, 0.4); margin-bottom: 24px;">PLATFORM</h4>
+                <ul style="list-style: none; display: flex; flex-direction: column; gap: 16px;">
+                    <li><a href="{{ url_for('root') }}" style="color: white; text-decoration: none; font-size: 14px;">Events</a></li>
+                    <li><a href="{{ url_for('organizer') }}" style="color: white; text-decoration: none; font-size: 14px;">Organizer Portal</a></li>
+                    <li><a href="{{ url_for('checker') }}" style="color: white; text-decoration: none; font-size: 14px;">Ticket Checker</a></li>
+                </ul>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
