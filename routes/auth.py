@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
 
 from config import Config
-from models import get_db_connection
+from models import fix_all_sequences, get_db_connection
 from routes.deps import CurrentUser
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -33,7 +33,8 @@ def _hash_password(password: str) -> str:
 
 
 
-def _fix_sequence(cur, table: str):
+
+def fix_sequence(cur, table: str):
     """Reset sequence to the current max ID (hotfix for seed data out of sync)"""
     cur.execute(f"SELECT setval('{table}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM {table}), true);")
 
@@ -95,12 +96,8 @@ def register(body: RegisterBody):
                     detail="Email นี้มีบัญชีอยู่แล้ว",
                 )
 
-            # Reset sequence if needed (hotfix for seed data out of sync)
-            _fix_sequence(cur, "users")
-            _fix_sequence(cur, "customer_profile")
-            _fix_sequence(cur, "organizer_profile")
-            _fix_sequence(cur, "staff_profile")
-            _fix_sequence(cur, "social_account")
+            # Reset all sequences before insertion
+            fix_all_sequences(cur)
 
             # INSERT users
             cur.execute(
@@ -305,10 +302,8 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
             if existing:
                 user_id, role = existing
             else:
-                # Reset sequence if needed
-                _fix_sequence(cur, "users")
-                _fix_sequence(cur, "social_account")
-                _fix_sequence(cur, "customer_profile")
+                # Reset all sequences
+                fix_all_sequences(cur)
 
                 # สร้าง user ใหม่ (id_card และ phone ยังไม่มี ใส่ placeholder)
                 cur.execute(
