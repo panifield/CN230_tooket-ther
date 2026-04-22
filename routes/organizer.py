@@ -143,6 +143,9 @@ def create_concert(body: CreateConcertBody, current_user: CurrentUser):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            from models import fix_all_sequences
+            fix_all_sequences(cur)
+
             cur.execute(
                 """
                 INSERT INTO concert

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel
 
-from models import get_db_connection
+from models import fix_all_sequences, get_db_connection
 from routes.deps import CurrentUser
 
 booking_router = APIRouter(prefix="/booking", tags=["booking"])
@@ -59,6 +59,7 @@ def queue_join(concert_id: int, current_user: CurrentUser):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            fix_all_sequences(cur)
             # ดึง address ของผู้ใช้
             cur.execute("SELECT address FROM users WHERE id = %s", (current_user["user_id"],))
             u_addr_row = cur.fetchone()
@@ -344,6 +345,7 @@ def book_seats(body: BookBody, current_user: CurrentUser):
     with get_db_connection() as conn:
         try:
             with conn.cursor() as cur:
+                fix_all_sequences(cur)
                 # เช็ก admitted queue
                 cur.execute(
                     """
