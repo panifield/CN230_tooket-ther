@@ -15,14 +15,40 @@
 
 ## สารบัญ
 
-1. [Booking / Queue / Seat APIs](#1-booking--queue--seat-apis) — `routes/booking.py`
-2. [Organizer APIs](#2-organizer-apis) — `routes/organizer.py`
-3. [Payment APIs](#3-payment-apis) — `routes/payment.py`
-4. [Refund APIs](#4-refund-apis) — `routes/refund.py`
+1. [Auth APIs](#1-auth-apis) — `routes/auth.py`
+2. [Booking / Queue / Seat APIs](#2-booking--queue--seat-apis) — `routes/booking.py`
+3. [Organizer APIs](#3-organizer-apis) — `routes/organizer.py`
+4. [Payment APIs](#4-payment-apis) — `routes/payment.py`
+5. [Refund APIs](#5-refund-apis) — `routes/refund.py`
 
 ---
 
-## 1. Booking / Queue / Seat APIs
+---
+
+## 1. Auth APIs
+
+### 1.1 `POST /auth/register`
+
+**Description:** สมัครสมาชิกใหม่
+
+**Request body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "Password123",
+  "name": "Full Name",
+  "role": "customer",
+  "address": "Bangkok",
+  "id_card": "1100100123456",
+  "phone": "0812345678"
+}
+```
+- `role`: `customer`, `organizer`, `staff`
+- `id_card` และ `phone` เป็นค่าที่ต้องส่งตาม schema ฐานข้อมูล
+
+---
+
+## 2. Booking / Queue / Seat APIs
 
 ### 1.1 `GET /booking/health`
 
@@ -372,9 +398,9 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-### 2.4 `POST /organizer/concerts`
+### 3.4 `POST /organizer/concerts`
 
-**Description:** สร้างคอนเสิร์ตใหม่ ใช้ในหน้า "สร้างคอนเสิร์ต" ของ organizer
+**Description:** สร้างคอนเสิร์ตใหม่ พร้อมกำหนดโซนและที่นั่งได้ทันที
 
 **Auth:** Organizer JWT
 
@@ -388,9 +414,26 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
   "concert_datetime": "2026-06-15T19:00:00",
   "sale_open_at": "2026-05-01T10:00:00",
   "sale_close_at": "2026-06-14T23:59:00",
-  "status": "on_sale"
+  "status": "on_sale",
+  "zones": [
+    {
+      "zone_name": "VIP",
+      "total_seats": 50,
+      "price": 5000,
+      "row_prefix": "VIP-"
+    },
+    {
+      "zone_name": "Standard",
+      "total_seats": 100,
+      "price": 2000,
+      "row_prefix": "A"
+    }
+  ]
 }
 ```
+- `zones`: (array) รายการโซนที่จะสร้างพร้อมที่นั่ง
+- `row_prefix`: (string) คำขึ้นต้นเลขที่นั่ง (เช่น `row_prefix: "A"` จะได้ที่นั่ง `A1`, `A2`...)
+- ระบบจะสร้าง `seat` ให้อัตโนมัติตามจำนวน `total_seats`
 - `sale_close_at` เป็น optional
 - `status` เริ่มต้น `on_sale` — ตั้ง `draft` ถ้ายังไม่อยากให้ลูกค้าเห็น
 
