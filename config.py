@@ -22,9 +22,19 @@ class Config:
     # OAuth — Line
     LINE_CLIENT_ID = os.getenv("LINE_CLIENT_ID", "")
     LINE_CLIENT_SECRET = os.getenv("LINE_CLIENT_SECRET", "")
-    LINE_REDIRECT_URI = os.getenv("LINE_REDIRECT_URI", "http://127.0.0.1:5500/index.html")
+    LINE_REDIRECT_URI = os.getenv(
+        "LINE_REDIRECT_URI", "http://127.0.0.1:5500/index.html"
+    )
 
     # OAuth — Google
     GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
     GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-    GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/oauth/google/callback")
+    GOOGLE_REDIRECT_URI = os.getenv(
+        "GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/oauth/google/callback"
+    )
+
+    # Payment webhook — HMAC-SHA256 shared secret กับ Payment Gateway
+    PAYMENT_WEBHOOK_SECRET = os.getenv("PAYMENT_WEBHOOK_SECRET", "dev-webhook-secret")
+
+    # PromptPay merchant ID (mobile number หรือ National ID) สำหรับ QR payload
+    PROMPTPAY_ID = os.getenv("PROMPTPAY_ID", "0899999999")

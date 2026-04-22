@@ -13,12 +13,14 @@ Phase 4 — Seat Soft Lock & Booking:
   GET  /booking/my                                           ประวัติการจองของตัวเอง
   POST /booking/{booking_id}/confirm                         ยืนยันชำระ (stub สำหรับ A3)
 """
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from models import get_db_connection
+from models import fix_all_sequences, get_db_connection
 from routes.deps import CurrentUser
 
 booking_router = APIRouter(prefix="/booking", tags=["booking"])
@@ -59,6 +61,7 @@ def queue_join(concert_id: int, current_user: CurrentUser):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            fix_all_sequences(cur)
             # ดึง address ของผู้ใช้
             cur.execute("SELECT address FROM users WHERE id = %s", (current_user["user_id"],))
             u_addr_row = cur.fetchone()
@@ -344,6 +347,7 @@ def book_seats(body: BookBody, current_user: CurrentUser):
     with get_db_connection() as conn:
         try:
             with conn.cursor() as cur:
+                fix_all_sequences(cur)
                 # เช็ก admitted queue
                 cur.execute(
                     """
@@ -550,3 +554,173 @@ def confirm_booking(booking_id: int, current_user: CurrentUser):
             raise HTTPException(status_code=500, detail=str(e))
 
     return {"message": "ยืนยันการจองสำเร็จ", "booking_id": booking_id, "status": "paid"}
+
+
+# ---------------------------------------------------------------------------
+# Zone-closure voucher: Free upgrade (rebook) into an active zone
+# ---------------------------------------------------------------------------
+
+class RebookRequestBody(BaseModel):
+    new_seat_ids: list[int] = Field(..., min_length=1, max_length=20)
+
+
+@booking_router.post("/{booking_id}/rebook")
+def rebook_zone_closure(booking_id: int, body: RebookRequestBody, current_user: CurrentUser):
+    """
+    ใช้ voucher จาก zone closure เพื่อย้ายไปนั่งโซนอื่นแบบฟรี.
+    - booking ต้องเป็น 'zone_closed_action_required' และเป็นของ user เอง
+    - new_seat_ids ต้องอยู่ในโซน active (is_active=TRUE), concert เดียวกัน, status='available'
+    - จำนวน new_seat_ids ต้องเท่ากับจำนวน ticket เดิม
+    - transaction: lock seats (เก่า+ใหม่) → DELETE ticket เก่า → free seat เก่า →
+      seat ใหม่ → 'sold' → INSERT ticket ใหม่ → booking=paid
+    """
+    if current_user["role"] != "customer":
+        raise HTTPException(status_code=403, detail="เฉพาะลูกค้าเท่านั้น")
+
+    customer_profile_id = current_user.get("customer_profile_id")
+    if not customer_profile_id:
+        raise HTTPException(status_code=400, detail="ไม่พบ customer profile")
+
+    new_seat_ids = list(dict.fromkeys(body.new_seat_ids))
+    if len(new_seat_ids) != len(body.new_seat_ids):
+        raise HTTPException(status_code=400, detail="new_seat_ids มีที่นั่งซ้ำ")
+
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT id, customer_id, concert_id, status
+                    FROM booking WHERE id = %s FOR UPDATE
+                    """,
+                    (booking_id,),
+                )
+                booking = cur.fetchone()
+                if not booking:
+                    raise HTTPException(status_code=404, detail="ไม่พบ booking")
+
+                b_id, b_customer_id, b_concert_id, b_status = booking
+                if b_customer_id != customer_profile_id:
+                    raise HTTPException(status_code=403, detail="ไม่ใช่ booking ของคุณ")
+                if b_status != "zone_closed_action_required":
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"booking สถานะ '{b_status}' ไม่ใช่ voucher จากการปิดโซน",
+                    )
+
+                cur.execute(
+                    "SELECT seat_id FROM ticket WHERE booking_id = %s ORDER BY seat_id",
+                    (b_id,),
+                )
+                old_seat_ids = [r[0] for r in cur.fetchall()]
+                if not old_seat_ids:
+                    raise HTTPException(status_code=409, detail="ไม่พบ ticket เดิมของ booking นี้")
+                if len(new_seat_ids) != len(old_seat_ids):
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"จำนวนที่นั่งใหม่ ({len(new_seat_ids)}) ต้องเท่ากับ ticket เดิม ({len(old_seat_ids)})",
+                    )
+                if set(new_seat_ids) & set(old_seat_ids):
+                    raise HTTPException(
+                        status_code=409,
+                        detail="new_seat_ids ซ้ำกับที่นั่งเดิม",
+                    )
+
+                # Lock เก่า+ใหม่ พร้อมกัน เรียง id กันชน deadlock
+                all_seat_ids = sorted(set(old_seat_ids) | set(new_seat_ids))
+                placeholders = ",".join(["%s"] * len(all_seat_ids))
+                cur.execute(
+                    f"""
+                    SELECT s.id, s.status, s.zone_id, z.is_active, z.concert_id
+                    FROM seat s
+                    JOIN zone z ON z.id = s.zone_id
+                    WHERE s.id IN ({placeholders})
+                    ORDER BY s.id
+                    FOR UPDATE
+                    """,
+                    all_seat_ids,
+                )
+                rows = cur.fetchall()
+                seat_map = {r[0]: r for r in rows}
+
+                missing = [sid for sid in all_seat_ids if sid not in seat_map]
+                if missing:
+                    raise HTTPException(status_code=404, detail=f"ไม่พบที่นั่ง {missing}")
+
+                # Validate เฉพาะที่นั่งใหม่
+                for sid in new_seat_ids:
+                    _, s_status, _, z_active, z_concert = seat_map[sid]
+                    if z_concert != b_concert_id:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"seat {sid} ไม่ใช่ของ concert เดียวกับ booking",
+                        )
+                    if not z_active:
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"seat {sid} อยู่ในโซนที่ถูกปิด",
+                        )
+                    if s_status != "available":
+                        raise HTTPException(
+                            status_code=409,
+                            detail=f"seat {sid} ไม่ว่าง (status='{s_status}')",
+                        )
+
+                # DELETE ticket เดิม
+                cur.execute("DELETE FROM ticket WHERE booking_id = %s", (b_id,))
+
+                # Free seat เดิม
+                old_placeholders = ",".join(["%s"] * len(old_seat_ids))
+                cur.execute(
+                    f"UPDATE seat SET status = 'available' WHERE id IN ({old_placeholders})",
+                    old_seat_ids,
+                )
+
+                # lock seat ใหม่ → 'sold' ทันที (ถือว่า paid แล้ว)
+                new_placeholders = ",".join(["%s"] * len(new_seat_ids))
+                cur.execute(
+                    f"UPDATE seat SET status = 'sold' WHERE id IN ({new_placeholders})",
+                    new_seat_ids,
+                )
+
+                # INSERT ticket ใหม่
+                new_ticket_ids = []
+                for seat_id in new_seat_ids:
+                    qr_hash = hashlib.sha256(
+                        f"TKT-{b_id}-{seat_id}-{secrets.token_hex(8)}".encode()
+                    ).hexdigest()
+                    cur.execute(
+                        """
+                        INSERT INTO ticket (seat_id, booking_id, qr_hash)
+                        VALUES (%s, %s, %s) RETURNING id
+                        """,
+                        (seat_id, b_id, qr_hash),
+                    )
+                    new_ticket_ids.append(cur.fetchone()[0])
+
+                cur.execute(
+                    """
+                    UPDATE booking SET status = 'paid', expired_at = NULL
+                    WHERE id = %s AND status = 'zone_closed_action_required'
+                    """,
+                    (b_id,),
+                )
+                if cur.rowcount != 1:
+                    raise HTTPException(status_code=409, detail="booking ถูกเปลี่ยนสถานะไปแล้ว")
+
+            conn.commit()
+
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"rebook ไม่สำเร็จ: {exc}")
+
+    return {
+        "message": "ย้ายที่นั่งสำเร็จ (free upgrade)",
+        "booking_id": b_id,
+        "status": "paid",
+        "new_seat_ids": new_seat_ids,
+        "new_ticket_ids": new_ticket_ids,
+    }

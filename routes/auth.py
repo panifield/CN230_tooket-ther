@@ -18,7 +18,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr
 
 from config import Config
-from models import get_db_connection
+from models import fix_all_sequences, get_db_connection
 from routes.deps import CurrentUser
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -33,7 +33,8 @@ def _hash_password(password: str) -> str:
 
 
 
-def _fix_sequence(cur, table: str):
+
+def fix_sequence(cur, table: str):
     """Reset sequence to the current max ID (hotfix for seed data out of sync)"""
     cur.execute(f"SELECT setval('{table}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM {table}), true);")
 
@@ -68,6 +69,19 @@ class LoginBody(BaseModel):
     password: str
 
 
+class UpdateProfileBody(BaseModel):
+    name: str = None
+    phone: str = None
+    address: str = None
+    id_card: str = None
+
+
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+    id_card: str
+    new_password: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -95,12 +109,8 @@ def register(body: RegisterBody):
                     detail="Email นี้มีบัญชีอยู่แล้ว",
                 )
 
-            # Reset sequence if needed (hotfix for seed data out of sync)
-            _fix_sequence(cur, "users")
-            _fix_sequence(cur, "customer_profile")
-            _fix_sequence(cur, "organizer_profile")
-            _fix_sequence(cur, "staff_profile")
-            _fix_sequence(cur, "social_account")
+            # Reset all sequences before insertion
+            fix_all_sequences(cur)
 
             # INSERT users
             cur.execute(
@@ -305,10 +315,8 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
             if existing:
                 user_id, role = existing
             else:
-                # Reset sequence if needed
-                _fix_sequence(cur, "users")
-                _fix_sequence(cur, "social_account")
-                _fix_sequence(cur, "customer_profile")
+                # Reset all sequences
+                fix_all_sequences(cur)
 
                 # สร้าง user ใหม่ (id_card และ phone ยังไม่มี ใส่ placeholder)
                 cur.execute(
@@ -356,3 +364,58 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
 def get_me(current_user: CurrentUser):
     """ดูข้อมูล user ที่ login อยู่"""
     return current_user
+
+
+@auth_router.patch("/profiles")
+def update_profile(body: UpdateProfileBody, current_user: CurrentUser):
+    """แก้ไขข้อมูลส่วนตัว"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            updates = []
+            params = []
+            if body.name is not None:
+                updates.append("name = %s")
+                params.append(body.name)
+            if body.phone is not None:
+                updates.append("phone = %s")
+                params.append(body.phone)
+            if body.address is not None:
+                updates.append("address = %s")
+                params.append(body.address)
+            if body.id_card is not None:
+                updates.append("id_card = %s")
+                params.append(body.id_card)
+
+            if not updates:
+                return {"message": "ไม่มีข้อมูลที่ต้องการแก้ไข"}
+
+            params.append(current_user["user_id"])
+            query = f"UPDATE users SET {', '.join(updates)} WHERE id = %s"
+            cur.execute(query, tuple(params))
+            conn.commit()
+
+    return {"message": "แก้ไขข้อมูลสำเร็จ"}
+
+
+@auth_router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordBody):
+    """ลืมรหัสผ่าน (ใช้ ID Card ยืนยันใน dev)"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE email = %s AND id_card = %s",
+                (body.email, body.id_card),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="ข้อมูลยืนยันไม่ถูกต้อง (Email หรือ ID Card ผิด)",
+                )
+
+            cur.execute(
+                "UPDATE users SET password = %s WHERE id = %s",
+                (_hash_password(body.new_password), row[0]),
+            )
+            conn.commit()
+    return {"message": "เปลี่ยนรหัสผ่านสำเร็จแล้ว"}
