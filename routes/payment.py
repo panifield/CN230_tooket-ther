@@ -279,7 +279,7 @@ def _verify_signature(raw_body: bytes, signature: Optional[str]) -> bool:
     if not signature:
         return False
     secret = Config.PAYMENT_WEBHOOK_SECRET.encode("utf-8")
-    expected = hmac.new(secret, raw_body, hashlib.sha256).hexdigest()
+    expected = hmac.HMAC(secret, raw_body, hashlib.sha256).hexdigest()
     return hmac.compare_digest(expected, signature)
 
 

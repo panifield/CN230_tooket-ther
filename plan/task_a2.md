@@ -84,12 +84,12 @@
 
 ## Phase 6 — Queries & ส่งงาน (สัปดาห์ 3–4)
 
-- [ ] ทบทวน `queries.sql` ให้ครบ ≥ 5 ข้อ และ **ชื่อตาราง/คอลัมน์ตรง `database/schema.sql`** (เช่น `min_threshold` vs `threshold` ถ้าเคยเปลี่ยน)
-- [ ] แต่ละ query มีคอมเมนต์สั้นๆ ว่าใช้ทำอะไร (JOIN / GROUP BY / subquery / HAVING ฯลฯ)
+- [x] ทบทวน `queries.sql` ให้ครบ ≥ 5 ข้อ และ **ชื่อตาราง/คอลัมน์ตรง `database/schema.sql`**
+- [x] แต่ละ query มีคอมเมนต์สั้นๆ ว่าใช้ทำอะไร (JOIN / GROUP BY / subquery / HAVING ฯลฯ)
 - [ ] Integration test แบบ manual หรือ pytest กับ DB (ถ้าทีมมีแนวทาง)
 - [ ] ประสาน A3: เส้นทาง booking → payment; A4: template เรียก API
 
-**Definition of done:** rubric query + CRUD path หลักผ่าน review ทีม
+**Definition of done:** rubric query + CRUD path หลักผ่าน review ทีม (Reviewed by Antigravity)
 
 ---
 

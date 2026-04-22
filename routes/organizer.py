@@ -6,6 +6,7 @@ POST   /organizer/queues/{queue_id}/admit       เปลี่ยนสถา�
 PATCH  /organizer/queues/{queue_id}/priority    แก้ไขคะแนน priority (location_score)
 """
 import logging
+from decimal import Decimal
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
@@ -340,3 +341,119 @@ def close_zone(zone_id: int, background_tasks: BackgroundTasks, current_user: Cu
         "affected_bookings": len(affected_booking_ids),
         "notifications_queued": len(affected),
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 6 — Organizer Dashboard (สรุปรายรับรายจ่ายรายวันของคอนเสิร์ต)
+# ---------------------------------------------------------------------------
+
+class DailyStat(BaseModel):
+    date: str
+    income: Decimal
+    expense: Decimal
+    net_profit: Decimal
+
+
+class GrandTotals(BaseModel):
+    total_income: Decimal
+    total_expense: Decimal
+    total_net_profit: Decimal
+
+
+class DashboardResponse(BaseModel):
+    concert_id: int
+    daily_stats: list[DailyStat]
+    grand_totals: GrandTotals
+
+
+@organizer_router.get(
+    "/concerts/{concert_id}/dashboard",
+    response_model=DashboardResponse,
+)
+def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
+    """
+    Phase 6 — สรุปรายรับ/รายจ่ายรายวันของคอนเสิร์ต (Asia/Bangkok timezone)
+    - income: payment.status='paid' รวมตาม paid_at (แปลงเป็นเวลาไทยก่อน)
+    - expense: refund ที่ยังไม่ถูก reject รวมตามเวลาคำขอ/อนุมัติ/เสร็จสิ้น
+    """
+    _check_organizer_role(current_user)
+    organizer_profile_id = current_user.get("organizer_profile_id")
+    if not organizer_profile_id:
+        raise HTTPException(status_code=403, detail="ไม่พบ organizer profile")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT organizer_id FROM concert WHERE id = %s",
+                (concert_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="ไม่พบคอนเสิร์ต")
+            if row[0] != organizer_profile_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้",
+                )
+
+            # ใช้ payment + refund แทน finance table เพราะ finance ไม่มี timestamp
+            # สำหรับ group by วันได้ — แต่ยอดตรงกันเพราะ finance rows ถูก insert
+            # ใน transaction เดียวกับ payment/refund (ดู routes/payment.py, routes/refund.py)
+            cur.execute(
+                """
+                WITH income AS (
+                    SELECT
+                        (p.paid_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok')::date AS day,
+                        SUM(p.amount) AS amount
+                    FROM payment p
+                    JOIN booking b ON b.id = p.booking_id
+                    WHERE b.concert_id = %s
+                      AND p.status = 'paid'
+                      AND p.paid_at IS NOT NULL
+                    GROUP BY day
+                ),
+                expense AS (
+                    SELECT
+                        (COALESCE(r.completed_at, r.approved_at, r.requested_at)
+                            AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok')::date AS day,
+                        SUM(r.amount) AS amount
+                    FROM refund r
+                    JOIN payment p ON p.id = r.payment_id
+                    JOIN booking b ON b.id = p.booking_id
+                    WHERE b.concert_id = %s
+                      AND r.status <> 'rejected'
+                    GROUP BY day
+                )
+                SELECT
+                    COALESCE(i.day, e.day) AS day,
+                    COALESCE(i.amount, 0) AS income,
+                    COALESCE(e.amount, 0) AS expense
+                FROM income i
+                FULL OUTER JOIN expense e ON e.day = i.day
+                ORDER BY day ASC
+                """,
+                (concert_id, concert_id),
+            )
+            rows = cur.fetchall()
+
+    daily_stats = [
+        DailyStat(
+            date=day.isoformat(),
+            income=income,
+            expense=expense,
+            net_profit=income - expense,
+        )
+        for (day, income, expense) in rows
+    ]
+    total_income = sum((d.income for d in daily_stats), Decimal("0"))
+    total_expense = sum((d.expense for d in daily_stats), Decimal("0"))
+
+    return DashboardResponse(
+        concert_id=concert_id,
+        daily_stats=daily_stats,
+        grand_totals=GrandTotals(
+            total_income=total_income,
+            total_expense=total_expense,
+            total_net_profit=total_income - total_expense,
+        ),
+    )

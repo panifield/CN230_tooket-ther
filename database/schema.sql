@@ -50,7 +50,7 @@ CREATE TABLE social_account (
     id               SERIAL PRIMARY KEY,
     user_id          INT             NOT NULL REFERENCES users(id),
     social_user_id   VARCHAR(100)    NOT NULL,
-    type_social      VARCHAR(20)     NOT NULL CHECK (type_social IN ('line','facebook','email')),
+    type_social      VARCHAR(20)     NOT NULL CHECK (type_social IN ('line','facebook','email','google')),
     UNIQUE (social_user_id, type_social)
 );
 

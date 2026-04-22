@@ -32,6 +32,12 @@ def _hash_password(password: str) -> str:
     return hashlib.sha256(password.encode()).hexdigest()
 
 
+
+def _fix_sequence(cur, table: str):
+    """Reset sequence to the current max ID (hotfix for seed data out of sync)"""
+    cur.execute(f"SELECT setval('{table}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM {table}), true);")
+
+
 def _issue_jwt(user_id: int, role: str) -> str:
     """ออก JWT access token"""
     payload = {
@@ -88,6 +94,13 @@ def register(body: RegisterBody):
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Email นี้มีบัญชีอยู่แล้ว",
                 )
+
+            # Reset sequence if needed (hotfix for seed data out of sync)
+            _fix_sequence(cur, "users")
+            _fix_sequence(cur, "customer_profile")
+            _fix_sequence(cur, "organizer_profile")
+            _fix_sequence(cur, "staff_profile")
+            _fix_sequence(cur, "social_account")
 
             # INSERT users
             cur.execute(
@@ -194,14 +207,14 @@ _OAUTH_CONFIGS = {
         "redirect_uri": lambda: Config.LINE_REDIRECT_URI,
         "scope": "profile openid",
     },
-    "facebook": {
-        "authorize_url": "https://www.facebook.com/v18.0/dialog/oauth",
-        "token_url": "https://graph.facebook.com/v18.0/oauth/access_token",
-        "profile_url": "https://graph.facebook.com/me",
-        "client_id": lambda: Config.FACEBOOK_CLIENT_ID,
-        "client_secret": lambda: Config.FACEBOOK_CLIENT_SECRET,
-        "redirect_uri": lambda: Config.FACEBOOK_REDIRECT_URI,
-        "scope": "public_profile,email",
+    "google": {
+        "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth",
+        "token_url": "https://oauth2.googleapis.com/token",
+        "profile_url": "https://www.googleapis.com/oauth2/v3/userinfo",
+        "client_id": lambda: Config.GOOGLE_CLIENT_ID,
+        "client_secret": lambda: Config.GOOGLE_CLIENT_SECRET,
+        "redirect_uri": lambda: Config.GOOGLE_REDIRECT_URI,
+        "scope": "openid email profile",
     },
 }
 
@@ -211,7 +224,7 @@ def _get_oauth_config(provider: str) -> dict:
     if cfg is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Provider '{provider}' ไม่รองรับ (รองรับ: line, facebook)",
+            detail=f"Provider '{provider}' ไม่รองรับ (รองรับ: line, google)",
         )
     return cfg
 
@@ -227,7 +240,9 @@ def oauth_authorize_url(provider: str, state: str = Query(default="tooket-state"
         "client_id": cfg["client_id"](),
         "redirect_uri": cfg["redirect_uri"](),
         "scope": cfg["scope"],
-        "state": state,
+    "state": state,
+        "access_type": "offline",
+        "prompt": "select_account",
     }
     url = cfg["authorize_url"] + "?" + urllib.parse.urlencode(params)
     return {"provider": provider, "authorize_url": url}
@@ -259,23 +274,17 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
     access_token = token_resp.json().get("access_token")
 
     # 2. ดึง profile
-    profile_params: dict = {}
-    if provider == "facebook":
-        profile_params["fields"] = "id,name,email"
-        profile_params["access_token"] = access_token
-
     profile_resp = http.get(
         cfg["profile_url"],
-        params=profile_params if profile_params else None,
-        headers={"Authorization": f"Bearer {access_token}"} if not profile_params else {},
+        headers={"Authorization": f"Bearer {access_token}"},
         timeout=10,
     )
     if not profile_resp.ok:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="ดึง profile ไม่สำเร็จ")
 
     profile = profile_resp.json()
-    social_user_id = profile.get("userId") or profile.get("id") or ""
-    display_name = profile.get("displayName") or profile.get("name") or "User"
+    social_user_id = profile.get("sub") or profile.get("userId") or profile.get("id") or ""
+    display_name = profile.get("name") or profile.get("displayName") or "User"
     email = profile.get("email", f"{social_user_id}@{provider}.oauth")
 
     # 3. ค้นหา / สร้าง user
@@ -296,6 +305,11 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
             if existing:
                 user_id, role = existing
             else:
+                # Reset sequence if needed
+                _fix_sequence(cur, "users")
+                _fix_sequence(cur, "social_account")
+                _fix_sequence(cur, "customer_profile")
+
                 # สร้าง user ใหม่ (id_card และ phone ยังไม่มี ใส่ placeholder)
                 cur.execute(
                     """
@@ -304,7 +318,7 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
                     ON CONFLICT (email) DO UPDATE SET name = EXCLUDED.name
                     RETURNING id, role
                     """,
-                    (f"OAUTH-{social_user_id[:15]}", display_name, email),
+                    (f"OAUTH-{social_user_id[:14]}", display_name, email),
                 )
                 user_id, role = cur.fetchone()
 
