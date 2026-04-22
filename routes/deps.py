@@ -55,7 +55,8 @@ def get_current_user(
                 SELECT u.id, u.name, u.email, u.role,
                        cp.id AS customer_profile_id,
                        cp.location_score,
-                       op.id AS organizer_profile_id
+                       op.id AS organizer_profile_id,
+                       u.phone, u.address, u.id_card
                 FROM users u
                 LEFT JOIN customer_profile cp ON cp.user_id = u.id
                 LEFT JOIN organizer_profile op ON op.user_id = u.id
@@ -79,6 +80,9 @@ def get_current_user(
         "customer_profile_id": row[4],
         "location_score": row[5],
         "organizer_profile_id": row[6],
+        "phone": row[7],
+        "address": row[8],
+        "id_card": row[9],
     }
 
 

@@ -69,6 +69,13 @@ class LoginBody(BaseModel):
     password: str
 
 
+class UpdateProfileBody(BaseModel):
+    name: str = None
+    phone: str = None
+    address: str = None
+    id_card: str = None
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -351,3 +358,34 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
 def get_me(current_user: CurrentUser):
     """ดูข้อมูล user ที่ login อยู่"""
     return current_user
+
+
+@auth_router.patch("/profiles")
+def update_profile(body: UpdateProfileBody, current_user: CurrentUser):
+    """แก้ไขข้อมูลส่วนตัว"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            updates = []
+            params = []
+            if body.name is not None:
+                updates.append("name = %s")
+                params.append(body.name)
+            if body.phone is not None:
+                updates.append("phone = %s")
+                params.append(body.phone)
+            if body.address is not None:
+                updates.append("address = %s")
+                params.append(body.address)
+            if body.id_card is not None:
+                updates.append("id_card = %s")
+                params.append(body.id_card)
+
+            if not updates:
+                return {"message": "ไม่มีข้อมูลที่ต้องการแก้ไข"}
+
+            params.append(current_user["user_id"])
+            query = f"UPDATE users SET {', '.join(updates)} WHERE id = %s"
+            cur.execute(query, tuple(params))
+            conn.commit()
+
+    return {"message": "แก้ไขข้อมูลสำเร็จ"}
