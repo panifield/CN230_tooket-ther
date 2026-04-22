@@ -69,6 +69,19 @@ class LoginBody(BaseModel):
     password: str
 
 
+class UpdateProfileBody(BaseModel):
+    name: str = None
+    phone: str = None
+    address: str = None
+    id_card: str = None
+
+
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+    id_card: str
+    new_password: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -351,3 +364,58 @@ def oauth_callback(provider: str, code: str = Query(...), state: str = Query(def
 def get_me(current_user: CurrentUser):
     """ดูข้อมูล user ที่ login อยู่"""
     return current_user
+
+
+@auth_router.patch("/profiles")
+def update_profile(body: UpdateProfileBody, current_user: CurrentUser):
+    """แก้ไขข้อมูลส่วนตัว"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            updates = []
+            params = []
+            if body.name is not None:
+                updates.append("name = %s")
+                params.append(body.name)
+            if body.phone is not None:
+                updates.append("phone = %s")
+                params.append(body.phone)
+            if body.address is not None:
+                updates.append("address = %s")
+                params.append(body.address)
+            if body.id_card is not None:
+                updates.append("id_card = %s")
+                params.append(body.id_card)
+
+            if not updates:
+                return {"message": "ไม่มีข้อมูลที่ต้องการแก้ไข"}
+
+            params.append(current_user["user_id"])
+            query = f"UPDATE users SET {', '.join(updates)} WHERE id = %s"
+            cur.execute(query, tuple(params))
+            conn.commit()
+
+    return {"message": "แก้ไขข้อมูลสำเร็จ"}
+
+
+@auth_router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordBody):
+    """ลืมรหัสผ่าน (ใช้ ID Card ยืนยันใน dev)"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE email = %s AND id_card = %s",
+                (body.email, body.id_card),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="ข้อมูลยืนยันไม่ถูกต้อง (Email หรือ ID Card ผิด)",
+                )
+
+            cur.execute(
+                "UPDATE users SET password = %s WHERE id = %s",
+                (_hash_password(body.new_password), row[0]),
+            )
+            conn.commit()
+    return {"message": "เปลี่ยนรหัสผ่านสำเร็จแล้ว"}
