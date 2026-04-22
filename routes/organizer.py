@@ -125,6 +125,22 @@ def update_queue_priority(queue_id: int, body: UpdatePriorityBody, current_user:
     return {"message": f"อัปเดต Priority ของคิวที่ {queue_id} เป็น {body.priority_score} สำเร็จ"}
 
 from datetime import datetime
+from typing import List
+
+
+class ZoneInput(BaseModel):
+    zone_name: str
+    total_seats: int
+    price: Decimal
+    row_prefix: str = "A"
+
+    @property
+    def validate_fields(self):
+        if self.total_seats <= 0:
+            raise ValueError("total_seats ต้องมากกว่า 0")
+        if self.price < 0:
+            raise ValueError("price ต้องไม่ติดลบ")
+
 
 class CreateConcertBody(BaseModel):
     title: str
@@ -135,36 +151,130 @@ class CreateConcertBody(BaseModel):
     sale_open_at: datetime
     sale_close_at: datetime = None
     status: str = "on_sale"
+    zones: List[ZoneInput] = []
+
 
 @organizer_router.post("/concerts", status_code=status.HTTP_201_CREATED)
 def create_concert(body: CreateConcertBody, current_user: CurrentUser):
     """
-    Organizer สร้างคอนเสิร์ตใหม่
+    Organizer สร้างคอนเสิร์ตใหม่ พร้อม zone และ seat ได้เลยในครั้งเดียว
+
+    ตัวอย่าง body:
+    {
+        "title": "Big Concert 2025",
+        "artist": "Artist Name",
+        "venue": "Impact Arena",
+        "address": "เมืองทองธานี",
+        "concert_datetime": "2025-12-01T19:00:00",
+        "sale_open_at": "2025-10-01T10:00:00",
+        "zones": [
+            {"zone_name": "VIP",     "total_seats": 100, "price": 5000},
+            {"zone_name": "General", "total_seats": 500, "price": 1500}
+        ]
+    }
     """
     _check_organizer_role(current_user)
     organizer_profile_id = current_user.get("organizer_profile_id")
     if not organizer_profile_id:
         raise HTTPException(status_code=400, detail="ไม่พบข้อมูล organizer profile ของคุณ")
 
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            from models import fix_all_sequences
-            fix_all_sequences(cur)
-
-            cur.execute(
-                """
-                INSERT INTO concert
-                  (organizer_id, title, artist, venue, address, concert_datetime, sale_open_at, sale_close_at, status)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                RETURNING id
-                """,
-                (organizer_profile_id, body.title, body.artist, body.venue, body.address, 
-                 body.concert_datetime, body.sale_open_at, body.sale_close_at, body.status)
+    # ตรวจสอบ zone ก่อน hit DB
+    seen_names = set()
+    for z in body.zones:
+        if z.total_seats <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Zone '{z.zone_name}': total_seats ต้องมากกว่า 0",
             )
-            concert_id = cur.fetchone()[0]
-        conn.commit()
+        if z.price < 0:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Zone '{z.zone_name}': price ต้องไม่ติดลบ",
+            )
+        if z.zone_name in seen_names:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"ชื่อ zone '{z.zone_name}' ซ้ำกัน",
+            )
+        seen_names.add(z.zone_name)
 
-    return {"message": "สร้างคอนเสิร์ตสำเร็จ", "concert_id": concert_id}
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                from models import fix_all_sequences
+                fix_all_sequences(cur)
+
+                # 1) สร้าง concert
+                cur.execute(
+                    """
+                    INSERT INTO concert
+                      (organizer_id, title, artist, venue, address,
+                       concert_datetime, sale_open_at, sale_close_at, status)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (
+                        organizer_profile_id, body.title, body.artist,
+                        body.venue, body.address, body.concert_datetime,
+                        body.sale_open_at, body.sale_close_at, body.status,
+                    ),
+                )
+                concert_id = cur.fetchone()[0]
+
+                # 2) สร้าง zone + seat (ถ้ามี)
+                zones_created = []
+                for z in body.zones:
+                    cur.execute(
+                        """
+                        INSERT INTO zone
+                          (concert_id, zone_name, total_seats, price, is_active)
+                        VALUES (%s, %s, %s, %s, TRUE)
+                        RETURNING id
+                        """,
+                        (concert_id, z.zone_name, z.total_seats, z.price),
+                    )
+                    zone_id = cur.fetchone()[0]
+
+                    # สร้าง seat ทีละแถวตามจำนวน total_seats
+                    if z.total_seats > 0:
+                        # สร้าง seat_number เช่น A1, A2, ... ตาม row_prefix
+                        prefix = z.row_prefix if z.row_prefix else "A"
+                        seat_rows = [
+                            (zone_id, f"{prefix}{i+1}", prefix, "available")
+                            for i in range(z.total_seats)
+                        ]
+                        cur.executemany(
+                            "INSERT INTO seat (zone_id, seat_number, seat_row, status) VALUES (%s, %s, %s, %s)",
+                            seat_rows,
+                        )
+
+                    zones_created.append({
+                        "zone_id": zone_id,
+                        "zone_name": z.zone_name,
+                        "total_seats": z.total_seats,
+                        "price": float(z.price),
+                    })
+
+            conn.commit()
+
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            logger.exception("create_concert error: %s", exc)
+            raise HTTPException(status_code=500, detail=f"สร้างคอนเสิร์ตไม่สำเร็จ: {exc}")
+
+    logger.info(
+        "Concert created: concert_id=%s organizer=%s zones=%d",
+        concert_id, organizer_profile_id, len(zones_created),
+    )
+
+    return {
+        "message": "สร้างคอนเสิร์ตสำเร็จ",
+        "concert_id": concert_id,
+        "zones": zones_created,
+    }
 
 
 @organizer_router.post("/concerts/{concert_id}/queues/auto_sort")

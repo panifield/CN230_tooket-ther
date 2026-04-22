@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <title>Tooket-ther Platform</title>
+  <title>Tooket-ther Testing Platform</title>
   <style>
     :root {
       --bg: #121212;
@@ -11,6 +11,8 @@
       --primary: #bb86fc;
       --secondary: #03dac6;
       --error: #cf6679;
+      --warning: #ffb74d;
+      --success: #81c784;
       --on-bg: #e0e0e0;
       --white: #ffffff;
       --border: #333;
@@ -22,9 +24,7 @@
       color: var(--on-bg);
       margin: 0;
       padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      padding-bottom: 50px;
     }
 
     header {
@@ -36,6 +36,9 @@
       align-items: center;
       box-sizing: border-box;
       border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
     }
 
     header h1 {
@@ -50,7 +53,7 @@
     }
 
     .container {
-      max-width: 1000px;
+      max-width: 1200px;
       width: 100%;
       margin: 30px auto;
       display: grid;
@@ -62,18 +65,28 @@
 
     .card {
       background-color: var(--surface);
-      border-radius: 8px;
-      padding: 20px;
+      border-radius: 12px;
+      padding: 24px;
       border: 1px solid var(--border);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
     }
 
     .card h2 {
       margin-top: 0;
       color: var(--secondary);
+      border-bottom: 2px solid var(--border);
+      padding-bottom: 10px;
+      margin-bottom: 20px;
+    }
+
+    .card h3 {
+      color: var(--primary);
+      margin-top: 25px;
     }
 
     input,
     select,
+    textarea,
     button {
       padding: 10px;
       margin-bottom: 10px;
@@ -85,7 +98,8 @@
     }
 
     input:focus,
-    select:focus {
+    select:focus,
+    textarea:focus {
       outline: none;
       border-color: var(--primary);
     }
@@ -96,11 +110,16 @@
       font-weight: bold;
       border: none;
       cursor: pointer;
-      width: 100%;
+      transition: all 0.2s;
     }
 
     button:hover {
-      background-color: #9965f4;
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    button:active {
+      transform: translateY(0);
     }
 
     button.secondary {
@@ -109,60 +128,88 @@
       color: var(--primary);
     }
 
-    button.secondary:hover {
-      background-color: rgba(187, 134, 252, 0.1);
-    }
-
     button.danger {
       background-color: var(--error);
       color: #fff;
     }
 
+    button.success {
+      background-color: var(--success);
+      color: #000;
+    }
+
+    button.warning {
+      background-color: var(--warning);
+      color: #000;
+    }
+
+    button:disabled {
+      background-color: #444;
+      color: #888;
+      cursor: not-allowed;
+      transform: none;
+    }
+
     /* Panels Configuration */
     #authPanel,
     #customerPanel,
-    #organizerPanel,
-    #staffPanel {
+    #organizerPanel {
       display: none;
     }
 
     /* Seat Grid */
     .seat-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+      gap: 8px;
       margin: 20px 0;
+      background: #111;
+      padding: 15px;
+      border-radius: 8px;
     }
 
     .seat {
-      padding: 10px;
+      padding: 8px;
       text-align: center;
       border-radius: 4px;
       cursor: pointer;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: bold;
+      transition: transform 0.1s;
+    }
+
+    .seat:hover:not(.locked):not(.sold):not(.closed) {
+      transform: scale(1.1);
     }
 
     .seat.available {
-      background-color: var(--secondary);
+      background-color: var(--success);
       color: #000;
     }
 
     .seat.locked {
-      background-color: #fbc02d;
+      background-color: var(--warning);
       color: #000;
       cursor: not-allowed;
     }
 
     .seat.sold {
       background-color: var(--error);
+      color: #fff;
+      cursor: not-allowed;
+    }
+
+    .seat.closed {
+      background-color: #555;
+      color: #888;
       cursor: not-allowed;
     }
 
     .seat.selected {
       border: 2px solid var(--white);
-      transform: scale(1.1);
-      box-shadow: 0 0 10px var(--white);
+      transform: scale(1.2);
+      box-shadow: 0 0 15px var(--white);
+      z-index: 10;
     }
 
     /* Tables */
@@ -175,37 +222,95 @@
     th,
     td {
       text-align: left;
-      padding: 10px;
+      padding: 12px;
       border-bottom: 1px solid var(--border);
     }
 
     th {
       color: var(--primary);
+      text-transform: uppercase;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+    }
+
+    .status-pill {
+      padding: 4px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .status-paid { background: rgba(129, 199, 132, 0.2); color: var(--success); }
+    .status-pending { background: rgba(255, 183, 77, 0.2); color: var(--warning); }
+    .status-expired { background: rgba(207, 102, 121, 0.2); color: var(--error); }
+    .status-action { background: rgba(187, 134, 252, 0.2); border: 1px solid var(--primary); color: var(--primary); }
+
+    .action-banner {
+      background: rgba(187, 134, 252, 0.1);
+      border-left: 4px solid var(--primary);
+      padding: 15px;
+      margin: 15px 0;
+      border-radius: 4px;
     }
 
     .flex-row {
       display: flex;
       gap: 10px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
-    .flex-row>* {
+    .flex-row > * {
       margin-bottom: 0;
-      width: auto;
       flex: 1;
+      min-width: 150px;
     }
 
     .logs {
       background-color: #000;
-      padding: 10px;
-      border-radius: 4px;
-      height: 150px;
+      padding: 15px;
+      border-radius: 8px;
+      height: 200px;
       overflow-y: auto;
-      font-family: monospace;
-      font-size: 12px;
+      font-family: 'Cascadia Code', 'Fira Code', monospace;
+      font-size: 13px;
       color: #0f0;
       border: 1px solid #333;
       margin-top: 20px;
+      box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Modal Styles */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--surface);
+      padding: 30px;
+      border-radius: 12px;
+      max-width: 500px;
+      width: 90%;
+      border: 1px solid var(--border);
+    }
+
+    #qrContainer {
+      background: white;
+      padding: 20px;
+      margin: 20px auto;
+      width: 250px;
+      height: 250px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
     }
   </style>
 </head>
@@ -222,140 +327,216 @@
     <!-- 1. AUTH PANEL -->
     <div id="authPanel" class="card" style="display: block;">
       <h2>Authentication</h2>
+      <h3>Login</h3>
       <div class="flex-row">
         <input type="email" id="loginEmail" placeholder="Email" value="test@example.com">
         <input type="password" id="loginPassword" placeholder="Password" value="Test1234.">
         <button onclick="login()">Login</button>
       </div>
-      <div style="margin: 10px 0; text-align: center; color: #888;">OR</div>
-      <button onclick="loginWithLine()"
-        style="background-color: #00B900; color: white; width: 100%; border: none; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;">
-        <span style="font-size: 1.2rem;">🟢</span> Login with LINE
-      </button>
-      <button onclick="loginWithGoogle()"
-        style="background-color: #ffffff; color: #757575; width: 100%; border: 1px solid #ddd; padding: 10px; border-radius: 4px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px;">
-        <span style="font-size: 1.2rem;">G</span> Login with Google
-      </button>
-      <hr style="border-color:var(--border);">
+      <div style="margin: 15px 0; text-align: center; color: #888;">OR</div>
       <div class="flex-row">
-        <input type="text" id="regName" placeholder="Name" value="New Staff">
-        <input type="email" id="regEmail" placeholder="New Email">
-        <input type="password" id="regPassword" placeholder="New Password" value="Test1234.">
-        <select id="regRole" style="max-width: 150px;">
+        <button onclick="loginWithLine()" style="background-color: #00B900; color: white;">LINE Login</button>
+        <button onclick="loginWithGoogle()" style="background-color: #ffffff; color: #757575;">Google Login</button>
+      </div>
+      
+      <hr style="border-color:var(--border); margin: 25px 0;">
+      
+      <h3>Register</h3>
+      <div class="flex-row">
+        <input type="text" id="regName" placeholder="Full Name" value="Tester One">
+        <input type="email" id="regEmail" placeholder="Email Address">
+        <input type="password" id="regPassword" placeholder="Password" value="Test1234.">
+      </div>
+      <div class="flex-row">
+        <input type="text" id="regIdCard" placeholder="ID Card No. (13 digits)" value="1100100123456">
+        <input type="text" id="regPhone" placeholder="Phone Number" value="0812345678">
+      </div>
+      <div class="flex-row">
+        <select id="regRole">
           <option value="customer">Customer</option>
           <option value="organizer">Organizer</option>
-          <option value="staff">Staff (Checker)</option>
+          <option value="staff">Gate Staff</option>
         </select>
-        <button onclick="register()" class="secondary">Register</button>
+        <input type="text" id="regAddress" placeholder="Address (Province/City)" value="Bangkok">
+        <button onclick="register()" class="secondary">Create Account</button>
       </div>
     </div>
 
     <!-- 2. CUSTOMER PANEL -->
-    <div id="customerPanel">
-      <div class="card" style="margin-bottom: 20px;">
-        <h2>Select Concert</h2>
+    <div id="customerPanel" class="card">
+      <h2>Customer Dashboard</h2>
+      
+      <section>
+        <h3>Upcoming Concerts</h3>
         <div class="flex-row">
           <select id="customerConcertSelect" onchange="resetCustomerFlow()"></select>
-          <button onclick="fetchConcertsForCustomer()" style="max-width:150px;" class="secondary">Refresh</button>
+          <button onclick="fetchConcertsForCustomer()" style="flex: 0 1 150px;" class="secondary">Refresh List</button>
+          <button onclick="joinQueue()" id="joinBtn">Enter Queue</button>
         </div>
-      </div>
-
-      <div class="card" style="margin-bottom: 20px;">
-        <h2>Queue Waiting Room</h2>
-        <div class="flex-row">
-          <button onclick="joinQueue()">1. Join Queue</button>
-          <button onclick="checkQueueStatus()" class="secondary">2. Check Status</button>
+        <div id="queueStatusDisplay" class="action-banner" style="display:none;">
+          Waiting for status...
         </div>
-        <p id="queueStatusDisplay"
-          style="background:#222; padding:10px; border-radius:4px; font-size:14px; margin-top:10px;">Queue: -</p>
-      </div>
+      </section>
 
-      <div class="card">
-        <h2>Reserve Seats</h2>
+      <section id="seatSection" style="display:none;">
+        <h3>Select Your Seats</h3>
         <div class="flex-row">
           <button onclick="loadZones()">1. Load Zones</button>
           <select id="zoneSelect" onchange="loadSeats()">
             <option value="">-- Select Zone --</option>
           </select>
-          <button onclick="loadSeats()" class="secondary">2. Load Seats</button>
+          <button onclick="loadSeats()" class="secondary">2. Refresh Seats</button>
         </div>
         <div id="seatContainer" class="seat-grid">
-          <div style="color:#666;">Waiting for zone selection...</div>
+          <div style="color:#666; text-align: center; grid-column: 1/-1;">Please select a zone to see available seats</div>
         </div>
-        <div style="background:#222; padding:15px; border-radius:5px;">
-          Selected: <span id="selectedSeatsDisplay" style="color:var(--secondary);">None</span>
-          <button onclick="bookSeats()" style="margin-top:10px;">3. Book Selected</button>
+        <div style="background:rgba(0,0,0,0.3); padding:20px; border-radius:8px; border: 1px solid var(--border);">
+          <div style="margin-bottom:15px;">Selected: <span id="selectedSeatsDisplay" style="color:var(--secondary); font-weight:bold; font-size:1.1rem;">None</span></div>
+          <div class="flex-row">
+            <select id="deliveryType" style="flex: 0 1 200px;">
+              <option value="digital">Digital Ticket</option>
+              <option value="pickup">Pick up at Venue</option>
+              <option value="postal">Postal Delivery</option>
+            </select>
+            <button onclick="bookSeats()" id="bookBtn" class="success">Confirm & Book Now</button>
+          </div>
         </div>
-        <hr style="border-color:var(--border); margin:20px 0;">
-        <div class="flex-row">
-          <input type="number" id="mockBookingId" placeholder="Booking ID">
-          <button onclick="confirmBooking()" class="secondary">Mock Payment Confirm</button>
-        </div>
-      </div>
-    </div>
+      </section>
 
-    <!-- 3. ORGANIZER PANEL -->
-    <div id="organizerPanel">
-      <div class="card" style="margin-bottom: 20px;">
-        <h2>Create Concert</h2>
-        <div class="flex-row">
-          <input type="text" id="newConcertTitle" placeholder="Title">
-          <input type="text" id="newConcertArtist" placeholder="Artist">
-          <input type="text" id="newConcertVenue" placeholder="Venue">
+      <section>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 40px;">
+          <h3 style="margin:0;">My Booking History</h3>
+          <button onclick="fetchMyBookings()" class="secondary" style="width:auto; margin:0;">Refresh History</button>
         </div>
-        <div class="flex-row">
-          <input type="text" id="newConcertAddress" placeholder="Address (Province/City)">
-          <input type="text" id="newConcertDate" placeholder="Date (YYYY-MM-DD HH:MM:SS)">
-          <input type="text" id="newConcertSaleDate" placeholder="Sale Open (YYYY-MM-DD HH:MM:SS)">
-        </div>
-        <button onclick="createConcert()" style="margin-top: 10px;">Create Concert</button>
-      </div>
-
-      <div class="card" style="margin-bottom: 20px;">
-        <h2>Organizer Dashboard</h2>
-        <div class="flex-row">
-          <select id="orgConcertSelect"></select>
-          <button onclick="fetchConcertsForOrganizer()" style="max-width:150px;" class="secondary">Load
-            Concerts</button>
-          <button onclick="fetchOrganizerQueues()" style="max-width:150px;">Load Queues</button>
-          <button onclick="autoSortQueues()" style="max-width:150px;" class="secondary">Auto Sort Queue</button>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>Queue Management</h2>
-        <table id="orgQueueTable">
+        <table id="myBookingsTable">
           <thead>
             <tr>
-              <th>Queue ID</th>
-              <th>Customer Name</th>
-              <th>Priority Score</th>
-              <th>Time</th>
+              <th>ID</th>
+              <th>Concert</th>
+              <th>Tickets</th>
+              <th>Amount</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colspan="6" style="text-align:center; color:#666;">No data. Click "Load Queues" first.</td>
-            </tr>
+            <tr><td colspan="6" style="text-align:center; color:#666;">No bookings yet.</td></tr>
           </tbody>
         </table>
-      </div>
+      </section>
     </div>
 
-    <!-- 4. STAFF PANEL -->
-    <div id="staffPanel">
-      <div class="card" style="text-align: center; padding: 50px;">
-        <h2 style="font-size: 2rem;">Gate Checker Dashboard</h2>
-        <p style="color: #888;">This page is currently empty. Further implementation is coming soon.</p>
-        <button onclick="logout()" style="max-width: 200px; margin-top:20px;" class="danger">Logout</button>
-      </div>
+    <!-- 3. ORGANIZER PANEL -->
+    <div id="organizerPanel" class="card">
+      <h2>Organizer Control Room</h2>
+
+      <section>
+        <h3>Create New Concert</h3>
+        <div class="flex-row">
+          <input type="text" id="newConcertTitle" placeholder="Concert Title" value="Rock Fest 2026">
+          <input type="text" id="newConcertArtist" placeholder="Artist Name" value="Rock Stars">
+          <input type="text" id="newConcertVenue" placeholder="Venue Name" value="Impact Arena">
+        </div>
+        <div class="flex-row">
+          <input type="text" id="newConcertAddress" placeholder="Province/City" value="Nonthaburi">
+          <input type="datetime-local" id="newConcertDate" value="2026-06-15T19:00">
+          <input type="datetime-local" id="newConcertSaleDate" value="2026-05-01T10:00">
+        </div>
+        
+        <h4 style="margin-top:15px; color:var(--primary);">Zones Configuration</h4>
+        <div id="newConcertZonesContainer">
+          <div class="flex-row zone-row" style="margin-bottom:5px;">
+            <input type="text" class="zone-name" placeholder="Zone (e.g. VIP)" value="VIP">
+            <input type="text" class="zone-row-prefix" placeholder="Row (e.g. A)" value="A" style="max-width:80px;">
+            <input type="number" class="zone-seats" placeholder="Seats" value="50">
+            <input type="number" class="zone-price" placeholder="Price" value="5000">
+            <button type="button" onclick="this.parentElement.remove()" class="danger" style="width:auto; margin-bottom:10px;">X</button>
+          </div>
+        </div>
+        <div class="flex-row">
+          <button type="button" onclick="addZoneRow()" class="secondary" style="margin-bottom:15px;">+ Add Another Zone</button>
+          <div style="flex:2;"></div>
+          <button onclick="createConcert()" class="success">Create Concert with Zones</button>
+        </div>
+      </section>
+
+      <section style="margin-top: 30px;">
+        <h3>Event Management</h3>
+        <div class="flex-row">
+          <select id="orgConcertSelect" onchange="loadOrgConcertDetails()"></select>
+          <button onclick="fetchConcertsForOrganizer()" class="secondary">Reload List</button>
+          <button onclick="autoSortQueues()" class="warning" id="autoSortBtn">Auto-Sort Queue</button>
+          <button onclick="loadFinancialDashboard()" class="success">Financial Stats</button>
+        </div>
+        
+        <div id="orgConcertControls" style="display:none; margin-top: 20px; padding: 20px; border: 1px solid var(--border); border-radius: 8px;">
+           <div class="flex-row">
+             <div style="flex: 2;">
+               <h4>Zones Management</h4>
+               <div id="orgZonesContainer" class="flex-row"></div>
+             </div>
+           </div>
+        </div>
+
+        <h4 style="margin-top: 30px; color: var(--primary);">Queue Management</h4>
+        <div style="max-height: 400px; overflow-y: auto;">
+          <table id="orgQueueTable">
+            <thead>
+              <tr>
+                <th>ID/Time</th>
+                <th>Customer</th>
+                <th>Score</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
     </div>
 
     <!-- System Logs -->
-    <div class="logs" id="logs"></div>
+    <div class="card" style="margin-top: 20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <h2 style="margin:0; border-bottom:none;">System Logs</h2>
+        <button onclick="document.getElementById('logs').innerHTML=''" class="secondary" style="width:auto; margin:0; padding:4px 10px; font-size:11px;">Clear</button>
+      </div>
+      <div class="logs" id="logs"></div>
+    </div>
 
+  </div>
+
+  <!-- Modal for Payment QR -->
+  <div id="paymentModal" class="modal-overlay">
+    <div class="modal-content">
+      <h2 style="color:var(--primary); margin-top:0;">Payment</h2>
+      <p>Scan this QR code to pay ฿<span id="paymentAmountDisplay">0.00</span></p>
+      <div id="qrContainer">
+        <!-- In real app, we'd use qrcode.js. Here we mock it -->
+        <div style="text-align:center; color:#000;">[QR CODE PAYLOAD]<br><br><small id="qrPayloadDisplay" style="word-break:break-all;"></small></div>
+      </div>
+      <p style="text-align:center; font-weight:bold;" id="paymentTimer">Expires in: --:--</p>
+      <button onclick="closePaymentModal()" class="secondary">Cancel Payment</button>
+      <button onclick="manualConfirmStub()" style="margin-top:10px;">Testing: Manual Confirm</button>
+    </div>
+  </div>
+
+  <!-- Modal for Refund Form -->
+  <div id="refundModal" class="modal-overlay">
+    <div class="modal-content">
+      <h2 id="refundModalTitle">Request Refund</h2>
+      <input type="hidden" id="refundBookingId">
+      <input type="hidden" id="isVoucherRefund" value="0">
+      <input type="text" id="refundBank" placeholder="Bank Name (e.g. Kasikorn)" value="KBank">
+      <input type="text" id="refundAccount" placeholder="Account Number" value="1234567890">
+      <input type="text" id="refundAccountName" placeholder="Account Name" value="Test User">
+      <textarea id="refundReason" placeholder="Reason (Optional)" style="width:100%; height:80px; box-sizing: border-box;"></textarea>
+      <div class="flex-row">
+        <button onclick="closeRefundModal()" class="secondary">Cancel</button>
+        <button onclick="submitRefund()" class="danger">Submit Request</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -363,8 +544,10 @@
     let token = null;
     let currentUser = null;
     let selectedSeatIds = new Set();
+    let queueStatusInterval = null;
+    let paymentPollingInterval = null;
 
-    // ----------- Common Logs & API Fetch -----------
+    // ----------- Utils -----------
     function log(msg, err = false) {
       const logs = document.getElementById("logs");
       const div = document.createElement("div");
@@ -379,8 +562,12 @@
       if (token) hdrs["Authorization"] = `Bearer ${token}`;
       try {
         const res = await fetch(API_URL + path, { ...options, headers: { ...hdrs, ...options.headers } });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || data.message || "Error");
+        let data = {};
+        if (res.status !== 204) {
+           const text = await res.text();
+           if (text) data = JSON.parse(text);
+        }
+        if (!res.ok) throw new Error(data.detail || data.message || `Error ${res.status}`);
         return data;
       } catch (err) {
         log(`API Error [${path}]: ${err.message}`, true);
@@ -389,18 +576,20 @@
     }
 
     // ----------- Auth -----------
-    function switchRoleUI(role) {
-      const p = { authPanel: 0, customerPanel: 0, organizerPanel: 0, staffPanel: 0 };
-      if (!role) p.authPanel = 1;
-      else if (role === 'customer') p.customerPanel = 1;
-      else if (role === 'organizer') p.organizerPanel = 1;
-      else if (role === 'staff') p.staffPanel = 1;
-
-      Object.keys(p).forEach(k => {
-        document.getElementById(k).style.display = p[k] ? 'block' : 'none';
+    function setupUI(role) {
+      const panels = { authPanel: 0, customerPanel: 0, organizerPanel: 0 };
+      if (!role) panels.authPanel = 1;
+      else if (role === 'customer') panels.customerPanel = 1;
+      else if (role === 'organizer') panels.organizerPanel = 1;
+      
+      Object.keys(panels).forEach(k => {
+        document.getElementById(k).style.display = panels[k] ? 'block' : 'none';
       });
 
-      if (role === 'customer') fetchConcertsForCustomer();
+      if (role === 'customer') {
+        fetchConcertsForCustomer();
+        fetchMyBookings();
+      }
       if (role === 'organizer') fetchConcertsForOrganizer();
     }
 
@@ -410,275 +599,554 @@
         const password = document.getElementById("loginPassword").value;
         const res = await api("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
         token = res.access_token;
-        log("Login success.");
-
+        localStorage.setItem("tooket_token", token);
+        
         currentUser = await api("/auth/me");
-        document.getElementById("userInfo").textContent = `Logged in: ${currentUser.email} (${currentUser.role}) | `;
-        const logoutBtn = document.createElement('a');
-        logoutBtn.innerText = "Logout";
-        logoutBtn.style.color = "var(--error)";
-        logoutBtn.style.cursor = "pointer";
-        logoutBtn.onclick = logout;
-        document.getElementById("userInfo").appendChild(logoutBtn);
-
-        switchRoleUI(currentUser.role);
-      } catch (e) { }
+        
+        displayUser();
+        log(`Logged in as ${currentUser.email}`);
+        setupUI(currentUser.role);
+      } catch (e) {}
     }
-    // ฟังก์ชันสำหรับส่งผู้ใช้ไปที่หน้า LINE Login
-    async function loginWithLine() {
-      try {
-        localStorage.setItem("oauth_provider", "line");
-        const res = await api("/auth/oauth/line/authorize-url");
-        // ระบบจะพาผู้ใช้ไปยัง URL ของ LINE ที่ Backend สร้างมาให้
-        window.location.href = res.authorize_url;
-      } catch (e) {
-        log("Failed to get LINE Authorize URL", true);
+
+    function displayUser() {
+      if (currentUser) {
+        document.getElementById("userInfo").innerHTML = `<b>${currentUser.email}</b> (${currentUser.role}) | <a href="#" onclick="logout()" style="color:var(--error)">Logout</a>`;
+      } else {
+        document.getElementById("userInfo").textContent = "Not Logged In";
       }
     }
-
-    async function loginWithGoogle() {
-      try {
-        localStorage.setItem("oauth_provider", "google");
-        const res = await api("/auth/oauth/google/authorize-url");
-        window.location.href = res.authorize_url;
-      } catch (e) {
-        log("Failed to get Google Authorize URL", true);
-      }
-    }
-
-    // ฟังก์ชันสำหรับจัดการรหัส (Code) หลังจาก Login สำเร็จแล้วดีดกลับมาที่หน้าเว็บ
-    async function handleOAuthCallback() {
-      const urlParams = new URLSearchParams(window.location.search);
-      const code = urlParams.get('code');
-      const provider = localStorage.getItem("oauth_provider") || "line";
-
-      if (code) {
-        log(`Processing ${provider.toUpperCase()} Callback...`);
-
-        // ล้าง Parameter code ออกจาก URL เพื่อความสวยงามและความปลอดภัย
-        window.history.replaceState({}, document.title, window.location.pathname);
-
-        try {
-          // ส่ง code ไปแลก JWT Token ที่ Backend
-          const res = await api(`/auth/oauth/${provider}/callback?code=${code}`);
-          token = res.access_token;
-          log(`${provider.toUpperCase()} Login successful.`);
-
-          // ดึงข้อมูล User และสลับหน้าจอ UI
-          currentUser = await api("/auth/me");
-          document.getElementById("userInfo").textContent = `Logged in: ${currentUser.email} (${currentUser.role}) | `;
-
-          const logoutBtn = document.createElement('a');
-          logoutBtn.innerText = "Logout";
-          logoutBtn.style.color = "var(--error)";
-          logoutBtn.style.cursor = "pointer";
-          logoutBtn.onclick = logout;
-          document.getElementById("userInfo").appendChild(logoutBtn);
-
-          switchRoleUI(currentUser.role);
-          localStorage.removeItem("oauth_provider");
-        } catch (e) {
-          log(`${provider.toUpperCase()} Login failed: ` + e.message, true);
-        }
-      }
-    }
-
-    // เพิ่มคำสั่งให้ตรวจสอบ Callback ทุกครั้งที่โหลดหน้าเว็บ
-    window.addEventListener('load', handleOAuthCallback);
 
     async function register() {
       try {
         const body = {
-          id_card: "UID-" + Math.floor(Math.random() * 10000),
-          name: document.getElementById("regName").value,
           email: document.getElementById("regEmail").value,
-          phone: "0000000000", address: "Local",
           password: document.getElementById("regPassword").value,
-          role: document.getElementById("regRole").value
+          name: document.getElementById("regName").value,
+          role: document.getElementById("regRole").value,
+          address: document.getElementById("regAddress").value,
+          id_card: document.getElementById("regIdCard").value,
+          phone: document.getElementById("regPhone").value
         };
         await api("/auth/register", { method: "POST", body: JSON.stringify(body) });
-        log("Registered successfully.");
-      } catch (e) { }
+        log("Registration successful! You can now login.");
+      } catch (e) {}
     }
 
     function logout() {
-      token = null; currentUser = null;
-      document.getElementById("userInfo").textContent = "Not Logged In";
-      switchRoleUI(null);
+      token = null; 
+      currentUser = null;
+      localStorage.removeItem("tooket_token");
+      clearInterval(queueStatusInterval);
+      clearInterval(paymentPollingInterval);
+      displayUser();
+      setupUI(null);
       log("Logged out.");
     }
 
-    // ----------- Specifics for Concert Fetching -----------
-    async function fetchConcertsAndPopulate(selectId) {
+    // ----------- Customer Logic -----------
+    async function fetchConcertsForCustomer() {
       try {
         const concerts = await api("/booking/concerts");
-        const select = document.getElementById(selectId);
-        select.innerHTML = "";
+        const select = document.getElementById("customerConcertSelect");
+        select.innerHTML = '<option value="">-- Select Concert --</option>';
         concerts.forEach(c => {
-          const opt = document.createElement("option");
-          opt.value = c.concert_id;
-          opt.textContent = `${c.title} (ID: ${c.concert_id})`;
-          select.appendChild(opt);
+          select.innerHTML += `<option value="${c.concert_id}">${c.title} [${c.status}]</option>`;
         });
-        if (concerts.length === 0) select.innerHTML = "<option>No active concerts found</option>";
-        log(`Loaded ${concerts.length} concerts.`);
-      } catch (e) { }
+      } catch (e) {}
     }
 
-    // ----------- Customer -----------
-    function fetchConcertsForCustomer() { fetchConcertsAndPopulate("customerConcertSelect"); }
     function resetCustomerFlow() {
-      document.getElementById("queueStatusDisplay").textContent = "Queue: -";
-      document.getElementById("seatContainer").innerHTML = "<div style='color:#666;'>Waiting for zone selection...</div>";
-      document.getElementById("zoneSelect").innerHTML = "<option value=''>-- Select Zone --</option>";
-      selectedSeatIds.clear(); updateSeatDisplay();
+      const cId = document.getElementById("customerConcertSelect").value;
+      document.getElementById("seatSection").style.display = 'none';
+      document.getElementById("queueStatusDisplay").style.display = 'none';
+      clearInterval(queueStatusInterval);
+      if (!cId) return;
+      
+      // Auto-check if we are in queue
+      checkQueueStatusInitially();
     }
 
-    function getCustConcert() { return document.getElementById("customerConcertSelect").value; }
+    async function checkQueueStatusInitially() {
+       try {
+         const cId = document.getElementById("customerConcertSelect").value;
+         const res = await api(`/booking/concerts/${cId}/queue/status`);
+         startQueuePolling();
+       } catch (e) {
+         // Probably not in queue yet, that's fine
+       }
+    }
 
     async function joinQueue() {
-      try {
-        const cId = getCustConcert();
-        const res = await api(`/booking/concerts/${cId}/queue/join`, { method: "POST" });
-        log(res.message); checkQueueStatus();
-      } catch (e) { }
+       const cId = document.getElementById("customerConcertSelect").value;
+       if (!cId) return log("Select a concert first", true);
+       try {
+         const res = await api(`/booking/concerts/${cId}/queue/join`, { method: "POST" });
+         log(res.message);
+         startQueuePolling();
+       } catch (e) {}
     }
 
-    async function checkQueueStatus() {
-      try {
-        const res = await api(`/booking/concerts/${getCustConcert()}/queue/status`);
-        document.getElementById("queueStatusDisplay").textContent = `Queue ID: ${res.queue_id} | Status: ${res.status} | Priority: ${res.priority_score} | Pos: ${res.position_in_queue || '-'} / ${res.total_waiting}`;
-        log(`Status is ${res.status}`);
-      } catch (e) { }
+    function startQueuePolling() {
+      clearInterval(queueStatusInterval);
+      document.getElementById("queueStatusDisplay").style.display = 'block';
+      
+      const poll = async () => {
+         const cId = document.getElementById("customerConcertSelect").value;
+         if (!cId) return clearInterval(queueStatusInterval);
+         
+         const res = await api(`/booking/concerts/${cId}/queue/status`);
+         const display = document.getElementById("queueStatusDisplay");
+         display.innerHTML = `
+           <strong>Queue ID: ${res.queue_id}</strong> | Status: <b>${res.status}</b><br>
+           ${res.status === 'waiting' ? `Position: ${res.position_in_queue} / ${res.total_waiting}` : 'You are ready to select seats!'}
+         `;
+         
+         if (res.status === 'admitted') {
+           clearInterval(queueStatusInterval);
+           document.getElementById("seatSection").style.display = 'block';
+           log("Admitted to booking! Loading zones...");
+           loadZones();
+         }
+      };
+      
+      poll();
+      queueStatusInterval = setInterval(poll, 4000);
     }
 
     async function loadZones() {
+      const cId = document.getElementById("customerConcertSelect").value;
       try {
-        const zones = await api(`/booking/concerts/${getCustConcert()}/zones`);
+        const zones = await api(`/booking/concerts/${cId}/zones`);
         const sel = document.getElementById("zoneSelect");
-        sel.innerHTML = "<option value=''>-- Select Zone --</option>";
-        zones.forEach(z => sel.innerHTML += `<option value='${z.zone_id}'>${z.zone_name} (฿${z.price}) - ${z.available_count} left</option>`);
-      } catch (e) { }
+        sel.innerHTML = '<option value="">-- Select Zone --</option>';
+        zones.forEach(z => {
+          sel.innerHTML += `<option value="${z.zone_id}" ${!z.is_active ? 'disabled' : ''}>${z.zone_name} (฿${z.price}) - ${z.available_count} left ${!z.is_active ? '[CLOSED]' : ''}</option>`;
+        });
+      } catch (e) {}
     }
 
     async function loadSeats() {
+      const cId = document.getElementById("customerConcertSelect").value;
       const zId = document.getElementById("zoneSelect").value;
       if (!zId) return;
       try {
-        const seats = await api(`/booking/concerts/${getCustConcert()}/zones/${zId}/seats`);
-        const con = document.getElementById("seatContainer");
-        con.innerHTML = ""; selectedSeatIds.clear(); updateSeatDisplay();
+        const seats = await api(`/booking/concerts/${cId}/zones/${zId}/seats`);
+        const container = document.getElementById("seatContainer");
+        container.innerHTML = "";
+        selectedSeatIds.clear();
+        updateSelectedSeatsDisplay();
+        
         seats.forEach(s => {
-          const d = document.createElement("div");
-          d.className = `seat ${s.status}`; d.textContent = s.seat_number;
-          d.onclick = () => {
-            if (s.status !== 'available') { log("Cannot select.", true); return; }
-            if (selectedSeatIds.has(s.seat_id)) { selectedSeatIds.delete(s.seat_id); d.classList.remove('selected'); }
-            else { selectedSeatIds.add(s.seat_id); d.classList.add('selected'); }
-            updateSeatDisplay();
+          const div = document.createElement('div');
+          div.className = `seat ${s.status}`;
+          div.textContent = s.seat_number;
+          if (s.status === 'available') {
+            div.onclick = () => {
+              if (selectedSeatIds.has(s.seat_id)) {
+                selectedSeatIds.delete(s.seat_id);
+                div.classList.remove('selected');
+              } else {
+                selectedSeatIds.add(s.seat_id);
+                div.classList.add('selected');
+              }
+              updateSelectedSeatsDisplay();
+            };
           }
-          con.appendChild(d);
+          container.appendChild(div);
         });
-      } catch (e) { }
+      } catch (e) {}
     }
-    function updateSeatDisplay() {
+
+    function updateSelectedSeatsDisplay() {
       document.getElementById("selectedSeatsDisplay").textContent = selectedSeatIds.size > 0 ? Array.from(selectedSeatIds).join(", ") : "None";
     }
 
     async function bookSeats() {
+      const cId = document.getElementById("customerConcertSelect").value;
+      if (selectedSeatIds.size === 0) return log("Select at least one seat", true);
+      
       try {
-        const res = await api("/booking/book", { method: "POST", body: JSON.stringify({ concert_id: getCustConcert(), seat_ids: Array.from(selectedSeatIds) }) });
-        log(`Success! ID: ${res.booking_id}`);
-        document.getElementById("mockBookingId").value = res.booking_id;
-        loadSeats();
-      } catch (e) { }
+        const body = {
+          concert_id: parseInt(cId),
+          seat_ids: Array.from(selectedSeatIds),
+          delivery_type: document.getElementById("deliveryType").value
+        };
+        const res = await api("/booking/book", { method: "POST", body: JSON.stringify(body) });
+        log(res.message);
+        fetchMyBookings();
+        document.getElementById("seatSection").style.display = 'none';
+        
+        // Auto-open payment if possible
+        startPaymentFlow(res.booking_id, res.total_amount);
+      } catch (e) {}
     }
 
-    async function confirmBooking() {
+    async function fetchMyBookings() {
       try {
-        const id = document.getElementById("mockBookingId").value;
-        await api(`/booking/${id}/confirm`, { method: "POST" });
-        log("Confirmed Payment!"); loadSeats();
-      } catch (e) { }
+        const bookings = await api("/booking/my");
+        const tbody = document.querySelector("#myBookingsTable tbody");
+        tbody.innerHTML = "";
+        
+        if (bookings.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#666;">No bookings found.</td></tr>';
+          return;
+        }
+
+        bookings.forEach(b => {
+          let statusClass = "status-pending";
+          if (b.status === 'paid') statusClass = "status-paid";
+          if (b.status === 'expired' || b.status === 'cancelled') statusClass = "status-expired";
+          if (b.status === 'zone_closed_action_required') statusClass = "status-action";
+          
+          let actions = "";
+          if (b.status === 'pending') {
+            actions = `<button class="success" style="padding:4px 8px; font-size:11px;" onclick="startPaymentFlow(${b.booking_id}, ${b.total_amount})">Pay Now</button>`;
+          } else if (b.status === 'paid') {
+            actions = `<button class="danger" style="padding:4px 8px; font-size:11px;" onclick="openRefundModal(${b.booking_id}, false)">Refund</button>`;
+          } else if (b.status === 'zone_closed_action_required') {
+             actions = `
+               <button class="warning" style="padding:4px 8px; font-size:11px; margin-bottom:5px;" onclick="startRebookFlow(${b.booking_id})">Re-select Seats</button><br>
+               <button class="danger" style="padding:4px 8px; font-size:11px;" onclick="openRefundModal(${b.booking_id}, true)">Full Refund</button>
+             `;
+          }
+
+          tbody.innerHTML += `
+            <tr>
+              <td>#${b.booking_id}</td>
+              <td>${b.concert_title}<br><small>${b.concert_datetime}</small></td>
+              <td>${b.total_tickets}</td>
+              <td>฿${parseFloat(b.total_amount).toLocaleString()}</td>
+              <td><span class="status-pill ${statusClass}">${b.status}</span></td>
+              <td>${actions}</td>
+            </tr>
+          `;
+        });
+      } catch (e) {}
     }
 
-    // ----------- Organizer -----------
-    function fetchConcertsForOrganizer() { fetchConcertsAndPopulate("orgConcertSelect"); }
+    // ----------- Payment Flow -----------
+    let currentPaymentRef = null;
+    let paymentBookingId = null;
+
+    async function startPaymentFlow(bookingId, amount) {
+      try {
+        const res = await api("/api/v1/payments/generate-qr", { method: "POST", body: JSON.stringify({ booking_id: bookingId, method: "qr_code" }) });
+        
+        document.getElementById("paymentAmountDisplay").textContent = parseFloat(res.amount).toFixed(2);
+        document.getElementById("qrPayloadDisplay").textContent = res.qr_payload;
+        document.getElementById("paymentModal").style.display = 'flex';
+        
+        currentPaymentRef = res.transaction_ref;
+        paymentBookingId = bookingId;
+        
+        // Start polling status
+        startPaymentPolling(res.transaction_ref);
+        
+        // Simple timer mock
+        const expiry = new Date(res.expired_at).getTime();
+        const timerInt = setInterval(() => {
+          const now = new Date().getTime();
+          const diff = expiry - now;
+          if (diff <= 0) {
+            clearInterval(timerInt);
+            document.getElementById("paymentTimer").textContent = "EXPIRED";
+            return;
+          }
+          const m = Math.floor(diff / 60000);
+          const s = Math.floor((diff % 60000) / 1000);
+          document.getElementById("paymentTimer").textContent = `Expires in: ${m}:${s.toString().padStart(2, '0')}`;
+        }, 1000);
+      } catch (e) {}
+    }
+
+    function startPaymentPolling(ref) {
+      clearInterval(paymentPollingInterval);
+      paymentPollingInterval = setInterval(async () => {
+        try {
+          const res = await api(`/api/v1/payments/status/${ref}`);
+          if (res.payment_status === 'paid' || res.booking_status === 'paid') {
+            clearInterval(paymentPollingInterval);
+            log(`Booking #${res.booking_id} Paid Successfully!`);
+            closePaymentModal();
+            fetchMyBookings();
+          } else if (res.payment_status === 'expired' || res.payment_status === 'failed') {
+            clearInterval(paymentPollingInterval);
+            log("Payment failed or expired.", true);
+          }
+        } catch (e) {
+          clearInterval(paymentPollingInterval);
+        }
+      }, 3000);
+    }
+
+    function closePaymentModal() {
+      document.getElementById("paymentModal").style.display = 'none';
+      clearInterval(paymentPollingInterval);
+    }
+
+    async function manualConfirmStub() {
+       // Testing endpoint from guide 1.9
+       try {
+         await api(`/booking/${paymentBookingId}/confirm`, { method: "POST" });
+         log("Manual confirmation triggered.");
+         closePaymentModal();
+         fetchMyBookings();
+       } catch (e) {}
+    }
+
+    // ----------- Refund Flow -----------
+    function openRefundModal(bookingId, isVoucher) {
+      document.getElementById("refundBookingId").value = bookingId;
+      document.getElementById("isVoucherRefund").value = isVoucher ? "1" : "0";
+      document.getElementById("refundModalTitle").textContent = isVoucher ? "Zone Closure Full Refund" : "Request Refund";
+      document.getElementById("refundModal").style.display = 'flex';
+    }
+
+    function closeRefundModal() {
+      document.getElementById("refundModal").style.display = 'none';
+    }
+
+    async function submitRefund() {
+      const bId = document.getElementById("refundBookingId").value;
+      const isVoucher = document.getElementById("isVoucherRefund").value === "1";
+      
+      const body = {
+        bank_name: document.getElementById("refundBank").value,
+        account_number: document.getElementById("refundAccount").value,
+        account_name: document.getElementById("refundAccountName").value,
+        reason: document.getElementById("refundReason").value
+      };
+
+      try {
+        let res;
+        if (isVoucher) {
+          res = await api(`/api/v1/refunds/voucher/${bId}`, { method: "POST", body: JSON.stringify(body) });
+        } else {
+          res = await api("/api/v1/refunds/request", { method: "POST", body: JSON.stringify({ ...body, booking_id: parseInt(bId) }) });
+        }
+        log(res.message);
+        closeRefundModal();
+        fetchMyBookings();
+      } catch (e) {}
+    }
+
+    // ----------- Rebook Flow -----------
+    async function startRebookFlow(bookingId) {
+       // We need to find the concert ID for this booking
+       try {
+         const bookings = await api("/booking/my");
+         const b = bookings.find(x => x.booking_id === bookingId);
+         if (!b) return;
+         
+         // Mock UI switch to seat selection
+         log(`Rebooking for #${bookingId}. Please select new seats.`);
+         
+         // In a real app we'd have a separate mode. For this test tool:
+         // 1. Switch concert select to the booking's concert
+         // 2. Load zones
+         // 3. User selects seats
+         // 4. Then we call rebook API instead of book API
+         
+         // Let's add a global state
+         window.rebookingId = bookingId;
+         document.getElementById("bookBtn").textContent = "Confirm Rebook (Free)";
+         document.getElementById("bookBtn").onclick = submitRebook;
+         
+         // Find concert ID via hack for this test tool (usually UI context knows)
+         // Assuming we can just find it by name or fetching all
+         const concerts = await api("/booking/concerts");
+         const c = concerts.find(x => x.title === b.concert_title);
+         if (c) {
+           document.getElementById("customerConcertSelect").value = c.concert_id;
+           document.getElementById("seatSection").style.display = 'block';
+           loadZones();
+         }
+       } catch (e) {}
+    }
+
+    async function submitRebook() {
+       if (selectedSeatIds.size === 0) return log("Select new seats", true);
+       try {
+         const res = await api(`/booking/${window.rebookingId}/rebook`, { 
+            method: "POST", 
+            body: JSON.stringify({ new_seat_ids: Array.from(selectedSeatIds) }) 
+         });
+         log(res.message);
+         window.rebookingId = null;
+         document.getElementById("bookBtn").textContent = "Confirm & Book Now";
+         document.getElementById("bookBtn").onclick = bookSeats;
+         document.getElementById("seatSection").style.display = 'none';
+         fetchMyBookings();
+       } catch (e) {}
+    }
+
+
+    // ----------- Organizer Logic -----------
+    async function fetchConcertsForOrganizer() {
+      try {
+        const concerts = await api("/booking/concerts");
+        const select = document.getElementById("orgConcertSelect");
+        select.innerHTML = '<option value="">-- Select Concert --</option>';
+        concerts.forEach(c => {
+          select.innerHTML += `<option value="${c.concert_id}">${c.title} (ID: ${c.concert_id})</option>`;
+        });
+      } catch (e) {}
+    }
+
+    async function loadOrgConcertDetails() {
+      const cId = document.getElementById("orgConcertSelect").value;
+      if (!cId) return;
+      
+      document.getElementById("orgConcertControls").style.display = 'block';
+      fetchOrganizerQueues();
+      loadOrgZones();
+    }
 
     async function fetchOrganizerQueues() {
       const cId = document.getElementById("orgConcertSelect").value;
-      if (!cId) return;
       try {
         const queues = await api(`/organizer/concerts/${cId}/queues`);
-        const tbody = document.getElementById("orgQueueTable").querySelector("tbody");
+        const tbody = document.querySelector("#orgQueueTable tbody");
         tbody.innerHTML = "";
-        if (queues.length === 0) tbody.innerHTML = "<tr><td colspan='6' style='text-align:center;'>No queues found.</td></tr>";
-
+        
         queues.forEach(q => {
-          const tr = document.createElement("tr");
-          tr.innerHTML = `
-            <td>#${q.queue_id}</td>
-            <td>${q.customer_name}<br><small style="color:var(--secondary);">${q.customer_email}</small></td>
-            <td>
-              <input type="number" id="q_score_${q.queue_id}" value="${q.priority_score}" style="width:60px; padding:5px; margin:0;">
-              <button onclick="updateQueuePriority(${q.queue_id})" class="secondary" style="padding:5px; margin-left:5px; width:auto; font-size:10px;">Save</button>
-            </td>
-            <td>${q.entered_at?.split('T')[1].split('.')[0] || '-'}</td>
-            <td><strong>${q.status}</strong></td>
-            <td>
-              ${q.status === 'waiting' ? `<button onclick="admitQueueFromOrg(${q.queue_id})" style="padding:5px; background:var(--secondary); width:auto;">Admit</button>` : `<span style="color:#666;">-</span>`}
-            </td>
+          tbody.innerHTML += `
+            <tr>
+              <td>#${q.queue_id}<br><small>${new Date(q.entered_at).toLocaleTimeString()}</small></td>
+              <td>${q.customer_name}<br><small style="color:#888;">${q.customer_email}</small></td>
+              <td><input type="number" value="${q.priority_score}" style="width:50px;" onchange="updateQueuePriority(${q.queue_id}, this.value)"></td>
+              <td><b>${q.status}</b></td>
+              <td>
+                ${q.status === 'waiting' ? `<button onclick="admitQueue(${q.queue_id})" class="success" style="padding:4px 8px; font-size:11px;">Admit</button>` : '-'}
+              </td>
+            </tr>
           `;
-          tbody.appendChild(tr);
         });
-        log(`Loaded ${queues.length} queue records.`);
-      } catch (e) { }
+      } catch (e) {}
     }
 
-    async function admitQueueFromOrg(qId) {
-      try {
-        await api(`/organizer/queues/${qId}/admit`, { method: "POST" });
-        log(`Queue ${qId} Admitted!`);
-        fetchOrganizerQueues();
-      } catch (e) { }
-    }
-
-    async function updateQueuePriority(qId) {
-      const score = document.getElementById(`q_score_${qId}`).value;
+    async function updateQueuePriority(qId, score) {
       try {
         await api(`/organizer/queues/${qId}/priority`, { method: "PATCH", body: JSON.stringify({ priority_score: parseInt(score) }) });
-        log(`Updated priority score for Queue ${qId}.`);
-        fetchOrganizerQueues();
-      } catch (e) { }
+        log(`Updated Queue #${qId} Priority to ${score}`);
+      } catch (e) {}
     }
 
-    async function createConcert() {
-      const data = {
-        title: document.getElementById("newConcertTitle").value,
-        artist: document.getElementById("newConcertArtist").value,
-        venue: document.getElementById("newConcertVenue").value,
-        address: document.getElementById("newConcertAddress").value,
-        concert_datetime: document.getElementById("newConcertDate").value,
-        sale_open_at: document.getElementById("newConcertSaleDate").value
-      };
-      if (!data.title || !data.concert_datetime) { log("Missing fields for Concert Creation", true); return; }
-
+    async function admitQueue(qId) {
       try {
-        await api("/organizer/concerts", { method: "POST", body: JSON.stringify(data) });
-        log("Concert Created successfully!");
-        fetchConcertsForOrganizer();
-      } catch (e) { }
+        await api(`/organizer/queues/${qId}/admit`, { method: "POST" });
+        log(`Admitted Queue #${qId}`);
+        fetchOrganizerQueues();
+      } catch (e) {}
     }
 
     async function autoSortQueues() {
       const cId = document.getElementById("orgConcertSelect").value;
-      if (!cId) { log("No concert selected.", true); return; }
       try {
         const res = await api(`/organizer/concerts/${cId}/queues/auto_sort`, { method: "POST" });
         log(res.message);
         fetchOrganizerQueues();
-      } catch (e) { }
+      } catch (e) {}
     }
+
+    async function loadOrgZones() {
+       const cId = document.getElementById("orgConcertSelect").value;
+       try {
+         const zones = await api(`/booking/concerts/${cId}/zones`);
+         const container = document.getElementById("orgZonesContainer");
+         container.innerHTML = "";
+         zones.forEach(z => {
+           container.innerHTML += `
+             <div style="background:#333; padding:10px; border-radius:4px; margin-bottom:5px;">
+               <b>${z.zone_name}</b> (฿${z.price})<br>
+               Status: ${z.is_active ? 'Active' : '<span style="color:red">Closed</span>'}<br>
+               ${z.is_active ? `<button class="danger" style="padding:2px 6px; font-size:10px; width:auto;" onclick="closeZone(${z.zone_id})">Close Zone</button>` : ''}
+             </div>
+           `;
+         });
+       } catch (e) {}
+    }
+
+    async function closeZone(zId) {
+      if (!confirm("Are you sure you want to close this zone? PAID tickets will need rebooking/refund!")) return;
+      try {
+        const res = await api(`/organizer/zones/${zId}/close`, { method: "POST" });
+        log(`Zone closed! Affected bookings: ${res.affected_bookings}`);
+        loadOrgZones();
+      } catch (e) {}
+    }
+
+    async function loadFinancialDashboard() {
+      const cId = document.getElementById("orgConcertSelect").value;
+      if (!cId) return;
+      try {
+        const res = await api(`/organizer/concerts/${cId}/dashboard`);
+        log(`--- Financial Stats for #${cId} ---`);
+        log(`Total Income: ฿${res.grand_totals.total_income}`);
+        log(`Total Refund: ฿${res.grand_totals.total_expense}`);
+        log(`Net Profit: ฿${res.grand_totals.total_net_profit}`);
+        console.table(res.daily_stats);
+      } catch (e) {}
+    }
+
+    function addZoneRow() {
+       const container = document.getElementById("newConcertZonesContainer");
+       const div = document.createElement("div");
+       div.className = "flex-row zone-row";
+       div.style.marginBottom = "5px";
+       div.innerHTML = `
+         <input type="text" class="zone-name" placeholder="Zone (e.g. A1)">
+         <input type="text" class="zone-row-prefix" placeholder="Row (e.g. B)" style="max-width:80px;">
+         <input type="number" class="zone-seats" placeholder="Seats">
+         <input type="number" class="zone-price" placeholder="Price">
+         <button type="button" onclick="this.parentElement.remove()" class="danger" style="width:auto; margin-bottom:10px;">X</button>
+       `;
+       container.appendChild(div);
+    }
+
+    async function createConcert() {
+       const zoneRows = document.querySelectorAll(".zone-row");
+       const zones = Array.from(zoneRows).map(row => ({
+         zone_name: row.querySelector(".zone-name").value,
+         row_prefix: row.querySelector(".zone-row-prefix").value || "A",
+         total_seats: parseInt(row.querySelector(".zone-seats").value) || 0,
+         price: parseFloat(row.querySelector(".zone-price").value) || 0
+       }));
+
+       const body = {
+         title: document.getElementById("newConcertTitle").value,
+         artist: document.getElementById("newConcertArtist").value,
+         venue: document.getElementById("newConcertVenue").value,
+         address: document.getElementById("newConcertAddress").value,
+         concert_datetime: document.getElementById("newConcertDate").value + ":00",
+         sale_open_at: document.getElementById("newConcertSaleDate").value + ":00",
+         zones: zones
+       };
+       try {
+         await api("/organizer/concerts", { method: "POST", body: JSON.stringify(body) });
+         log("Concert created successfully with zones!");
+         fetchConcertsForOrganizer();
+       } catch (e) {}
+    }
+
+    // ----------- Initialization -----------
+    async function initApp() {
+      const savedToken = localStorage.getItem("tooket_token");
+      if (savedToken) {
+        token = savedToken;
+        try {
+          currentUser = await api("/auth/me");
+          displayUser();
+          setupUI(currentUser.role);
+          log(`Session restored for ${currentUser.email}`);
+        } catch (e) {
+          log("Session expired, please login again.", true);
+          logout();
+        }
+      }
+    }
+    initApp();
 
   </script>
 </body>
