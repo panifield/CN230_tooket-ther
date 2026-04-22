@@ -7,11 +7,11 @@
 
 ## 1. ภาพรวมโปรเจกต์
 
-Tooket-ther คือแพลตฟอร์มจองบัตรคอนเสิร์ตแบบ End-to-End พัฒนาด้วย **Python (Flask)** + **PostgreSQL** โดยเน้นการแก้ปัญหาความไม่เป็นธรรมในการเข้าถึงบัตร, การจองซ้ำซ้อน และการบริหารโซนที่นั่ง
+Tooket-ther คือแพลตฟอร์มจองบัตรคอนเสิร์ตแบบ End-to-End พัฒนาด้วย **Python (FastAPI)** + **PostgreSQL** โดยเน้นการแก้ปัญหาความไม่เป็นธรรมในการเข้าถึงบัตร, การจองซ้ำซ้อน และการบริหารโซนที่นั่ง
 
 | รายการ | รายละเอียด |
 |---|---|
-| Backend | Python 3.12, Flask, SQLAlchemy, psycopg2 |
+| Backend | Python 3.12, FastAPI, SQLAlchemy, psycopg2 |
 | Database | PostgreSQL |
 | Frontend |  |
 | Auth | JWT + Line/Facebook OAuth |
@@ -262,7 +262,7 @@ ORDER BY u.priority_status DESC, q.entered_at ASC;
 
 | งาน | รายละเอียด |
 |---|---|
-| Flask Setup | ตั้ง Flask app, config, PostgreSQL connection ผ่าน psycopg2 |
+| FastAPI Setup | ตั้ง FastAPI app, config, PostgreSQL connection ผ่าน psycopg2 |
 | Auth | OAuth Login ผ่าน Line/Facebook API + JWT token |
 | Priority Queue | Logic คำนวณ priority_status จาก domicile |
 | Seat Soft Lock | BEGIN TRANSACTION → LOCK seat → set expiry_time |
@@ -294,7 +294,7 @@ ORDER BY u.priority_status DESC, q.entered_at ASC;
 | User UI | หน้า Login, เลือกโซน, แผนผังที่นั่ง, ชำระเงิน, ตั๋วของฉัน |
 | Organizer UI | Dashboard รายรับ/รายจ่าย, จัดการโซน |
 | Ticket Checker | หน้าสแกน QR + แสดงผลยืนยัน |
-| Flask Integration | เชื่อม template กับ route ทุกหน้า |
+| FastAPI Integration | เชื่อม template กับ route ทุกหน้า |
 | รายงาน + README | จัดทำ PDF รายงานฉบับสมบูรณ์ + README วิธีติดตั้ง |
 
 ---
@@ -349,7 +349,7 @@ docs: แก้ README หรือ comment
 
 ```
 cn230-tooket-ther/
-├── app.py                    # A2: Flask entry point
+├── app.py                    # A2: FastAPI entry point
 ├── models.py                 # A2: SQLAlchemy models (optional)
 ├── config.py                 # A2: config, DB URL จาก .env
 ├── requirements.txt          # ทุกคน: เพิ่ม library ที่ใช้
@@ -442,8 +442,8 @@ cp .env.example .env
 # แก้ค่า DATABASE_URL และ SECRET_KEY
 
 # 7. รันระบบ
-flask run
-# เปิด http://localhost:5000
+uvicorn app:app --reload
+# เปิด http://localhost:8000/docs
 ```
 
 ---
@@ -452,7 +452,7 @@ flask run
 
 | สัปดาห์ | A1 (DB) | A2 (Backend) | A3 (Payment) | A4 (Frontend) |
 |---|---|---|---|---|
-| สัปดาห์ 1 | ✅ schema.sql, seed.sql, ERD | ตั้ง Flask + DB connection | — | ตั้ง templates พื้นฐาน |
+| สัปดาห์ 1 | ✅ schema.sql, seed.sql, ERD | ตั้ง FastAPI + DB connection | — | ตั้ง templates พื้นฐาน |
 | สัปดาห์ 2 | ปรับ schema ตาม feedback | Priority Queue + Soft Lock | Payment + Refund flow | หน้า User (Login, จอง, จ่าย) |
 | สัปดาห์ 3 | เพิ่ม Index + View | เขียน Query ≥5 ข้อ | Zone Management + Dashboard API | Checker UI + Organizer UI |
 | สัปดาห์ 4 | — | Integration Test | Integration Test | รายงาน PDF + ซ้อม Demo |

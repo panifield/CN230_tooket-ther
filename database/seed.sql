@@ -7,189 +7,240 @@
 -- (ต้องรัน schema.sql ก่อน)
 -- ============================================================
 
--- ============================================================
--- 1. ORGANIZERS (3 ราย)
--- ============================================================
-INSERT INTO organizers (organizer_id, name, email, phone, company_name) VALUES
-(1, 'สมชาย วงศ์ดนตรี',   'somchai@bighit-th.com',  '0891234501', 'Big Hit Thailand'),
-(2, 'นฤมล อีเวนต์',      'narumon@live-nation.co.th','0891234502', 'Live Nation Thailand'),
-(3, 'ธนพล โปรโมชัน',     'thanapol@scg-event.com', '0891234503', 'SCG Event');
-
-SELECT setval('organizers_organizer_id_seq', 3);
+BEGIN;
 
 -- ============================================================
--- 2. USERS (12 ราย — ทั้งในและต่างประเทศ)
+-- 1. USERS (Organizer + Staff + Customer)
 -- ============================================================
-INSERT INTO users (user_id, name, email, phone, domicile, address, priority_status, auth_provider) VALUES
--- ผู้ใช้ในประเทศ (priority_status = 1)
-(1,  'อนันต์ ใจดี',        'anun@gmail.com',        '0811111101', 'กรุงเทพมหานคร',  '10/5 ถ.สุขุมวิท แขวงคลองเตย กรุงเทพฯ',     1, 'line'),
-(2,  'สุดา รักดนตรี',      'suda@gmail.com',        '0811111102', 'เชียงใหม่',       '25 ถ.นิมมานเหมินทร์ อ.เมือง เชียงใหม่',    1, 'facebook'),
-(3,  'ปรีชา แฟนพันธุ์แท้', 'precha@hotmail.com',    '0811111103', 'ขอนแก่น',         '88 ถ.มิตรภาพ อ.เมือง ขอนแก่น',             1, 'line'),
-(4,  'วิภา สุขสันต์',      'wipa@yahoo.com',        '0811111104', 'นครราชสีมา',      '44 ถ.มิตรภาพ อ.เมือง นครราชสีมา',          1, 'local'),
-(5,  'กานต์ มีสุข',        'karn@gmail.com',        '0811111105', 'สงขลา',           '12 ถ.จุติอนุสรณ์ อ.เมือง สงขลา',           1, 'facebook'),
-(6,  'นิชา พรรณงาม',       'nicha@gmail.com',       '0811111106', 'ภูเก็ต',          '33 ถ.เจ้าฟ้า อ.เมือง ภูเก็ต',              1, 'line'),
-(7,  'ธีรพล ชอบเพลง',     'teerapon@outlook.com',  '0811111107', 'ระยอง',           '7 ถ.สุขุมวิท อ.เมือง ระยอง',               1, 'local'),
-(8,  'ปิยะ วัฒนา',         'piya@gmail.com',        '0811111108', 'อุดรธานี',        '55 ถ.โพศรี อ.เมือง อุดรธานี',              1, 'facebook'),
--- ผู้ใช้ต่างประเทศ (priority_status = 0)
-(9,  'Akira Tanaka',       'akira@japan.co.jp',     NULL,         'Tokyo, Japan',    '1-2-3 Shibuya, Tokyo',                      0, 'line'),
-(10, 'Emily Chen',         'emily@sg.com',          NULL,         'Singapore',       '10 Orchard Road, Singapore',                0, 'facebook'),
-(11, 'James Park',         'james@korea.kr',        NULL,         'Seoul, Korea',    '123 Gangnam-gu, Seoul',                     0, 'local'),
-(12, 'Li Wei',             'liwei@china.cn',        NULL,         'Beijing, China',  '88 Wangfujing, Beijing',                    0, 'line');
+INSERT INTO users (id, id_card, name, email, role, phone, address, password) VALUES
+-- Organizer
+(1, '94038203838', 'สุพรัตน์ วงศวาง' ,'Suparat_t@gmail.com'    ,'organizer'    , '0648763092'        ,'Bangkok'  ,'Suprarut45.'),
+(2, '17283737282', 'Anunda Sery'  ,'Anunda_se@gmail.com'    ,'organizer'    , '0648745091'        ,'England'  ,'Anunda_organiz3.'),
 
-SELECT setval('users_user_id_seq', 12);
+-- Staff
+(3, '11110987172', 'กิติรัตน์ มีนาสวย' ,'gitiratt@gmail.com'     ,'staff'        , '0647563092'         ,'Bangkok'  ,'Gitt7.68G'),
+
+-- Customer
+(4, '12382938491', 'อนันต์ ใจดี'     ,'anunda_d@gmail.com'     ,'customer'     , '0548763088'         ,'Bangkok'  ,'Anunnnn23.'),
+(5, '29384719182', 'สุดา รักดนตรี'   ,'suda_s@gmail.com'       ,'customer'     , '0888763066'         ,'Chiangmai','sudarat123.'),
+(6, '19191919191', 'Akira Tanaka' ,'akira@gmail.com'        ,'customer'      , '0647763097'         ,'Japan'    ,'Akira_ra8.');
 
 -- ============================================================
--- 3. CONCERTS (3 งาน)
+-- SOCIAL ACCOUNT
 -- ============================================================
-INSERT INTO concerts (concert_id, organizer_id, title, artist, venue, concert_date, concert_time, sale_open_at, status) VALUES
-(1, 1, 'BTS WORLD TOUR: LOVE YOURSELF BANGKOK',
-        'BTS', 'ราชมังคลากีฬาสถาน', '2025-08-15', '18:00:00',
-        '2025-05-01 10:00:00', 'on_sale'),
-(2, 2, 'BLACKPINK BORN PINK IN BANGKOK',
-        'BLACKPINK', 'อิมแพ็ค อารีน่า เมืองทองธานี', '2025-09-20', '19:00:00',
-        '2025-06-01 10:00:00', 'upcoming'),
-(3, 3, 'TAYLOR SWIFT THE ERAS TOUR THAILAND',
-        'Taylor Swift', 'ราชมังคลากีฬาสถาน', '2025-10-10', '18:30:00',
-        '2025-06-15 10:00:00', 'upcoming');
-
-SELECT setval('concerts_concert_id_seq', 3);
+INSERT INTO social_account(user_id, type_social, social_user_id) VALUES
+(1, 'line',      'U4af4980629'),
+(2, 'email',     'Anunda_se@gmail.com'),
+(3, 'facebook',  '10234567891234567'),
+(4, 'facebook',  '1023456759123456'),
+(5, 'email',     'suda_s@gmail.com'),
+(6, 'email',     'akira@gmail.com');
 
 -- ============================================================
--- 4. ZONES (สร้าง 4 โซนต่อคอนเสิร์ต)
+-- 2. customer PROFILE
 -- ============================================================
-INSERT INTO zones (zone_id, concert_id, zone_name, price, total_seats, available_seats, min_threshold, is_active) VALUES
--- Concert 1: BTS
-( 1, 1, 'GOLDEN CIRCLE', 9500.00,  200,  198, 20, TRUE),
-( 2, 1, 'VIP',           6500.00,  500,  495, 30, TRUE),
-( 3, 1, 'A',             4500.00, 1000,  980, 50, TRUE),
-( 4, 1, 'B',             2500.00, 2000, 1990, 80, TRUE),
--- Concert 2: BLACKPINK
-( 5, 2, 'GOLDEN CIRCLE', 9000.00,  150,  150, 15, TRUE),
-( 6, 2, 'VIP',           6000.00,  400,  400, 25, TRUE),
-( 7, 2, 'A',             4000.00,  800,  800, 40, TRUE),
-( 8, 2, 'B',             2000.00, 1500, 1500, 60, TRUE),
--- Concert 3: Taylor Swift
-( 9, 3, 'PIT',          10000.00,  300,  300, 25, TRUE),
-(10, 3, 'VIP',           7500.00,  600,  600, 35, TRUE),
-(11, 3, 'A',             5000.00, 1200, 1200, 60, TRUE),
-(12, 3, 'B',             3000.00, 2500, 2500, 90, TRUE);
+INSERT INTO customer_profile(id, user_id, location_score) VALUES
+(1, 4,  1),
+(2, 5,  2),
+(3, 6,  3);
 
-SELECT setval('zones_zone_id_seq', 12);
 
 -- ============================================================
--- 5. SEATS (สร้างที่นั่งสำหรับ Concert 1 เพื่อทดสอบ)
+-- 2. ORGANIZER PROFILE
+-- ============================================================
+INSERT INTO organizer_profile (id, user_id, tax_id, company_name) VALUES
+(1, 1, 'TAX001','Big Hit Thailand'),
+(2, 2, 'TAX002','Live Nation Thailand');
+
+
+-- ============================================================
+-- 3. STAFF PROFILE
+-- ============================================================
+INSERT INTO staff_profile (id, organizer_id, user_id, staff_code, status) VALUES
+(1, 1, 3, 'STAFF001','active');
+
+
+-- ============================================================
+-- 4. CONCERT
+-- ============================================================
+INSERT INTO concert (id, organizer_id, title, artist, venue, address, concert_datetime, sale_open_at, status) VALUES
+(1, 1, 'BTS WORLD TOUR BANGKOK' ,'BTS'      , 'Rajamangala Stadium', 'Bangkok', '2025-08-15 18:00:00', '2025-05-01 10:00:00','on_sale'),
+(2, 2, 'BLACKPINK BANGKOK'      ,'BLACKPINK', 'Impact Arena'       , 'Nonthaburi', '2025-09-20 19:00:00', '2025-06-01 10:00:00','closed');
+
+
+-- ============================================================
+-- 5. ZONE
+-- ============================================================
+INSERT INTO zone 
+(id, concert_id, zone_name, total_seats, min_booking_threshold, price, is_active) 
+VALUES
+-- concert_1
+(1, 1, 'GOLDEN CIRCLE', 150, 10, 6500, TRUE),
+(2, 1, 'VIP',           300, 10, 4000, TRUE),
+(3, 1, 'A',             600, 10, 3000, TRUE),
+(4, 1, 'B',            1200, 10, 2500, TRUE),
+
+-- concert_2
+(5, 2, 'VIP',           150, 10, 7500, TRUE),
+(6, 2, 'A',             300, 10, 5000, TRUE),
+(7, 2, 'C',             600, 10, 4200, TRUE),
+(8, 2, 'B',            1200, 10, 3500, TRUE);
+
+
+-- ============================================================
+-- 6. SEATS (สร้างที่นั่งสำหรับ Concert 1 เพื่อทดสอบ)
 --    Zone 1: GOLDEN CIRCLE (A01–A10 ตัวอย่าง 10 ที่)
 --    Zone 2: VIP           (B01–B10 ตัวอย่าง 10 ที่)
 --    Zone 3: A             (C01–C20 ตัวอย่าง 20 ที่)
 --    Zone 4: B             (D01–D20 ตัวอย่าง 20 ที่)
 -- ============================================================
-
 -- Zone 1: GOLDEN CIRCLE
-INSERT INTO seats (zone_id, seat_number, row_label, status) VALUES
-(1,'A01','A','sold'),   (1,'A02','A','sold'),   (1,'A03','A','available'),
-(1,'A04','A','available'),(1,'A05','A','locked'),(1,'A06','A','available'),
-(1,'A07','A','available'),(1,'A08','A','available'),(1,'A09','A','available'),
-(1,'A10','A','available');
+INSERT INTO seat (id, zone_id, seat_number, seat_row, status) VALUES
+(1, 1,'A01','A','sold')     ,  (2, 1,'A02','A','sold')      ,   (3, 1,'A03','A','available'),
+(4, 1,'A04','A','available'),  (5, 1,'A05','A','locked')    ,   (6, 1,'A06','A','available'),
+(7, 1,'A07','A','available'),  (8, 1,'A08','A','available') ,   (9, 1,'A09','A','available'),
+(10,1,'A10','A','available');
 
 -- Zone 2: VIP
-INSERT INTO seats (zone_id, seat_number, row_label, status) VALUES
-(2,'B01','B','sold'),   (2,'B02','B','sold'),   (2,'B03','B','sold'),
-(2,'B04','B','sold'),   (2,'B05','B','sold'),   (2,'B06','B','available'),
-(2,'B07','B','available'),(2,'B08','B','available'),(2,'B09','B','locked'),
-(2,'B10','B','available');
+INSERT INTO seat (id, zone_id, seat_number, seat_row, status) VALUES
+(11, 2,'B01','B','sold')     , (12, 2,'B02','B','sold')     , (13, 2,'B03','B','sold'),
+(14, 2,'B04','B','sold')     , (15, 2,'B05','B','sold')     , (16, 2,'B06','B','available'),
+(17, 2,'B07','B','available'), (18, 2,'B08','B','available'), (19, 2,'B09','B','locked'),
+(20, 2,'B10','B','available');
 
 -- Zone 3: A
-INSERT INTO seats (zone_id, seat_number, row_label, status) VALUES
-(3,'C01','C','available'),(3,'C02','C','available'),(3,'C03','C','sold'),
-(3,'C04','C','sold'),    (3,'C05','C','available'),(3,'C06','C','available'),
-(3,'C07','C','available'),(3,'C08','C','available'),(3,'C09','C','available'),
-(3,'C10','C','available'),(3,'C11','C','available'),(3,'C12','C','available'),
-(3,'C13','C','available'),(3,'C14','C','available'),(3,'C15','C','available'),
-(3,'C16','C','available'),(3,'C17','C','available'),(3,'C18','C','available'),
-(3,'C19','C','available'),(3,'C20','C','available');
+INSERT INTO seat (id, zone_id, seat_number, seat_row, status) VALUES
+(21, 3,'C01','C','available'), (22, 3,'C02','C','available'), (23, 3,'C03','C','sold'),
+(24, 3,'C04','C','sold')     , (25, 3,'C05','C','available'), (26, 3,'C06','C','available'),
+(27, 3,'C07','C','available'), (28, 3,'C08','C','available'), (29, 3,'C09','C','available'),
+(30, 3,'C10','C','available'), (31, 3,'C11','C','available'), (32, 3,'C12','C','available'),
+(33, 3,'C13','C','available'), (34, 3,'C14','C','available'), (35, 3,'C15','C','available'),
+(36, 3,'C16','C','available'), (37, 3,'C17','C','available'), (38, 3,'C18','C','available'),
+(39, 3,'C19','C','available'), (40, 3,'C20','C','available');
 
 -- Zone 4: B
-INSERT INTO seats (zone_id, seat_number, row_label, status) VALUES
-(4,'D01','D','available'),(4,'D02','D','available'),(4,'D03','D','available'),
-(4,'D04','D','available'),(4,'D05','D','available'),(4,'D06','D','sold'),
-(4,'D07','D','sold'),    (4,'D08','D','sold'),    (4,'D09','D','available'),
-(4,'D10','D','available'),(4,'D11','D','available'),(4,'D12','D','available'),
-(4,'D13','D','available'),(4,'D14','D','available'),(4,'D15','D','available'),
-(4,'D16','D','available'),(4,'D17','D','available'),(4,'D18','D','available'),
-(4,'D19','D','available'),(4,'D20','D','available');
+INSERT INTO seat (id, zone_id, seat_number, seat_row, status) VALUES
+(41, 4,'D01','D','available'), (42, 4,'D02','D','available'), (43, 4,'D03','D','available'),
+(44, 4,'D04','D','available'), (45, 4,'D05','D','available'), (46, 4,'D06','D','sold'),
+(47, 4,'D07','D','sold')     , (48, 4,'D08','D','sold')     , (49, 4,'D09','D','available'),
+(50, 4,'D10','D','available'), (51, 4,'D11','D','available'), (52, 4,'D12','D','available'),
+(53, 4,'D13','D','available'), (54, 4,'D14','D','available'), (55, 4,'D15','D','available'),
+(56, 4,'D16','D','available'), (57, 4,'D17','D','available'), (58, 4,'D18','D','available'),
+(59, 4,'D19','D','available'), (60, 4,'D20','D','available');
+
 
 -- ============================================================
--- 6. QUEUE_SESSIONS
---    จำลองคิวสำหรับ Concert 1
---    คนในประเทศ (priority=1) ได้ลำดับก่อน
+-- 7. QUEUE SESSION
 -- ============================================================
-INSERT INTO queue_sessions (user_id, concert_id, priority_score, entered_at, status) VALUES
-(1,  1, 1, '2025-05-01 09:55:00', 'admitted'),  -- อนันต์ (TH) — เข้าแล้ว
-(2,  1, 1, '2025-05-01 09:56:00', 'admitted'),  -- สุดา (TH) — เข้าแล้ว
-(3,  1, 1, '2025-05-01 09:57:00', 'admitted'),  -- ปรีชา (TH) — เข้าแล้ว
-(4,  1, 1, '2025-05-01 09:58:00', 'waiting'),   -- วิภา (TH) — รอ
-(5,  1, 1, '2025-05-01 09:59:00', 'waiting'),   -- กานต์ (TH) — รอ
-(9,  1, 0, '2025-05-01 09:50:00', 'waiting'),   -- Akira (JP) — เข้าเร็วแต่ priority ต่ำ
-(10, 1, 0, '2025-05-01 09:51:00', 'waiting'),   -- Emily (SG)
-(11, 1, 0, '2025-05-01 09:52:00', 'waiting');   -- James (KR)
+INSERT INTO queue_session 
+(id, customer_id, concert_id, priority_score, entered_at, admitted_at, expired_at, status) 
+VALUES
+(1, 1, 1, 51, '2025-05-01 10:00:10', '2025-05-01 10:02:00', NULL, 'admitted'),
+(2, 2, 1, 62, '2025-05-01 10:00:15', NULL, '2025-05-01 11:10:00', 'waiting'),
+(3, 3, 1, 73, '2025-05-01 10:00:40', NULL, '2025-05-01 11:10:00', 'waiting');
+
 
 -- ============================================================
--- 7. BOOKINGS
---    จำลองการจอง 5 รายการ
---    seat_id ดึงมาจาก Zone 1-4 ที่มี status = 'sold'/'locked'
+-- 8. BOOKING
 -- ============================================================
--- หมายเหตุ: seat_id จาก INSERT ด้านบนเริ่มต้นที่ 1
--- Zone1: A01=1, A02=2   Zone2: B01=11..B05=15   Zone3: C03=23,C04=24   Zone4: D06=46..
+INSERT INTO booking
+(id, customer_id, concert_id, created_at, expired_at, total_amount, total_tickets, status, delivery_type)
+VALUES
+-- paid แล้ว (มีการจ่ายเงินสำเร็จ)
+(1, 1, 1, '2025-05-01 10:01:00', NULL,                 13000, 2, 'paid',     'digital'),
 
-INSERT INTO bookings (booking_id, user_id, seat_id, status, booked_at, expiry_time, confirmed_at, ticket_qr, delivery_method) VALUES
-(1, 1,  1, 'confirmed', '2025-05-01 10:02:00', '2025-05-01 10:17:00', '2025-05-01 10:08:00',
-    'TKT-2025-BTS-A01-USER1', 'digital'),
-(2, 2,  2, 'confirmed', '2025-05-01 10:03:00', '2025-05-01 10:18:00', '2025-05-01 10:10:00',
-    'TKT-2025-BTS-A02-USER2', 'digital'),
-(3, 3, 11, 'confirmed', '2025-05-01 10:04:00', '2025-05-01 10:19:00', '2025-05-01 10:12:00',
-    'TKT-2025-BTS-B01-USER3', 'postal'),
-(4, 4, 12, 'confirmed', '2025-05-01 10:05:00', '2025-05-01 10:20:00', '2025-05-01 10:11:00',
-    'TKT-2025-BTS-B02-USER4', 'digital'),
-(5, 5,  5, 'pending',   '2025-05-01 10:06:00', '2025-05-01 10:21:00', NULL,
-    NULL, 'digital');   -- ยังไม่จ่าย (soft lock)
+-- pending (กำลังรอจ่ายเงิน)
+(2, 2, 1, '2025-05-01 10:03:00', '2025-05-01 10:18:00', 2500,  1, 'pending',  'digital'), -- expire 15 minute ต้องไปกำหนดเวลาใน logic แทนนะ
 
-SELECT setval('bookings_booking_id_seq', 5);
+-- expired (จองแล้วไม่จ่าย)
+(3, 3, 1, '2025-05-01 10:05:00', '2025-05-01 10:20:00', 4000,  1, 'expired',  'pickup'),
+
+-- cancelled (ผู้ใช้ยกเลิก)
+(4, 1, 1, '2025-05-01 10:20:00', NULL,                  6500,  1, 'cancelled','postal'); -- ตัดสินใจไม่ไปแล้ว
+
 
 -- ============================================================
--- 8. PAYMENTS
---    ชำระเงินสำหรับ booking 1-4 (booking 5 ยังค้างอยู่)
+-- 9. TICKET
 -- ============================================================
-INSERT INTO payments (booking_id, amount, method, status, transaction_ref, paid_at) VALUES
-(1, 9500.00, 'qr_code', 'paid', 'TXN-20250501-001', '2025-05-01 10:08:00'),
-(2, 9500.00, 'qr_code', 'paid', 'TXN-20250501-002', '2025-05-01 10:10:00'),
-(3, 6500.00, 'qr_code', 'paid', 'TXN-20250501-003', '2025-05-01 10:12:00'),
-(4, 6500.00, 'qr_code', 'paid', 'TXN-20250501-004', '2025-05-01 10:11:00');
+INSERT INTO ticket (id, seat_id, booking_id, qr_hash, is_used)
+VALUES
+-- booking 1 (paid → มี 2 ใบ)
+(1, 1, 1, 'QR-TKT-0001', TRUE),
+(2, 2, 1, 'QR-TKT-0002', FALSE),
+
+-- booking 2 (pending → ยังไม่ควรมี ticket จริง แต่ใส่ไว้ test)
+(3, 4, 2, 'QR-TKT-0003', FALSE);
+
 
 -- ============================================================
--- 9. TICKET_CHECKS
---    จำลองการตรวจบัตรสำหรับ booking 1 และ 2
+-- 10. PAYMENT
 -- ============================================================
-INSERT INTO ticket_checks (booking_id, checked_by, checked_at, result) VALUES
-(1, 'checker_staff_01', '2025-08-15 17:45:00', 'valid'),
-(2, 'checker_staff_01', '2025-08-15 17:46:00', 'valid');
+INSERT INTO payment(id, booking_id, amount, created_at, expired_at, paid_at, transaction_ref,  method, status) VALUES
+-- paid แล้ว
+(1, 1, 13000, '2025-05-01 10:01:10', NULL, '2025-05-01 10:01:25', 'QR20260416TH00012345', 'qr_code', 'paid'),
+
+-- pending 
+(2, 2, 2500, '2025-05-01 10:03:40', '2025-05-01 10:18:40', NULL, NULL, 'qr_code', 'pending'),
+
+-- expired (หมดเวลาแล้ว)
+(3, 3, 4000, '2025-05-01 10:05:45', '2025-05-01 10:20:45', NULL, NULL, 'qr_code', 'expired'),
+
+(4, 4, 6500,  '2025-05-01 10:20:10', NULL, '2025-05-01 10:20:35', 'QR20232416TH00012345', 'bank_transfer', 'paid'); --- ที่จะคืนตัง
+
+
+-- ============================================================
+-- 12. REFUND
+-- ============================================================
+INSERT INTO refund (id, payment_id, requested_at, approved_at, completed_at, amount, status)
+VALUES
+(1, 4, '2025-05-03 09:40:00', NULL, NULL, 2500, 'requested');
+
+
+-- ============================================================
+-- 13. CHECK-IN
+-- ============================================================
+INSERT INTO ticket_checkin (id, staff_id, ticket_id, checked_at, status) VALUES
+(1, 1,  1, '2025-08-15 18:10:00', 'checked');
+
+
+-- ============================================================
+-- 14. FINANCE
+-- ============================================================
+INSERT INTO finance (id, concert_id, booking_id, type, amount, description) VALUES
+(1, 1,  1,  'income',   13000,  'ticket sales'),
+(2, 1,  4 , 'refund',   2500,   'refund');
+
+COMMIT;
 
 -- ============================================================
 -- ตรวจสอบผลลัพธ์หลัง seed
 -- ============================================================
-SELECT 'users'          AS tbl, COUNT(*) FROM users
+SELECT 'users' AS tbl,      COUNT(*) FROM users
 UNION ALL
-SELECT 'organizers',             COUNT(*) FROM organizers
+SELECT 'social_account',    COUNT(*) FROM social_account
 UNION ALL
-SELECT 'concerts',               COUNT(*) FROM concerts
+SELECT 'customer_profile',  COUNT(*) FROM customer_profile
 UNION ALL
-SELECT 'zones',                  COUNT(*) FROM zones
+SELECT 'organizer_profile', COUNT(*) FROM organizer_profile
 UNION ALL
-SELECT 'seats',                  COUNT(*) FROM seats
+SELECT 'staff_profile',     COUNT(*) FROM staff_profile
 UNION ALL
-SELECT 'queue_sessions',         COUNT(*) FROM queue_sessions
+SELECT 'concert',           COUNT(*) FROM concert
 UNION ALL
-SELECT 'bookings',               COUNT(*) FROM bookings
+SELECT 'zone',              COUNT(*) FROM zone
 UNION ALL
-SELECT 'payments',               COUNT(*) FROM payments
+SELECT 'seat',              COUNT(*) FROM seat
 UNION ALL
-SELECT 'ticket_checks',          COUNT(*) FROM ticket_checks;
+SELECT 'queue_session',     COUNT(*) FROM queue_session
+UNION ALL
+SELECT 'booking',           COUNT(*) FROM booking
+UNION ALL
+SELECT 'ticket',            COUNT(*) FROM ticket
+UNION ALL
+SELECT 'payment',           COUNT(*) FROM payment
+UNION ALL
+SELECT 'refund',            COUNT(*) FROM refund
+UNION ALL
+SELECT 'ticket_checkin',    COUNT(*) FROM ticket_checkin
+UNION ALL
+SELECT 'finance',           COUNT(*) FROM finance;

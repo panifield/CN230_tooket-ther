@@ -50,3 +50,17 @@ def get_db_connection():
         yield conn
     finally:
         _connection_pool.putconn(conn)
+
+def fix_sequence(cur, table: str):
+    """Reset sequence to the current max ID (hotfix for seed data out of sync)"""
+    cur.execute(f"SELECT setval('{table}_id_seq', (SELECT COALESCE(MAX(id), 0) FROM {table}), true);")
+
+def fix_all_sequences(cur):
+    """Reset all tables' sequences"""
+    tables = [
+        "users", "social_account", "customer_profile", "organizer_profile",
+        "staff_profile", "concert", "zone", "seat", "queue_session",
+        "booking", "ticket", "payment", "refund", "ticket_checkin", "finance"
+    ]
+    for table in tables:
+        fix_sequence(cur, table)
