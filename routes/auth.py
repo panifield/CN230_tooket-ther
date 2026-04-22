@@ -76,6 +76,12 @@ class UpdateProfileBody(BaseModel):
     id_card: str = None
 
 
+class ForgotPasswordBody(BaseModel):
+    email: EmailStr
+    id_card: str
+    new_password: str
+
+
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
@@ -389,3 +395,27 @@ def update_profile(body: UpdateProfileBody, current_user: CurrentUser):
             conn.commit()
 
     return {"message": "แก้ไขข้อมูลสำเร็จ"}
+
+
+@auth_router.post("/forgot-password")
+def forgot_password(body: ForgotPasswordBody):
+    """ลืมรหัสผ่าน (ใช้ ID Card ยืนยันใน dev)"""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT id FROM users WHERE email = %s AND id_card = %s",
+                (body.email, body.id_card),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="ข้อมูลยืนยันไม่ถูกต้อง (Email หรือ ID Card ผิด)",
+                )
+
+            cur.execute(
+                "UPDATE users SET password = %s WHERE id = %s",
+                (_hash_password(body.new_password), row[0]),
+            )
+            conn.commit()
+    return {"message": "เปลี่ยนรหัสผ่านสำเร็จแล้ว"}
