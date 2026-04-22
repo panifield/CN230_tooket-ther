@@ -1,21 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { ArrowLeft, ShieldCheck, CreditCard, Wallet, Landmark, CheckCircle, Plus } from 'lucide-react';
+import { ArrowLeft, ShieldCheck, CreditCard, Wallet, Landmark, CheckCircle, Plus, Clock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 export default function Payment() {
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [queueStatus, setQueueStatus] = useState<string | null>(localStorage.getItem('userQueueStatus'));
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
 
   useEffect(() => {
-    if (timeLeft <= 0 || isSuccess) return;
+    // Poll for status changes (mocked)
+    const interval = setInterval(() => {
+      setQueueStatus(localStorage.getItem('userQueueStatus'));
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (timeLeft <= 0 || isSuccess || queueStatus !== 'accepted') return;
     const timer = setInterval(() => {
       setTimeLeft(prev => prev - 1);
     }, 1000);
     return () => clearInterval(timer);
-  }, [timeLeft, isSuccess]);
+  }, [timeLeft, isSuccess, queueStatus]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -74,15 +83,66 @@ export default function Payment() {
 
             <div className="flex justify-between items-end mb-12">
               <h1 className="text-4xl font-medium">Secure Checkout</h1>
-              <div className={`px-4 py-2 rounded-sharp border flex items-center gap-3 ${
-                timeLeft < 60 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-sky-tint/10 border-sky-tint/20 text-brand-blue'
-              }`}>
-                <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
-                <span className="mono-label text-[10px]">TIME REMAINING: {formatTime(timeLeft)}</span>
-              </div>
+              {queueStatus === 'accepted' && (
+                <div className={`px-4 py-2 rounded-sharp border flex items-center gap-3 ${
+                  timeLeft < 60 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-sky-tint/10 border-sky-tint/20 text-brand-blue'
+                }`}>
+                  <div className="w-2 h-2 rounded-full bg-current animate-pulse" />
+                  <span className="mono-label text-[10px]">TIME REMAINING: {formatTime(timeLeft)}</span>
+                </div>
+              )}
             </div>
 
-            {timeLeft <= 0 && !isSuccess ? (
+            {queueStatus !== 'accepted' ? (
+               <div className="card-coastal p-12 text-center bg-brand-blue/5 border-brand-blue/20">
+                  <div className="w-16 h-16 bg-brand-blue/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Clock className="text-brand-blue animate-spin-slow" size={32} />
+                  </div>
+                  <h2 className="text-2xl font-medium mb-4 tracking-tight">Waiting for Approval</h2>
+                  
+                  {/* Dancing Animation Element */}
+                  <div className="flex justify-center gap-2 mb-8">
+                    {[0, 1, 2, 3].map((i) => (
+                      <motion.div
+                        key={i}
+                        animate={{ 
+                          y: [-10, 10, -10],
+                          rotate: [0, 10, -10, 0],
+                          scale: [1, 1.1, 0.9, 1]
+                        }}
+                        transition={{ 
+                          duration: 1.5, 
+                          repeat: Infinity, 
+                          delay: i * 0.2,
+                          ease: "easeInOut"
+                        }}
+                        className={`w-4 h-8 rounded-full ${
+                          i % 2 === 0 ? 'bg-brand-blue' : 'bg-brand-yellow'
+                        } opacity-40 shadow-lg shadow-brand-blue/20`}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="mb-8">
+                    <div className="text-[10px] mono-label text-midnight/40 mb-1 uppercase tracking-widest">Your Position in Queue</div>
+                    <div className="text-5xl font-medium text-brand-blue tracking-tighter">
+                      #{Math.floor(Math.random() * 12) + 1}
+                    </div>
+                    <p className="text-[10px] mono-label text-midnight/20 mt-2">
+                       ESTIMATED WAIT: ~{Math.floor(Math.random() * 5) + 2} MINUTES
+                    </p>
+                  </div>
+
+                  <p className="text-midnight/60 text-sm mb-8 leading-relaxed">
+                    Local priority verification is in progress. The organizer must manually 
+                    approve your admission before you can finalize payment. 
+                    <br />This page will automatically update once you are cleared.
+                  </p>
+                  <div className="inline-block px-4 py-2 bg-white rounded-sharp border border-black/5 mono-label text-[10px] text-brand-blue font-bold">
+                     STATUS: ENQUEUED / PENDING ADMISSION
+                  </div>
+               </div>
+            ) : timeLeft <= 0 && !isSuccess ? (
               <div className="card-coastal p-12 text-center">
                 <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Plus size={32} className="rotate-45" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { ArrowLeft, Calendar, MapPin, Music, Sparkles, Save } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { ArrowLeft, Calendar, MapPin, Music, Sparkles, Save, Box, Plus, Trash2 } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 
 export default function CreateConcert() {
@@ -10,9 +10,25 @@ export default function CreateConcert() {
     when: '',
     where: '',
     description: '',
-    capacity: ''
+    capacity: '',
+    posterUrl: ''
   });
+  const [zones, setZones] = useState([{ id: '1', name: '', capacity: '' }]);
   const [isLoading, setIsLoading] = useState(false);
+
+  const addZone = () => {
+    setZones([...zones, { id: Date.now().toString(), name: '', capacity: '' }]);
+  };
+
+  const removeZone = (id: string) => {
+    if (zones.length > 1) {
+      setZones(zones.filter(z => z.id !== id));
+    }
+  };
+
+  const updateZone = (id: string, field: 'name' | 'capacity', value: string) => {
+    setZones(zones.map(z => z.id === id ? { ...z, [field]: value } : z));
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,7 +39,10 @@ export default function CreateConcert() {
       setIsLoading(false);
       // Save locally for demo
       const savedConcerts = JSON.parse(localStorage.getItem('organizedConcerts') || '[]');
-      localStorage.setItem('organizedConcerts', JSON.stringify([...savedConcerts, { ...formData, id: Date.now().toString() }]));
+      localStorage.setItem('organizedConcerts', JSON.stringify([
+        ...savedConcerts, 
+        { ...formData, zones, id: Date.now().toString() }
+      ]));
       
       alert('Concert created successfully!');
       navigate('/organizer/dashboard');
@@ -44,6 +63,33 @@ export default function CreateConcert() {
 
         <form onSubmit={handleSubmit} className="card-coastal p-8 space-y-8">
           <div className="space-y-6">
+            {/* Poster Upload Section */}
+            <div className="space-y-4">
+              <label className="mono-label text-[10px] text-midnight/40">CONCERT POSTER</label>
+              <div className="flex gap-6 items-start">
+                <div className="w-32 h-44 bg-midnight/5 rounded-sharp border border-black/5 flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {formData.posterUrl ? (
+                    <img src={formData.posterUrl} alt="Poster preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <Music size={24} className="text-midnight/10" />
+                  )}
+                </div>
+                <div className="flex-grow space-y-2">
+                  <input
+                    type="url"
+                    placeholder="IMAGE URL (PNG, JPG)"
+                    value={formData.posterUrl}
+                    onChange={(e) => setFormData({ ...formData, posterUrl: e.target.value })}
+                    className="w-full bg-white border border-black/10 rounded-sharp px-4 py-3 text-sm focus:border-brand-blue outline-none transition-colors"
+                  />
+                  <p className="text-[10px] text-midnight/40 leading-relaxed italic">
+                    Paste a high-resolution image URL. 
+                    Recommended aspect ratio: 2:3 or 3:4.
+                  </p>
+                </div>
+              </div>
+            </div>
+
             <div className="space-y-2">
               <label className="mono-label text-[10px] text-midnight/40">CONCERT NAME</label>
               <div className="relative">
@@ -110,6 +156,64 @@ export default function CreateConcert() {
                 placeholder="5000"
                 className="w-full bg-white border border-black/10 rounded-sharp px-4 py-3 text-sm focus:border-brand-blue outline-none transition-colors"
               />
+            </div>
+
+            {/* Zone Management Section */}
+            <div className="space-y-4 pt-4">
+              <div className="flex justify-between items-center">
+                <label className="mono-label text-[10px] text-midnight/40 flex items-center gap-2">
+                  <Box size={14} className="text-brand-blue" />
+                  ZONE CONFIGURATION
+                </label>
+                <button
+                  type="button"
+                  onClick={addZone}
+                  className="flex items-center gap-1.5 text-[10px] mono-label text-brand-blue hover:underline"
+                >
+                  <Plus size={12} /> ADD ZONE
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <AnimatePresence initial={false}>
+                  {zones.map((zone, index) => (
+                    <motion.div
+                      key={zone.id}
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex gap-3 items-start"
+                    >
+                      <div className="flex-grow grid grid-cols-2 gap-3">
+                        <input
+                          type="text"
+                          required
+                          placeholder={`ZONE ${index + 1} NAME (E.G. VIP)`}
+                          value={zone.name}
+                          onChange={(e) => updateZone(zone.id, 'name', e.target.value)}
+                          className="bg-midnight/5 border border-black/5 rounded-sharp px-4 py-3 text-xs outline-none focus:border-brand-blue transition-colors"
+                        />
+                        <input
+                          type="number"
+                          required
+                          placeholder="CAPACITY"
+                          value={zone.capacity}
+                          onChange={(e) => updateZone(zone.id, 'capacity', e.target.value)}
+                          className="bg-midnight/5 border border-black/5 rounded-sharp px-4 py-3 text-xs outline-none focus:border-brand-blue transition-colors"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeZone(zone.id)}
+                        disabled={zones.length === 1}
+                        className="p-3.5 text-midnight/20 hover:text-red-400 disabled:opacity-0 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
             </div>
           </div>
 

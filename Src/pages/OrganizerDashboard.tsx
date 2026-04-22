@@ -1,5 +1,5 @@
 import { motion } from 'motion/react';
-import { TrendingUp, Users, Ticket, DollarSign, ArrowUpRight, ArrowDownRight, MoreHorizontal, Plus, AlertTriangle, Info, UserCheck, UserX, Clock } from 'lucide-react';
+import { TrendingUp, Users, Ticket, DollarSign, ArrowUpRight, ArrowDownRight, MoreHorizontal, Plus, AlertTriangle, Info, UserCheck, UserX, Clock, Search, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 
@@ -10,6 +10,8 @@ export default function OrganizerDashboard() {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [closedZones, setClosedZones] = useState<string[]>([]);
   const [showZoneCloseModal, setShowZoneCloseModal] = useState<string | null>(null);
+  const [eventSearchTerm, setEventSearchTerm] = useState('');
+  const [eventStatusFilter, setEventStatusFilter] = useState<'ALL' | 'ON SALE' | 'DRAFT'>('ALL');
 
   const recentEvents = [
     { id: 'E1', name: 'Coastal Tech Summit 2026', status: 'ON SALE', sold: '842/1000', revenue: '$242,000', tickets: 842, available: 158 },
@@ -19,21 +21,39 @@ export default function OrganizerDashboard() {
 
   // Manual Queue State
   const [queueUsers, setQueueUsers] = useState([
-    { id: '1', name: 'Alex Johnson', domicile: 'San Francisco, CA', score: 98, status: 'pending', time: '5m ago' },
-    { id: '2', name: 'Sarah Miller', domicile: 'Oakland, CA', score: 92, status: 'pending', time: '12m ago' },
-    { id: '3', name: 'Michael Chen', domicile: 'London, UK', score: 45, status: 'pending', time: '18m ago' },
-    { id: '4', name: 'Emma Davis', domicile: 'San Jose, CA', score: 88, status: 'pending', time: '22m ago' },
+    { id: '1', name: 'Alex Johnson', domicile: 'San Francisco, CA', isLocal: true, status: 'pending', enteredAt: new Date(Date.now() - 1000 * 60 * 5) },
+    { id: '2', name: 'Sarah Miller', domicile: 'Oakland, CA', isLocal: true, status: 'pending', enteredAt: new Date(Date.now() - 1000 * 60 * 12) },
+    { id: '3', name: 'Michael Chen', domicile: 'London, UK', isLocal: false, status: 'pending', enteredAt: new Date(Date.now() - 1000 * 60 * 18) },
+    { id: '4', name: 'Emma Davis', domicile: 'San Jose, CA', isLocal: true, status: 'pending', enteredAt: new Date(Date.now() - 1000 * 60 * 22) },
+    { id: '5', name: 'James Wilson', domicile: 'New York, NY', isLocal: false, status: 'pending', enteredAt: new Date(Date.now() - 1000 * 60 * 2) },
   ]);
 
   const handleAcceptUser = (userId: string) => {
     setQueueUsers(queueUsers.map(u => u.id === userId ? { ...u, status: 'accepted' } : u));
-    // Simulate notification
+    // In a real app, this would update the backend
+    localStorage.setItem('userQueueStatus', 'accepted');
     console.log(`User ${userId} accepted from queue.`);
   };
 
   const handleDeclineUser = (userId: string) => {
     setQueueUsers(queueUsers.filter(u => u.id !== userId));
   };
+
+  const formatDistanceToNow = (date: Date) => {
+    const mins = Math.floor((Date.now() - date.getTime()) / 60000);
+    return `${mins}m ago`;
+  };
+
+  const formatExactTime = (date: Date) => {
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Sorting: Earliest entered first (fastest arrival)
+  const sortQueue = (users: typeof queueUsers) => 
+    [...users].sort((a, b) => a.enteredAt.getTime() - b.enteredAt.getTime());
+
+  const localQueue = sortQueue(queueUsers.filter(u => u.isLocal && u.status === 'pending'));
+  const regionalQueue = sortQueue(queueUsers.filter(u => !u.isLocal && u.status === 'pending'));
 
   const [zoneStats, setZoneStats] = useState([
     { id: 'Z1', name: 'VIP FRONT', available: 42, total: 120, price: 500, threshold: 20 },
@@ -155,59 +175,171 @@ export default function OrganizerDashboard() {
           <div className="flex justify-between items-center mb-6">
             <div className="flex items-center gap-2">
               <Users className="text-brand-blue" size={20} />
-              <h3 className="mono-label text-brand-blue">PENDING QUEUE / MANUAL APPROVAL</h3>
+              <h3 className="mono-label text-brand-blue font-bold">REAL-TIME QUEUE / MANUAL ADMISSION</h3>
             </div>
-            <span className="text-[10px] mono-label text-midnight/40">{queueUsers.filter(u => u.status === 'pending').length} WAITING</span>
+            <div className="flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-brand-blue animate-pulse" />
+                <span className="text-[10px] mono-label text-midnight/40">LIVE MONITORING</span>
+              </div>
+              <span className="text-[10px] mono-label text-midnight/60 px-2 py-1 bg-midnight/5 rounded-sharp">
+                {queueUsers.filter(u => u.status === 'pending').length} TOTAL WAITING
+              </span>
+            </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {queueUsers.filter(u => u.status === 'pending').map((user) => (
-              <motion.div 
-                key={user.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="card-coastal p-6 flex flex-col sm:flex-row justify-between items-center gap-6 group hover:border-brand-blue/30 transition-colors"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-sky-tint/10 rounded-sharp flex items-center justify-center text-brand-blue font-bold text-xl uppercase">
-                    {user.name.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-sm">{user.name}</h4>
-                    <p className="text-[10px] text-midnight/40 mt-0.5">{user.domicile}</p>
-                    <div className="flex items-center gap-3 mt-2">
-                       <span className="text-[9px] px-2 py-0.5 bg-brand-blue/5 text-brand-blue rounded-sharp font-bold border border-brand-blue/10">PRIORITY: {user.score}</span>
-                       <span className="text-[9px] text-midnight/30 flex items-center gap-1"><Clock size={10} /> {user.time}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex gap-2 w-full sm:w-auto">
-                  <button 
-                    onClick={() => handleAcceptUser(user.id)}
-                    className="flex-1 sm:flex-none p-3 bg-green-500 text-white rounded-sharp hover:bg-green-600 transition-colors"
-                    title="Accept User"
-                  >
-                    <UserCheck size={18} />
-                  </button>
-                  <button 
-                    onClick={() => handleDeclineUser(user.id)}
-                    className="flex-1 sm:flex-none p-3 bg-red-50 text-red-500 rounded-sharp hover:bg-red-100 transition-colors"
-                    title="Decline User"
-                  >
-                    <UserX size={18} />
-                  </button>
-                </div>
-              </motion.div>
-            ))}
-
-            {queueUsers.filter(u => u.status === 'pending').length === 0 && (
-              <div className="col-span-full py-12 border-2 border-dashed border-black/5 rounded-card flex flex-col items-center justify-center text-midnight/20">
-                <Users size={32} className="mb-2" />
-                <p className="mono-label text-[10px]">QUEUE IS CURRENTLY EMPTY</p>
+          <div className="space-y-12">
+            {/* Local Section */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                 <div className="h-0.5 w-4 bg-brand-blue rounded-full" />
+                 <span className="mono-label text-[10px] text-brand-blue tracking-widest uppercase">Local Entrants (Priority Queue)</span>
               </div>
-            )}
+              <div className="card-coastal overflow-hidden p-0">
+                <table className="w-full text-left">
+                  <thead className="bg-midnight/5">
+                    <tr>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40 min-w-[200px]">NAME / DOMICILE</th>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40">WAITING SINCE</th>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40">ENTRY TIME</th>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40 text-right">ADMISSION ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {localQueue.map((user) => (
+                      <motion.tr 
+                        key={user.id}
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="group hover:bg-brand-blue/5 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-white rounded-sharp flex items-center justify-center text-brand-blue font-bold text-lg uppercase border border-brand-blue/10">
+                              {user.name.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-medium text-sm">{user.name}</div>
+                              <div className="text-[10px] text-midnight/40 uppercase">{user.domicile}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] text-brand-blue flex items-center gap-1 font-bold">
+                             <Clock size={12} /> {formatDistanceToNow(user.enteredAt)}
+                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] text-midnight/40 tabular-nums uppercase">{formatExactTime(user.enteredAt)}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex gap-2 justify-end">
+                            <button 
+                              onClick={() => handleAcceptUser(user.id)}
+                              className="p-2.5 bg-brand-blue text-white rounded-sharp hover:scale-110 transition-transform shadow-md"
+                              title="Accept Entry"
+                            >
+                              <UserCheck size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeclineUser(user.id)}
+                              className="p-2.5 bg-white text-red-400 border border-red-100 rounded-sharp hover:bg-red-50 transition-colors"
+                              title="Decline Entry"
+                            >
+                              <UserX size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                    {localQueue.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-20 text-center">
+                           <span className="mono-label text-[10px] text-midnight/20">NO LOCAL USERS IN QUEUE</span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Regional Section */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                 <div className="h-0.5 w-4 bg-midnight/20 rounded-full" />
+                 <span className="mono-label text-[10px] text-midnight/40 tracking-widest uppercase">Regional & International Entrants</span>
+              </div>
+              <div className="card-coastal overflow-hidden p-0">
+                <table className="w-full text-left">
+                  <thead className="bg-midnight/5">
+                    <tr>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40 min-w-[200px]">NAME / DOMICILE</th>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40">WAITING SINCE</th>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40">ENTRY TIME</th>
+                      <th className="px-6 py-4 mono-label text-[10px] text-midnight/40 text-right">ADMISSION ACTION</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {regionalQueue.map((user) => (
+                      <motion.tr 
+                        key={user.id}
+                        layout
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        className="group hover:bg-midnight/5 transition-colors"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-midnight/5 rounded-sharp flex items-center justify-center text-midnight/40 font-bold text-lg uppercase">
+                              {user.name.charAt(0)}
+                            </div>
+                            <div>
+                              <div className="font-medium text-sm">{user.name}</div>
+                              <div className="text-[10px] text-midnight/40 uppercase">{user.domicile}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] text-midnight/60 flex items-center gap-1">
+                             <Clock size={12} /> {formatDistanceToNow(user.enteredAt)}
+                           </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] text-midnight/40 tabular-nums uppercase">{formatExactTime(user.enteredAt)}</span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex gap-2 justify-end">
+                            <button 
+                              onClick={() => handleAcceptUser(user.id)}
+                              className="p-2.5 bg-midnight text-white rounded-sharp hover:scale-110 transition-transform shadow-md"
+                              title="Accept Entry"
+                            >
+                              <UserCheck size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeclineUser(user.id)}
+                              className="p-2.5 bg-white text-red-300 border border-black/5 rounded-sharp hover:bg-red-50 transition-colors"
+                              title="Decline Entry"
+                            >
+                              <UserX size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    ))}
+                    {regionalQueue.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="py-20 text-center">
+                           <span className="mono-label text-[10px] text-midnight/20">NO REGIONAL USERS IN QUEUE</span>
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -394,17 +526,53 @@ export default function OrganizerDashboard() {
 
           {/* Recent Events List */}
           <div className="lg:col-span-1 card-coastal p-8">
-            <h3 className="mono-label text-brand-blue mb-8">ACTIVE EVENTS</h3>
-            <div className="space-y-6">
-              {recentEvents.map((event) => (
-                <div 
-                  key={event.id} 
-                  className={`pb-6 border-b border-black/5 last:border-0 last:pb-0 cursor-pointer group ${selectedEventId === event.id ? 'bg-sky-tint/5 rounded-sharp -mx-4 px-4 pt-4' : ''}`}
-                  onClick={() => {
-                    setPaymentFilter('event');
-                    setSelectedEventId(event.id);
-                  }}
+            <h3 className="mono-label text-brand-blue mb-6">ACTIVE EVENTS</h3>
+            
+            {/* Search and Status Filter */}
+            <div className="space-y-4 mb-8">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="SEARCH EVENTS..."
+                  value={eventSearchTerm}
+                  onChange={(e) => setEventSearchTerm(e.target.value)}
+                  className="w-full bg-midnight/5 border border-black/5 rounded-sharp px-4 py-2.5 pl-10 mono-label text-[10px] outline-none focus:border-brand-blue/30 transition-colors"
+                />
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-midnight/20" />
+              </div>
+              <div className="relative">
+                <select
+                  value={eventStatusFilter}
+                  onChange={(e) => setEventStatusFilter(e.target.value as any)}
+                  className="w-full appearance-none bg-midnight/5 border border-black/5 rounded-sharp px-4 py-2.5 pl-10 mono-label text-[10px] outline-none focus:border-brand-blue/30 transition-colors cursor-pointer"
                 >
+                  <option value="ALL">ALL STATUSES</option>
+                  <option value="ON SALE">ON SALE</option>
+                  <option value="DRAFT">DRAFT</option>
+                </select>
+                <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-midnight/20" />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-midnight/20">
+                  <ArrowDownRight size={10} className="rotate-45" />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {recentEvents
+                .filter(event => {
+                  const matchesSearch = event.name.toLowerCase().includes(eventSearchTerm.toLowerCase());
+                  const matchesStatus = eventStatusFilter === 'ALL' || event.status === eventStatusFilter;
+                  return matchesSearch && matchesStatus;
+                })
+                .map((event) => (
+                  <div 
+                    key={event.id} 
+                    className={`pb-6 border-b border-black/5 last:border-0 last:pb-0 cursor-pointer group ${selectedEventId === event.id ? 'bg-sky-tint/5 rounded-sharp -mx-4 px-4 pt-4' : ''}`}
+                    onClick={() => {
+                      setPaymentFilter('event');
+                      setSelectedEventId(event.id);
+                    }}
+                  >
                   <div className="flex justify-between items-start mb-2">
                     <h4 className={`text-sm font-medium transition-colors ${selectedEventId === event.id ? 'text-brand-blue' : 'group-hover:text-brand-blue'}`}>{event.name}</h4>
                     <button className="text-midnight/30 hover:text-midnight"><MoreHorizontal size={14} /></button>
