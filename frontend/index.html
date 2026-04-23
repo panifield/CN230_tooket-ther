@@ -279,6 +279,76 @@
       flex-wrap: wrap;
     }
 
+    /* Concert Cards Grid */
+    .concert-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+
+    .concert-card {
+      background: #252525;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      transition: transform 0.2s;
+      cursor: pointer;
+    }
+
+    .concert-card:hover {
+      transform: translateY(-5px);
+      border-color: var(--primary);
+    }
+
+    .concert-card img {
+      width: 100%;
+      height: 150px;
+      object-fit: cover;
+      background: #333;
+      display: block;
+    }
+
+    .concert-card .no-image {
+      width: 100%;
+      height: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #333;
+      color: #666;
+      font-size: 0.8rem;
+    }
+
+    .concert-card .info {
+      padding: 12px;
+    }
+
+    .concert-card .title {
+      font-weight: bold;
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+
+    .concert-card .artist {
+      font-size: 0.9rem;
+      color: var(--secondary);
+    }
+
+    .concert-card .status-tag {
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      margin-top: 8px;
+      text-transform: uppercase;
+    }
+
+    .status-on_sale { background: var(--success); color: #000; }
+    .status-upcoming { background: var(--warning); color: #000; }
+    .status-closed { background: #666; color: #fff; }
+
     .flex-row>* {
       margin-bottom: 0;
       flex: 1;
@@ -397,6 +467,7 @@
           <button onclick="fetchConcertsForCustomer()" style="flex: 0 1 150px;" class="secondary">Refresh List</button>
           <button onclick="joinQueue()" id="joinBtn">Enter Queue</button>
         </div>
+        <div id="concertCardsGrid" class="concert-grid"></div>
         <div id="queueStatusDisplay" class="action-banner" style="display:none;">
           Waiting for status...
         </div>
@@ -469,6 +540,10 @@
           <input type="text" id="newConcertAddress" placeholder="Province/City" value="Nonthaburi">
           <input type="datetime-local" id="newConcertDate" value="2026-06-15T19:00">
           <input type="datetime-local" id="newConcertSaleDate" value="2026-05-01T10:00">
+        </div>
+        <div class="flex-row">
+          <label style="flex: 0 0 100px; color:var(--primary);">Poster Image:</label>
+          <input type="file" id="newConcertImage" accept="image/*">
         </div>
 
         <h4 style="margin-top:15px; color:var(--primary);">Zones Configuration</h4>
@@ -654,7 +729,10 @@
     }
 
     async function api(path, options = {}) {
-      const hdrs = { "Content-Type": "application/json" };
+      const hdrs = {};
+      if (!(options.body instanceof FormData)) {
+        hdrs["Content-Type"] = "application/json";
+      }
       if (token) hdrs["Authorization"] = `Bearer ${token}`;
       try {
         const res = await fetch(API_URL + path, { ...options, headers: { ...hdrs, ...options.headers } });
@@ -806,9 +884,40 @@
       try {
         const concerts = await api("/booking/concerts");
         const select = document.getElementById("customerConcertSelect");
+        const grid = document.getElementById("concertCardsGrid");
+        
         select.innerHTML = '<option value="">-- Select Concert --</option>';
+        grid.innerHTML = '';
+
         concerts.forEach(c => {
           select.innerHTML += `<option value="${c.concert_id}">${c.title} [${c.status}]</option>`;
+          
+          // Render Card
+          const card = document.createElement('div');
+          card.className = 'concert-card';
+          card.onclick = () => {
+            select.value = c.concert_id;
+            resetCustomerFlow();
+            // Scroll to the join button or actions
+            select.scrollIntoView({ behavior: 'smooth' });
+          };
+
+          const fullImgUrl = c.image_url ? (c.image_url.startsWith('http') ? c.image_url : `${API_URL}/${c.image_url}`) : null;
+          const imgHtml = fullImgUrl 
+            ? `<img src="${fullImgUrl}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">` 
+            : '';
+          const noImgHtml = `<div class="no-image" style="${c.image_url ? 'display:none;' : 'display:flex;'}">No Image</div>`;
+
+          card.innerHTML = `
+            ${imgHtml}
+            ${noImgHtml}
+            <div class="info">
+              <div class="title">${c.title}</div>
+              <div class="artist">${c.artist || 'Various Artists'}</div>
+              <div class="status-tag status-${c.status}">${c.status}</div>
+            </div>
+          `;
+          grid.appendChild(card);
         });
       } catch (e) { }
     }
@@ -1298,18 +1407,23 @@
         price: parseFloat(row.querySelector(".zone-price").value) || 0
       }));
 
-      const body = {
-        title: document.getElementById("newConcertTitle").value,
-        artist: document.getElementById("newConcertArtist").value,
-        venue: document.getElementById("newConcertVenue").value,
-        address: document.getElementById("newConcertAddress").value,
-        concert_datetime: document.getElementById("newConcertDate").value + ":00",
-        sale_open_at: document.getElementById("newConcertSaleDate").value + ":00",
-        zones: zones
-      };
+      const formData = new FormData();
+      formData.append("title", document.getElementById("newConcertTitle").value);
+      formData.append("artist", document.getElementById("newConcertArtist").value);
+      formData.append("venue", document.getElementById("newConcertVenue").value);
+      formData.append("address", document.getElementById("newConcertAddress").value);
+      formData.append("concert_datetime", document.getElementById("newConcertDate").value + ":00");
+      formData.append("sale_open_at", document.getElementById("newConcertSaleDate").value + ":00");
+      formData.append("zones_json", JSON.stringify(zones));
+      
+      const imgInput = document.getElementById("newConcertImage");
+      if (imgInput.files[0]) {
+        formData.append("image", imgInput.files[0]);
+      }
+
       try {
-        await api("/organizer/concerts", { method: "POST", body: JSON.stringify(body) });
-        log("Concert created successfully with zones!");
+        await api("/organizer/concerts", { method: "POST", body: formData });
+        log("Concert created successfully with image and zones!");
         fetchConcertsForOrganizer();
       } catch (e) { }
     }

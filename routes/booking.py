@@ -237,7 +237,8 @@ def get_concerts():
                     WHEN NOW() < sale_open_at THEN 'upcoming'
                     WHEN (NOW() >= sale_open_at AND (sale_close_at IS NULL OR NOW() <= sale_close_at)) THEN 'on_sale'
                     ELSE 'closed'
-                  END as dynamic_status
+                  END as dynamic_status,
+                  image_url
                 FROM concert
                 ORDER BY concert_datetime DESC
                 """
@@ -253,6 +254,7 @@ def get_concerts():
             "address": r[4],
             "concert_datetime": r[5].isoformat() if r[5] else None,
             "status": r[6],
+            "image_url": r[7],
         }
         for r in rows
     ]

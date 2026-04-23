@@ -11,6 +11,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from config import Config
 from models import close_db_pool, get_db_connection, init_db_pool
@@ -144,6 +145,9 @@ app.include_router(booking_router)
 app.include_router(organizer_router)
 app.include_router(payment_router)
 app.include_router(refund_router)
+
+# Serve static images for concerts
+app.mount("/database/image", StaticFiles(directory="database/image"), name="images")
 
 
 @app.get("/")

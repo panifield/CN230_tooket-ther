@@ -5,10 +5,16 @@ GET    /organizer/concerts/{concert_id}/queues  ดูรายชื่อค�
 POST   /organizer/queues/{queue_id}/admit       เปลี่ยนสถานะคิวลูกค้าเป็น admitted
 PATCH  /organizer/queues/{queue_id}/priority    แก้ไขคะแนน priority (location_score)
 """
+import os
 import logging
+import json
+import shutil
+import uuid
+from datetime import datetime
+from typing import List, Optional
 from decimal import Decimal
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, HTTPException, status, File, UploadFile, Form
 from pydantic import BaseModel
 
 from models import get_db_connection
@@ -155,45 +161,70 @@ class CreateConcertBody(BaseModel):
 
 
 @organizer_router.post("/concerts", status_code=status.HTTP_201_CREATED)
-def create_concert(body: CreateConcertBody, current_user: CurrentUser):
+def create_concert(
+    current_user: CurrentUser,
+    title: str = Form(...),
+    artist: str = Form(...),
+    venue: str = Form(...),
+    address: str = Form(...),
+    concert_datetime: str = Form(...),
+    sale_open_at: str = Form(...),
+    sale_close_at: Optional[str] = Form(None),
+    status: str = Form("on_sale"),
+    zones_json: str = Form("[]"),
+    image: Optional[UploadFile] = File(None)
+):
     """
-    Organizer สร้างคอนเสิร์ตใหม่ พร้อม zone และ seat ได้เลยในครั้งเดียว
-
-    ตัวอย่าง body:
-    {
-        "title": "Big Concert 2025",
-        "artist": "Artist Name",
-        "venue": "Impact Arena",
-        "address": "เมืองทองธานี",
-        "concert_datetime": "2025-12-01T19:00:00",
-        "sale_open_at": "2025-10-01T10:00:00",
-        "zones": [
-            {"zone_name": "VIP",     "total_seats": 100, "price": 5000},
-            {"zone_name": "General", "total_seats": 500, "price": 1500}
-        ]
-    }
+    Organizer สร้างคอนเสิร์ตใหม่ พร้อม zone และ seat + อัปโหลดรูปภาพ
     """
     _check_organizer_role(current_user)
     organizer_profile_id = current_user.get("organizer_profile_id")
     if not organizer_profile_id:
         raise HTTPException(status_code=400, detail="ไม่พบข้อมูล organizer profile ของคุณ")
 
+    # Parse zones
+    try:
+        zones_data = json.loads(zones_json)
+        zones = [ZoneInput(**z) for z in zones_data]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"รูปแบบ zones ไม่ถูกต้อง: {str(e)}")
+
+    # Handle image upload
+    image_url = None
+    if image:
+        # ตรวจสอบนามสกุลไฟล์
+        ext = os.path.splitext(image.filename)[1].lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            raise HTTPException(status_code=400, detail="อนุญาตเฉพาะไฟล์รูปภาพ (.jpg, .png, .webp)")
+        
+        # สร้างโฟลเดอร์ถ้าไม่มี
+        os.makedirs("database/image", exist_ok=True)
+        
+        # ตั้งชื่อไฟล์ใหม่เพื่อกันชื่อซ้ำ
+        filename = f"{uuid.uuid4()}{ext}"
+        filepath = os.path.join("database/image", filename)
+        
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+        
+        image_url = f"database/image/{filename}"
+
     # ตรวจสอบ zone ก่อน hit DB
     seen_names = set()
-    for z in body.zones:
+    for z in zones:
         if z.total_seats <= 0:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail=f"Zone '{z.zone_name}': total_seats ต้องมากกว่า 0",
             )
         if z.price < 0:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail=f"Zone '{z.zone_name}': price ต้องไม่ติดลบ",
             )
         if z.zone_name in seen_names:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=422,
                 detail=f"ชื่อ zone '{z.zone_name}' ซ้ำกัน",
             )
         seen_names.add(z.zone_name)
@@ -209,21 +240,21 @@ def create_concert(body: CreateConcertBody, current_user: CurrentUser):
                     """
                     INSERT INTO concert
                       (organizer_id, title, artist, venue, address,
-                       concert_datetime, sale_open_at, sale_close_at, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                       concert_datetime, sale_open_at, sale_close_at, status, image_url)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id
                     """,
                     (
-                        organizer_profile_id, body.title, body.artist,
-                        body.venue, body.address, body.concert_datetime,
-                        body.sale_open_at, body.sale_close_at, body.status,
+                        organizer_profile_id, title, artist,
+                        venue, address, concert_datetime,
+                        sale_open_at, sale_close_at, status, image_url
                     ),
                 )
                 concert_id = cur.fetchone()[0]
 
                 # 2) สร้าง zone + seat (ถ้ามี)
                 zones_created = []
-                for z in body.zones:
+                for z in zones:
                     cur.execute(
                         """
                         INSERT INTO zone
