@@ -103,8 +103,8 @@ CREATE TABLE concert (
     concert_datetime TIMESTAMP       NOT NULL,
     sale_open_at     TIMESTAMP,
     sale_close_at    TIMESTAMP,
-    status           VARCHAR(20)     NOT NULL CHECK (status IN ('draft','on_sale','closed','cancelled'))
-                                     -- status: draft คือ ยังไม่เปิดให้ user เห็นมีแค่ organizer ที่ไปแก้ไขข้อมูลได้
+    status           VARCHAR(20)     NOT NULL CHECK (status IN ('draft','on_sale','closed','cancelled')),
+    image_url        TEXT
 );
 
 -- =========================
