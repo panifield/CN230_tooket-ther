@@ -70,20 +70,19 @@ export function openRefundModal(options: RefundModalOptions): void {
     submitBtn.setAttribute("disabled", "true");
     status.textContent = "Submitting…";
     try {
+      const refundPayload = {
+        bank_name: bank,
+        account_number: accNum,
+        account_name: accName,
+        ...(reasonVal ? { reason: reasonVal } : {}),
+      };
+
       if (voucher) {
-        await refundApi.voucher(bookingId, {
-          bank_name: bank,
-          account_number: accNum,
-          account_name: accName,
-          reason: reasonVal || undefined,
-        });
+        await refundApi.voucher(bookingId, refundPayload);
       } else {
         await refundApi.request({
           booking_id: bookingId,
-          bank_name: bank,
-          account_number: accNum,
-          account_name: accName,
-          reason: reasonVal || undefined,
+          ...refundPayload,
         });
       }
       onSuccess();

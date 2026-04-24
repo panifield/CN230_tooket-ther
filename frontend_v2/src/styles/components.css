@@ -1,4 +1,52 @@
-/* ---------- Header ---------- */
+/* ============================================================
+   Coastal Edition Design System – CSS Variables
+   ============================================================ */
+:root {
+  /* Primary Palette */
+  --color-primary-blue:   #AAD6FA;
+  --color-accent-yellow:  #FCE6A9;
+  --color-sky-tint:       #C5F6FA;
+  --color-cream:          #FFF4C7;
+
+  /* Neutrals */
+  --color-midnight:       #010120;
+  --color-white:          #FFFFFF;
+  --color-border:         rgba(0, 0, 0, 0.08);
+  --color-glass-light:    rgba(255, 255, 255, 0.12);
+  --color-text-muted:     rgba(1, 1, 32, 0.45);
+  --color-danger:         #B3261E;
+
+  /* Gradients */
+  --gradient-coastal:     linear-gradient(135deg, #AAD6FA 0%, #FCE6A9 100%);
+
+  /* Typography */
+  --font-display:         "The Future", system-ui, sans-serif;
+  --font-mono:            "PP Neue Montreal Mono", "Courier New", monospace;
+  --fs-mono:              11px;
+  --ls-mono:              0.055px;
+
+  /* Geometry — SHARP 4px per §4 */
+  --radius-control:       4px;
+  --radius-container:     8px;
+
+  /* Shadows — always blue-tinted, never pure black */
+  --shadow-card:          rgba(1, 1, 32, 0.06) 0px 4px 12px;
+  --shadow-modal:         rgba(1, 1, 32, 0.12) 0px 8px 32px;
+
+  /* Spacing scale (4px base) */
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  24px;
+  --space-6:  32px;
+  --space-7:  40px;
+  --space-8:  48px;
+}
+
+/* ============================================================
+   Header
+   ============================================================ */
 .app-header {
   position: sticky;
   top: 0;
@@ -29,7 +77,7 @@
 .brand__mark {
   width: 28px;
   height: 28px;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-control); /* sharp 4px — not a circle */
   background: var(--gradient-coastal);
   display: inline-block;
 }
@@ -64,7 +112,9 @@
   color: var(--color-text-muted);
 }
 
-/* ---------- Buttons (DESIGN.md §4) ---------- */
+/* ============================================================
+   Buttons — §4: sharp 4px radius, NO pill/rounded variants
+   ============================================================ */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -75,7 +125,7 @@
   font-size: 14px;
   letter-spacing: -0.1px;
   font-weight: 500;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-control); /* 4px — always sharp */
   border: 1px solid transparent;
   cursor: pointer;
   transition: transform 80ms ease, opacity 80ms ease, background 80ms ease;
@@ -93,17 +143,19 @@
   cursor: not-allowed;
 }
 
+/* Primary: Dark Blue bg, White text */
 .btn--primary {
   background: var(--color-midnight);
   color: var(--color-white);
 }
 
 .btn--primary:hover:not(:disabled) {
-  background: #0a0a3a;
+  background: rgba(1, 1, 32, 0.85);
 }
 
+/* Secondary: #AAD6FA at 20% opacity, Blue border, Midnight text */
 .btn--secondary {
-  background: rgba(170, 214, 250, 0.2);
+  background: rgba(170, 214, 250, 0.20);
   border-color: var(--color-primary-blue);
   color: var(--color-midnight);
 }
@@ -112,12 +164,14 @@
   background: rgba(170, 214, 250, 0.35);
 }
 
+/* Ghost: transparent with border */
 .btn--ghost {
   background: transparent;
   color: var(--color-midnight);
   border-color: var(--color-border);
 }
 
+/* Dark mode button: glass-light bg, White text */
 .btn--dark {
   background: var(--color-glass-light);
   color: var(--color-white);
@@ -139,11 +193,13 @@
   font-size: 12px;
 }
 
-/* ---------- Cards ---------- */
+/* ============================================================
+   Cards — 8px container radius, blue-tinted shadow
+   ============================================================ */
 .card {
   background: var(--color-white);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-container);
+  border-radius: var(--radius-container); /* 8px */
   box-shadow: var(--shadow-card);
   padding: var(--space-5);
 }
@@ -185,7 +241,18 @@
   color: var(--color-midnight);
 }
 
-/* ---------- Forms ---------- */
+/* Mono label for stat — #AAD6FA per §6 "Agent Prompt Guide" */
+.stat__label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+  color: var(--color-primary-blue);
+}
+
+/* ============================================================
+   Forms
+   ============================================================ */
 .field {
   display: grid;
   gap: var(--space-1);
@@ -208,7 +275,7 @@
   font-size: 15px;
   padding: 10px 12px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-control); /* 4px */
   background: var(--color-white);
   color: var(--color-midnight);
 }
@@ -253,7 +320,9 @@
   font-size: 12px;
 }
 
-/* ---------- Tabs (page-level switcher inside dashboards) ---------- */
+/* ============================================================
+   Tabs
+   ============================================================ */
 .tabs {
   display: flex;
   gap: var(--space-1);
@@ -281,7 +350,9 @@
   border-bottom-color: var(--color-midnight);
 }
 
-/* ---------- Tables ---------- */
+/* ============================================================
+   Tables
+   ============================================================ */
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -313,7 +384,9 @@
   overflow-x: auto;
 }
 
-/* ---------- Status pills ---------- */
+/* ============================================================
+   Status pills — 4px radius per §4 geometry
+   ============================================================ */
 .pill {
   display: inline-block;
   padding: 2px 8px;
@@ -321,7 +394,7 @@
   font-size: var(--fs-mono);
   letter-spacing: var(--ls-mono);
   text-transform: uppercase;
-  border-radius: var(--radius-control);
+  border-radius: var(--radius-control); /* 4px — NOT pill-shaped */
   border: 1px solid var(--color-border);
 }
 
@@ -338,7 +411,7 @@
 }
 
 .pill--err {
-  background: rgba(179, 38, 30, 0.1);
+  background: rgba(179, 38, 30, 0.10);
   color: var(--color-danger);
   border-color: transparent;
 }
@@ -349,53 +422,85 @@
   border-color: transparent;
 }
 
-/* ---------- Seat grid ---------- */
+/* ============================================================
+   Booking Layout
+   ============================================================ */
+.booking-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: var(--space-8);
+  align-items: start;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-7) var(--space-5);
+}
+
+.selection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-7);
+}
+
+/* Headline — 40px section heading weight per §3 typography */
+.concert-title {
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  color: var(--color-midnight);
+}
+
+/* Stage bar */
+.stage-bar {
+  width: 100%;
+  background: rgba(1, 1, 32, 0.05);
+  height: 12px;
+  border-radius: var(--radius-control);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-8);
+  position: relative;
+}
+
+.stage-bar::after {
+  content: "STAGE / SCREEN";
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  color: var(--color-text-muted);
+  letter-spacing: var(--ls-mono);
+}
+
+/* Seat grid */
 .seat-grid {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: 12px;
   align-items: center;
-  padding: var(--space-4);
-  background: var(--color-cream);
-  border-radius: var(--radius-container);
-  border: 1px solid var(--color-border);
 }
 
 .seat-row {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
-}
-
-.seat-row__label {
-  width: 24px;
-  text-align: right;
-  font-family: var(--font-mono);
-  font-size: var(--fs-mono);
-  color: var(--color-text-muted);
 }
 
 .seat {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-control);
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-control); /* 4px — sharp */
   border: 1px solid var(--color-border);
   background: var(--color-white);
-  font-size: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
+  transition: all 0.15s ease;
   font-family: var(--font-mono);
-  color: var(--color-text-muted);
-  padding: 0;
 }
 
-.seat[data-status="locked"],
-.seat[data-status="sold"] {
-  background: rgba(1, 1, 32, 0.18);
-  cursor: not-allowed;
-  color: transparent;
+.seat:hover {
+  border-color: var(--color-midnight);
+  background: var(--color-sky-tint);
 }
 
 .seat[aria-pressed="true"] {
@@ -404,33 +509,153 @@
   border-color: var(--color-midnight);
 }
 
+.seat[disabled] {
+  background: rgba(1, 1, 32, 0.06);
+  color: transparent;
+  cursor: not-allowed;
+  border-color: transparent;
+}
+
+/* Seat legend */
 .seat-legend {
+  margin-top: var(--space-6);
   display: flex;
-  gap: var(--space-4);
-  flex-wrap: wrap;
-  margin-top: var(--space-3);
+  gap: var(--space-5);
+  font-size: 13px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+}
+
+/* Zone selector — REMOVED pill-shaped (100px) radius, use sharp 4px per §5 Don'ts */
+.zone-selector {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.zone-pill {
+  padding: 10px 20px;
+  border-radius: var(--radius-control); /* 4px — DON'T use pill buttons */
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 14px;
+  font-family: var(--font-display);
+}
+
+.zone-pill.selected {
+  background: var(--color-midnight);
+  color: var(--color-white);
+  border-color: var(--color-midnight);
+}
+
+/* Queue badge */
+.queue-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-sky-tint); /* brand tint, not arbitrary #f7feff */
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-control);
+}
+
+.queue-badge__number {
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--color-midnight); /* midnight, not arbitrary teal hex */
+  letter-spacing: -0.6px;
+}
+
+/* Order summary sidebar */
+.summary-column {
+  position: sticky;
+  top: 100px;
+}
+
+.order-summary-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-container); /* 8px */
+  padding: var(--space-6);
+  box-shadow: var(--shadow-card); /* blue-tinted shadow */
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-label {
   font-family: var(--font-mono);
   font-size: var(--fs-mono);
   letter-spacing: var(--ls-mono);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-5);
   text-transform: uppercase;
+}
+
+.summary-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.summary-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  color: var(--color-midnight);
+}
+
+.summary-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-4) 0;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0;
+  font-size: 14px;
   color: var(--color-text-muted);
 }
 
-.seat-legend__chip {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  margin-right: 6px;
-  vertical-align: middle;
-  border: 1px solid var(--color-border);
+.summary-row.total {
+  margin-top: var(--space-4);
+  font-weight: 500;
+  color: var(--color-midnight);
+  font-size: 16px;
 }
 
-/* ---------- Modal ---------- */
+.summary-total-price {
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--color-midnight);
+  letter-spacing: -0.6px;
+}
+
+.empty-cart {
+  text-align: center;
+  padding: var(--space-6) 0;
+}
+
+.empty-cart__icon {
+  font-size: 40px;
+  margin-bottom: var(--space-3);
+  opacity: 0.2;
+}
+
+/* ============================================================
+   Modal
+   ============================================================ */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(1, 1, 32, 0.5);
+  background: rgba(1, 1, 32, 0.50);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -440,7 +665,7 @@
 
 .modal {
   background: var(--color-white);
-  border-radius: var(--radius-container);
+  border-radius: var(--radius-container); /* 8px */
   box-shadow: var(--shadow-modal);
   max-width: 480px;
   width: 100%;
@@ -456,7 +681,9 @@
   margin-bottom: var(--space-3);
 }
 
-/* ---------- Toast / log panel ---------- */
+/* ============================================================
+   Log panel
+   ============================================================ */
 .log-panel {
   background: var(--color-midnight);
   color: var(--color-white);
@@ -475,7 +702,7 @@
 }
 
 .log-panel__line[data-level="error"] {
-  color: #ffb4af;
+  color: #ffb4af; /* safe: on midnight bg, not hardcoded UI text */
 }
 
 .log-panel__line[data-level="warn"] {
@@ -486,44 +713,116 @@
   color: var(--color-sky-tint);
 }
 
-/* ---------- Concert / queue / booking lists ---------- */
-.list {
+/* ============================================================
+   Concert card grid
+   ============================================================ */
+.card-grid-layout {
   display: grid;
-  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-6);
+  padding: var(--space-5) 0;
 }
 
-.list-item {
-  display: grid;
-  gap: var(--space-2);
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-container);
+.ticket-card {
   background: var(--color-white);
-}
-
-.list-item__row {
+  border-radius: var(--radius-container); /* 8px — not 16px */
+  overflow: hidden;
+  box-shadow: var(--shadow-card); /* blue-tinted, not rgba(0,0,0,0.06) */
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-3);
-  flex-wrap: wrap;
+  flex-direction: column;
+  height: 100%;
+  transition: transform 0.2s ease;
+  border: 1px solid var(--color-border);
 }
 
-.list-item__title {
-  font-size: 18px;
-  letter-spacing: -0.18px;
+.ticket-card:hover {
+  transform: translateY(-4px); /* subtle — not -8px overdone */
+  box-shadow: rgba(1, 1, 32, 0.10) 0px 12px 32px;
+}
+
+.ticket-card__img {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.ticket-card__content {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Headline — 500 weight, negative tracking per §3 */
+.ticket-card__title {
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.4px;
+  color: var(--color-midnight);
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.25;
+}
+
+.ticket-card:hover .ticket-card__title {
+  color: var(--color-primary-blue); /* on-hover: brand blue, not arbitrary AAD6FA override */
+  transition: color 0.2s ease;
+}
+
+.ticket-card__info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.ticket-card__info-icon {
+  width: 18px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.ticket-card__info-label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-right: 4px;
+}
+
+.ticket-card__info-value {
+  color: var(--color-midnight);
   font-weight: 500;
 }
 
-.empty-state {
-  padding: var(--space-6);
-  text-align: center;
-  color: var(--color-text-muted);
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-container);
+/* Book button — primary style, pushed to bottom */
+.btn-book-now {
+  width: 100%;
+  background: var(--color-midnight); /* not !important override soup */
+  color: var(--color-white);
+  padding: 12px var(--space-4);
+  border-radius: var(--radius-control); /* 4px */
+  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+  margin-top: auto;
+  border: none;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
 }
 
-/* ---------- Auth split layout ---------- */
+.btn-book-now:hover {
+  background: rgba(1, 1, 32, 0.85);
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+   Auth split layout
+   ============================================================ */
 .auth-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -556,6 +855,9 @@
   background: var(--color-border);
 }
 
+/* ============================================================
+   Sections & layout helpers
+   ============================================================ */
 .section {
   padding: var(--space-8) 0;
 }
@@ -574,4 +876,387 @@
 .banner--err {
   background: rgba(179, 38, 30, 0.08);
   color: var(--color-danger);
+}
+
+/* ============================================================
+   My Tickets — Split card (ticket stub design)
+   ============================================================ */
+.bg-tickets-page {
+  background-color: var(--color-cream); /* brand cream, not arbitrary #F8F9FA gray */
+  min-height: 100vh;
+}
+
+.ticket-card-v2 {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  background: var(--color-white);
+  border-radius: var(--radius-container); /* 8px */
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-card);
+  margin-bottom: var(--space-5);
+  position: relative;
+  overflow: visible;
+}
+
+/* Left info panel */
+.ticket-card-v2__info {
+  padding: var(--space-7);
+  border-right: 2px dashed var(--color-border); /* perforation line */
+  position: relative;
+}
+
+/* Perforation notches — color matches page bg */
+.ticket-card-v2__info::before,
+.ticket-card-v2__info::after {
+  content: '';
+  position: absolute;
+  right: -11px;
+  width: 20px;
+  height: 20px;
+  background: var(--color-cream); /* must match .bg-tickets-page */
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  z-index: 2;
+}
+
+.ticket-card-v2__info::before { top: -11px; }
+.ticket-card-v2__info::after  { bottom: -11px; }
+
+.ticket-card-v2__title {
+  font-size: 32px;
+  font-weight: 500; /* 500, not 700 — §4: weights are 400/500 only */
+  letter-spacing: -1px;
+  margin: var(--space-4) 0 var(--space-6) 0;
+  color: var(--color-midnight);
+}
+
+.ticket-card-v2__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6) var(--space-5);
+}
+
+/* Right QR panel */
+.ticket-card-v2__qr-area {
+  padding: var(--space-7);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-cream); /* brand cream surface */
+  border-radius: 0 var(--radius-container) var(--radius-container) 0;
+}
+
+.qr-box {
+  width: 140px;
+  height: 140px;
+  background: var(--color-white);
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control); /* 4px */
+  margin-bottom: var(--space-5);
+}
+
+/* Small action buttons on ticket */
+.btn-outline-sm {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+  border-radius: var(--radius-control); /* 4px */
+  cursor: pointer;
+  font-weight: 500;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.btn-outline-sm:hover {
+  background: var(--color-sky-tint);
+  border-color: var(--color-primary-blue);
+}
+
+/* ============================================================
+   Utility: mono label (shared across views)
+   ============================================================ */
+.label-mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-mono);
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+/* ============================================================
+   Utility: spacing helpers
+   ============================================================ */
+.mb-12 { margin-bottom: var(--space-3); }
+.space-y-8 > * + * { margin-top: var(--space-5); }
+
+/* =========================================
+   TOGETHER AI: COASTAL EDITION (PROFILE)
+   ========================================= */
+
+/* พื้นหลังหลัก (Pure White ตัดกับเงาสีฟ้าอ่อน) */
+.coastal-page {
+  background: #FFFFFF;
+  min-height: 100vh;
+  padding: 80px 20px;
+  color: #010120;
+  position: relative;
+  overflow: hidden;
+}
+
+/* เอฟเฟกต์แสง Gradient ด้านหลังให้ดูเป็น Coastal */
+.coastal-page::before {
+  content: '';
+  position: absolute;
+  top: -20%; right: -10%;
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, #C5F6FA 0%, transparent 70%);
+  opacity: 0.4;
+  z-index: 0;
+}
+
+/* Typography (PP Neue Montreal Mono) */
+.coastal-mono {
+  font-family: var(--font-mono), monospace;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.055px;
+  font-weight: 500;
+  color: #AAD6FA;
+}
+
+.coastal-mono--dark {
+  color: #010120;
+}
+
+/* Typography (The Future) */
+.coastal-title {
+  font-family: var(--font-heading), sans-serif;
+  font-size: 40px;
+  font-weight: 500;
+  letter-spacing: -0.8px;
+  color: #010120;
+  margin: 8px 0 40px 0;
+}
+
+/* Card Surface (Cream Base) */
+.coastal-card {
+  position: relative;
+  z-index: 1;
+  background: #fff9df ; /* ใช้ Cream Base ให้การ์ดดูมีมิติและอบอุ่น */
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: rgba(1, 1, 32, 0.06) 0px 4px 12px;
+  border-radius: 8px;
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 48px;
+}
+
+/* Inputs Field */
+.coastal-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coastal-input {
+  width: 100%;
+  padding: 14px 16px;
+  background: #FFFFFF;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 4px; /* Sharp corners ตามกฎ */
+  font-family: inherit;
+  font-size: 18px;
+  letter-spacing: -0.18px;
+  color: #010120;
+  transition: all 0.25s ease;
+  box-sizing: border-box;
+}
+
+/* ความสวยอยู่ตรงนี้! เวลาคลิกช่องพิมพ์ขอบจะเรืองแสงสีฟ้า */
+.coastal-input:focus {
+  outline: none;
+  border-color: #AAD6FA;
+  box-shadow: 0 0 0 3px #C5F6FA; 
+}
+
+/* Grid System ภายในฟอร์ม */
+.coastal-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px 20px;
+}
+
+.coastal-grid-full {
+  grid-column: 1 / -1;
+}
+
+/* Buttons */
+.coastal-btn-primary {
+  background: #010120;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 4px;
+  padding: 14px 32px;
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  letter-spacing: -0.18px;
+  transition: all 0.2s ease;
+}
+
+.coastal-btn-primary:hover:not(:disabled) {
+  opacity: 0.85;
+  transform: translateY(-1px);
+}
+
+.coastal-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.coastal-btn-glass {
+  background: rgba(170, 214, 250, 0.2);
+  border: 1px solid #AFE6FA ;
+  color: #010120;
+  border-radius: 4px;
+  padding: 14px 32px;
+  font-size: 18px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.coastal-btn-glass:hover {
+  background: rgba(170, 214, 250, 0.4);
+}
+
+/* =========================================
+   COASTAL EDITION: PREMIUM SEAT GRID
+   ========================================= */
+
+.coastal-seat-container {
+  background: #FFFFFF;
+  padding: 48px;
+  border-radius: 8px; /* โค้ง 4px-8px ตามกฎ DESIGN.md */
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: rgba(1, 1, 32, 0.04) 0px 8px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.coastal-grid-map {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+}
+
+.coastal-seat-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px; /* ระยะห่างระหว่างที่นั่งที่ดูโปร่งสบาย */
+  width: 100%;
+}
+
+.coastal-row-label {
+  width: 24px;
+  text-align: center;
+  font-family: var(--font-mono, 'PP Neue Montreal Mono', monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.055px;
+  color: rgba(1, 1, 32, 0.4);
+}
+
+/* 🪑 ตัวที่นั่ง */
+.coastal-seat {
+  width: 44px; /* ขนาดใหญ่ขึ้นนิดนึงให้กดง่ายและดูแพง */
+  height: 44px;
+  border-radius: 4px; /* Sharp 4px geometry */
+  font-family: var(--font-mono, 'PP Neue Montreal Mono', monospace);
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1); /* แอนิเมชันนุ่มๆ */
+  background: #FFFFFF;
+  color: #010120;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ✨ เอฟเฟกต์ตอนเอาเมาส์ชี้ (ว่าง) */
+.coastal-seat:not(.is-selected):not(.is-sold):hover {
+  border-color: #AAD6FA;
+  box-shadow: 0 0 0 3px #C5F6FA; /* แสงเรืองรองสีฟ้าสกาย */
+  color: #010120;
+  transform: translateY(-2px); /* ลอยขึ้นนิดนึง */
+}
+
+/* 🔵 เอฟเฟกต์ตอนถูกเลือก */
+.coastal-seat.is-selected {
+  background: #010120;
+  color: #FFFFFF;
+  border: 1px solid #010120;
+  box-shadow: rgba(1, 1, 32, 0.1) 0px 6px 16px;
+  transform: translateY(-2px);
+}
+
+/* ❌ เอฟเฟกต์ตอนถูกขายไปแล้ว */
+.coastal-seat.is-sold {
+  background: rgba(1, 1, 32, 0.04);
+  color: transparent; 
+  border: 1px solid transparent;
+  cursor: not-allowed;
+  position: relative;
+}
+
+/* จุดเล็กๆ บอกว่าที่นั่งนี้ไม่ว่างแล้ว */
+.coastal-seat.is-sold::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background-color: rgba(1, 1, 32, 0.15);
+  border-radius: 50%;
+}
+
+/* --- Legend (คำอธิบายสี) --- */
+.coastal-seat-legend {
+  display: flex;
+  gap: 32px;
+  margin-top: 48px;
+  justify-content: center;
+  font-family: var(--font-mono, 'PP Neue Montreal Mono', monospace);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.055px;
+  text-transform: uppercase;
+  color: #010120;
+}
+
+.legend-item { display: flex; align-items: center; gap: 10px; }
+.legend-chip { width: 16px; height: 16px; border-radius: 4px; }
+.legend-chip.is-available { background: #FFFFFF; border: 1px solid rgba(0, 0, 0, 0.08); }
+.legend-chip.is-selected { background: #010120; border: 1px solid #010120; }
+.legend-chip.is-sold { 
+  background: rgba(1, 1, 32, 0.04); 
+  display: flex; align-items: center; justify-content: center; 
+}
+.legend-chip.is-sold::after {
+  content: ''; width: 4px; height: 4px; background-color: rgba(1, 1, 32, 0.15); align-items: center; justify-content: center; border-radius: 50%;
 }

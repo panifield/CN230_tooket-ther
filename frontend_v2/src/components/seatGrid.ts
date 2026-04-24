@@ -10,6 +10,7 @@ export interface SeatGridOptions {
 export function renderSeatGrid(options: SeatGridOptions): HTMLElement {
   const { seats, selected, onToggle } = options;
 
+  // จัดกลุ่มที่นั่งตามแถว (Row)
   const byRow = new Map<string, Seat[]>();
   for (const seat of seats) {
     const list = byRow.get(seat.seat_row) ?? [];
@@ -19,58 +20,71 @@ export function renderSeatGrid(options: SeatGridOptions): HTMLElement {
   const sortedRows = [...byRow.keys()].sort();
 
   const rows = sortedRows.map((rowKey) => {
-    const rowSeats = (byRow.get(rowKey) ?? []).slice().sort(
-      (a, b) => a.seat_number - b.seat_number
-    );
-    return el("div", { class: "seat-row" }, [
-      el("span", { class: "seat-row__label", text: rowKey }),
-      ...rowSeats.map((seat) =>
-        el(
+    // 💡 ตัดให้เหลือแค่ 5 ที่นั่งต่อแถว (ด้วยคำสั่ง .slice(0, 5))
+    const rowSeats = (byRow.get(rowKey) ?? [])
+      .slice()
+      .sort((a, b) => a.seat_number - b.seat_number)
+      .slice(0, 5); 
+
+    return el("div", { class: "coastal-seat-row" }, [
+      el("span", { class: "coastal-row-label", text: rowKey }),
+      
+      // Render ที่นั่งทั้ง 5 ตัว
+      ...rowSeats.map((seat) => {
+        const isSelected = selected.has(seat.seat_id);
+        const isAvailable = seat.status === "available";
+
+        // ประมวลผลคลาส CSS
+        let seatClasses = "coastal-seat";
+        if (isSelected) seatClasses += " is-selected";
+        if (!isAvailable) seatClasses += " is-sold";
+
+        return el(
           "button",
           {
-            class: "seat",
+            class: seatClasses,
             attrs: {
               type: "button",
               "data-status": seat.status,
               "aria-label": `Seat ${seat.seat_row}${seat.seat_number} — ${seat.status}`,
-              "aria-pressed": selected.has(seat.seat_id) ? "true" : "false",
-              ...(seat.status !== "available" ? { disabled: "true" } : {}),
+              "aria-pressed": isSelected ? "true" : "false",
+              ...(!isAvailable ? { disabled: "true" } : {}),
             },
             on: {
               click: () => {
-                if (seat.status === "available") onToggle(seat.seat_id);
+                if (isAvailable) onToggle(seat.seat_id);
               },
             },
           },
           [String(seat.seat_number)]
-        )
-      ),
+        );
+      }),
+      
+      el("span", { class: "coastal-row-label", text: rowKey }) // ปิดท้ายแถวด้วยตัวอักษรอีกรอบให้สมดุล
     ]);
   });
 
-  const legend = el("div", { class: "seat-legend" }, [
-    el("span", {}, [
-      el("span", {
-        class: "seat-legend__chip",
-        attrs: { style: "background:#fff" },
-      }),
+  // Legend
+  const legend = el("div", { class: "coastal-seat-legend" }, [
+    el("span", { class: "legend-item" }, [
+      el("span", { class: "legend-chip is-available" }),
       "Available",
     ]),
-    el("span", {}, [
-      el("span", {
-        class: "seat-legend__chip",
-        attrs: { style: "background:#010120; border-color:#010120" },
-      }),
+    el("span", { class: "legend-item" }, [
+      el("span", { class: "legend-chip is-selected" }),
       "Selected",
     ]),
-    el("span", {}, [
-      el("span", {
-        class: "seat-legend__chip",
-        attrs: { style: "background:rgba(1,1,32,0.18)" },
-      }),
-      "Locked / Sold",
+    el("span", { class: "legend-item" }, [
+      el("span", { class: "legend-chip is-sold" }),
+      "Sold",
     ]),
   ]);
 
-  return el("div", { class: "seat-grid" }, [...rows, legend]);
+  const gridContainer = el("div", { class: "coastal-grid-map" }, [...rows]);
+
+  // ห่อหุ้มทุกอย่างด้วยการ์ดสวยๆ
+  return el("div", { class: "coastal-seat-container" }, [
+    gridContainer,
+    legend
+  ]);
 }

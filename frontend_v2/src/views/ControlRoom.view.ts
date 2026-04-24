@@ -2,8 +2,6 @@ import { bookingApi } from "../api/booking";
 import { organizerApi } from "../api/organizer";
 import type {
   Concert,
-  CreateConcertPayload,
-  CreateZonePayload,
   OrganizerDashboard,
   OrganizerQueueRow,
   Zone,
@@ -16,12 +14,9 @@ import {
   formatBaht,
   formatDateTime,
   statusLabel,
-  statusPillClass,
 } from "../utils/format";
 
-interface ZoneDraft extends CreateZonePayload {}
-
-export function renderOrganizerView(): HTMLElement {
+export function renderControlRoomView(): HTMLElement {
   if (!authStore.isAuthenticated() || authStore.getRole() !== "organizer") {
     router.navigate("/login");
     return el("div");
@@ -33,14 +28,12 @@ export function renderOrganizerView(): HTMLElement {
     queues: [] as OrganizerQueueRow[],
     dashboard: null as OrganizerDashboard | null,
     concertZones: [] as Zone[],
-    zones: [] as ZoneDraft[],
   };
 
   const concertListHost = el("div");
   const queueHost = el("div");
   const dashboardHost = el("div");
   const concertZonesHost = el("div");
-  const zoneDraftHost = el("div");
 
   const refreshConcerts = async (): Promise<void> => {
     state.concerts = await bookingApi.listConcerts();
@@ -67,8 +60,18 @@ export function renderOrganizerView(): HTMLElement {
           el(
             "tbody",
             {},
-            state.concerts.map((c) =>
-              el("tr", { attrs: { style: state.selectedConcertId === c.concert_id ? "background: var(--color-sky-tint);" : "" } }, [
+            state.concerts.map((c) => {
+              // แก้ไข: จัดการสีของ Status และแก้ปัญหา TypeScript แดง
+              const statusStr = String(c.status).toLowerCase();
+              let statusClass = "pill--muted"; // ค่าเริ่มต้น (สีเทา)
+              
+              if (statusStr === "upcoming") {
+                statusClass = "pill--ok"; // สีฟ้า (Sky Tint) สำหรับ UPCOMING
+              } else if (statusStr === "on_sale" || statusStr === "on sale") {
+                statusClass = "pill--warn"; // สีเหลือง (Cream) สำหรับ ON SALE
+              }
+
+              return el("tr", { attrs: { style: state.selectedConcertId === c.concert_id ? "background: var(--color-sky-tint);" : "" } }, [
                 el("td", {}, [
                   el("div", { attrs: { style: "font-weight: 500; font-size: 16px; color: var(--color-midnight);" }, text: c.title }),
                   el("div", { class: "label-mono", attrs: { style: "margin-top: 4px;" }, text: c.artist }),
@@ -79,7 +82,7 @@ export function renderOrganizerView(): HTMLElement {
                 ]),
                 el("td", {}, [
                   el("span", {
-                    class: `pill ${String(c.status) === 'published' || String(c.status) === 'publish' ? 'pill--ok' : 'pill--muted'}`,
+                    class: `pill ${statusClass}`,
                     text: statusLabel(c.status).toUpperCase(),
                   }),
                 ]),
@@ -123,8 +126,8 @@ export function renderOrganizerView(): HTMLElement {
                     ),
                   ]),
                 ]),
-              ])
-            )
+              ]);
+            })
           ),
         ]),
       ])
@@ -148,13 +151,12 @@ export function renderOrganizerView(): HTMLElement {
     }
     mount(
       queueHost,
-      el("div", { class: "table-wrap" }, [
+      el("div", { class: "table-wrap", attrs: { style: "max-height: 400px; overflow-y: auto;" } }, [
         el("table", { class: "table" }, [
           el("thead", {}, [
             el("tr", {}, [
               el("th", { text: "Customer" }),
               el("th", { text: "Priority" }),
-              el("th", { text: "Entered" }),
               el("th", { text: "Status" }),
               el("th", { attrs: { style: "text-align: right;" }, text: "Action" }),
             ]),
@@ -162,19 +164,21 @@ export function renderOrganizerView(): HTMLElement {
           el(
             "tbody",
             {},
-            state.queues.map((q) =>
-              el("tr", {}, [
+            state.queues.map((q) => {
+              const statusStr = String(q.status).toLowerCase();
+              const statusClass = statusStr === 'waiting' ? "pill--warn" : "pill--ok";
+
+              return el("tr", {}, [
                 el("td", { attrs: { style: "font-weight: 500;" }, text: q.customer_name }),
                 el("td", { text: String(q.priority_score) }),
-                el("td", { class: "label-mono", text: formatDateTime(q.entered_at) }),
                 el("td", {}, [
                   el("span", {
-                    class: `pill ${String(q.status) === 'waiting' ? 'pill--warn' : 'pill--ok'}`,
+                    class: `pill ${statusClass}`,
                     text: statusLabel(q.status).toUpperCase(),
                   }),
                 ]),
                 el("td", { attrs: { style: "text-align: right;" } }, [
-                  String(q.status) === "waiting"
+                  statusStr === "waiting"
                     ? el(
                         "button",
                         {
@@ -198,8 +202,8 @@ export function renderOrganizerView(): HTMLElement {
                       )
                     : el("span", { class: "label-mono", text: "—" }),
                 ]),
-              ])
-            )
+              ]);
+            })
           ),
         ]),
       ])
@@ -233,12 +237,11 @@ export function renderOrganizerView(): HTMLElement {
     }
     mount(
       concertZonesHost,
-      el("div", { class: "table-wrap" }, [
+      el("div", { class: "table-wrap", attrs: { style: "max-height: 400px; overflow-y: auto;" } }, [
         el("table", { class: "table" }, [
           el("thead", {}, [
             el("tr", {}, [
               el("th", { text: "Zone Name" }),
-              el("th", { text: "Price" }),
               el("th", { text: "Available" }),
               el("th", { text: "Status" }),
               el("th", { attrs: { style: "text-align: right;" }, text: "Action" }),
@@ -250,11 +253,10 @@ export function renderOrganizerView(): HTMLElement {
             state.concertZones.map((z) => {
               return el("tr", { attrs: { style: !z.is_active ? "opacity: 0.5;" : "" } }, [
                 el("td", { attrs: { style: "font-weight: 500;" }, text: z.zone_name }),
-                el("td", { text: formatBaht(z.price) }),
                 el("td", { class: "label-mono", text: `${z.available_count} / ${z.total_seats}` }),
                 el("td", {}, [
                   el("span", {
-                    class: `pill ${z.is_active ? "pill--ok" : "pill--err"}`,
+                    class: `pill ${z.is_active ? "pill--ok" : "pill--muted"}`,
                     text: z.is_active ? "ACTIVE" : "CLOSED",
                   }),
                 ]),
@@ -263,7 +265,7 @@ export function renderOrganizerView(): HTMLElement {
                     ? el(
                         "button",
                         {
-                          class: "btn btn--danger btn--sm",
+                          class: "btn btn--ghost btn--sm",
                           attrs: { type: "button" },
                           on: {
                             click: async () => {
@@ -349,7 +351,7 @@ export function renderOrganizerView(): HTMLElement {
                     el("td", { text: formatBaht(d.expense) }),
                     el("td", { attrs: { style: "text-align: right;" } }, [
                       el("span", {
-                        class: `pill ${d.net_profit >= 0 ? "pill--ok" : "pill--err"}`,
+                        class: `pill ${d.net_profit >= 0 ? "pill--ok" : "pill--muted"}`,
                         text: formatBaht(d.net_profit),
                       }),
                     ]),
@@ -362,230 +364,59 @@ export function renderOrganizerView(): HTMLElement {
     mount(dashboardHost, summary, breakdown);
   };
 
-  // ---------- Concert creation form ----------
-  const inputs = {
-    title: input("c-title", "text"),
-    artist: input("c-artist", "text"),
-    venue: input("c-venue", "text"),
-    address: input("c-address", "text"),
-    concert_datetime: input("c-when", "datetime-local"),
-    sale_open_at: input("c-sale-open", "datetime-local"),
-    sale_close_at: input("c-sale-close", "datetime-local"),
-  };
-  
-  const formStatus = el("p", { class: "field__error", attrs: { style: "margin-top: var(--space-3); text-align: center;" } });
-
-  const addZone = (): void => {
-    state.zones.push({
-      zone_name: `ZONE ${state.zones.length + 1}`,
-      price: 1000,
-      total_seats: 50,
-      rows: 5,
-      cols: 10,
-    });
-    renderZoneDrafts();
-  };
-
-  const renderZoneDrafts = (): void => {
-    if (state.zones.length === 0) {
-      mount(zoneDraftHost, el("div", { class: "empty-cart", text: "NO ZONES ADDED YET." }));
-      return;
-    }
-    mount(
-      zoneDraftHost,
-      ...state.zones.map((z, i) =>
-        el("div", { class: "card card--cream", attrs: { style: "margin-bottom: var(--space-3); padding: var(--space-4);" } }, [
-          el("div", { class: "form-grid" }, [
-            zoneField(`ZONE NAME`, z.zone_name, (v) => {
-              state.zones[i]!.zone_name = v;
-            }),
-            zoneField(
-              `PRICE (THB)`,
-              String(z.price),
-              (v) => { state.zones[i]!.price = Number(v) || 0; },
-              "number"
-            ),
-            zoneField(
-              `ROWS`,
-              String(z.rows),
-              (v) => {
-                state.zones[i]!.rows = Number(v) || 0;
-                state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
-                renderZoneDrafts();
-              },
-              "number"
-            ),
-            zoneField(
-              `COLUMNS`,
-              String(z.cols),
-              (v) => {
-                state.zones[i]!.cols = Number(v) || 0;
-                state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
-                renderZoneDrafts();
-              },
-              "number"
-            ),
-          ]),
-          el("div", { class: "form-actions", attrs: { style: "justify-content: space-between; align-items: center;" } }, [
-            el("span", { class: "label-mono", text: `TOTAL SEATS: ${z.rows * z.cols}` }),
-            el("button", {
-                class: "btn btn--danger btn--sm",
-                attrs: { type: "button" },
-                on: { click: () => { state.zones.splice(i, 1); renderZoneDrafts(); } },
-              },
-              ["REMOVE ZONE"]
-            ),
-          ]),
-        ])
-      )
-    );
-  };
-
-  const submitConcert = async (): Promise<void> => {
-    formStatus.textContent = "";
-    formStatus.style.color = "var(--color-danger)";
-    const payload: CreateConcertPayload = {
-      title: inputs.title.value.trim(),
-      artist: inputs.artist.value.trim(),
-      venue: inputs.venue.value.trim(),
-      address: inputs.address.value.trim(),
-      concert_datetime: inputs.concert_datetime.value,
-      sale_open_at: inputs.sale_open_at.value,
-      sale_close_at: inputs.sale_close_at.value,
-      zones: state.zones,
-    };
-    if (!payload.title || !payload.artist || !payload.venue || !payload.concert_datetime || payload.zones.length === 0) {
-      formStatus.textContent = "PLEASE PROVIDE TITLE, ARTIST, VENUE, DATETIME, AND AT LEAST ONE ZONE.";
-      return;
-    }
-    try {
-      const r = await organizerApi.createConcert(payload);
-      formStatus.style.color = "var(--color-midnight)";
-      formStatus.textContent = `${r.message.toUpperCase()} (CONCERT #${r.concert_id})`;
-      state.zones = [];
-      renderZoneDrafts();
-      await refreshConcerts();
-    } catch (err) {
-      formStatus.textContent = err instanceof Error ? err.message.toUpperCase() : "COULD NOT CREATE CONCERT.";
-    }
-  };
-
   void refreshConcerts();
-  renderZoneDrafts();
   renderQueues();
   renderConcertZones();
   renderDashboard();
 
   return el("div", { class: "coastal-page" }, [
-    el("div", { attrs: { style: "max-width: 1400px; margin: 0 auto;" } }, [
-      // Page Header
-      el("div", { class: "selection-header" }, [
+    el("div", { attrs: { style: "max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6);" } }, [
+      
+      el("div", { class: "selection-header", attrs: { style: "margin-bottom: 0;" } }, [
         el("div", {}, [
           el("span", { class: "label-mono", text: "PORTAL / ORGANIZER" }),
-          el("h1", { class: "coastal-title", text: "Performance Dashboard" }),
+          el("h1", { class: "coastal-title", text: "Control Room" }),
         ]),
       ]),
 
-      // Main Grid Layout (2 Columns)
-      el("div", { attrs: { style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--space-6); align-items: start;" } }, [
-        
-        // LEFT COLUMN: Creation Forms
-        el("div", { attrs: { style: "display: flex; flex-direction: column; gap: var(--space-6);" } }, [
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Create Concert" }),
-              el("span", { class: "label-mono", text: "CRAFT / SETUP" }),
-            ]),
-            el("div", { class: "form-grid" }, [
-              el("div", { class: "form-grid--full" }, [ field("c-title", "CONCERT NAME", inputs.title) ]),
-              field("c-artist", "ARTIST", inputs.artist),
-              field("c-venue", "VENUE (LOCATION)", inputs.venue),
-              el("div", { class: "form-grid--full" }, [ field("c-address", "FULL ADDRESS", inputs.address) ]),
-              el("div", { class: "form-grid--full" }, [ field("c-when", "WHEN (DATE & TIME)", inputs.concert_datetime) ]),
-              field("c-sale-open", "SALE OPENS", inputs.sale_open_at),
-              field("c-sale-close", "SALE CLOSES", inputs.sale_close_at),
-            ]),
-            
-            el("div", { class: "divider", text: "ZONE CONFIGURATION" }),
-            zoneDraftHost,
-            
-            el("div", { class: "form-actions" }, [
-              el("button", { class: "btn btn--secondary btn--block", attrs: { type: "button" }, on: { click: addZone } }, ["+ ADD ZONE"]),
-              el("button", { class: "btn btn--primary btn--block", attrs: { type: "button", style: "margin-top: var(--space-2);" }, on: { click: () => void submitConcert() } }, ["PUBLISH CONCERT"]),
-            ]),
-            formStatus,
+      // 1. Active Events (เต็มจอ ด้านบน)
+      el("section", { class: "card" }, [
+        el("div", { class: "card__header" }, [
+          el("h3", { class: "card__title", text: "Active Events" }),
+          el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void refreshConcerts() } }, ["REFRESH"]),
+        ]),
+        concertListHost,
+      ]),
+
+      // 2. Queue กับ Zones (แบ่งครึ่ง ซ้าย-ขวา)
+      el("div", { attrs: { style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--space-6);" } }, [
+        el("section", { class: "card" }, [
+          el("div", { class: "card__header" }, [
+            el("h3", { class: "card__title", text: "Real-time Queue" }),
+            el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadQueues() } }, ["RELOAD"]),
           ]),
+          queueHost,
         ]),
 
-        // RIGHT COLUMN: Dashboard & Management
-        el("div", { attrs: { style: "display: flex; flex-direction: column; gap: var(--space-6);" } }, [
-          
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Active Events" }),
-              el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void refreshConcerts() } }, ["REFRESH"]),
-            ]),
-            concertListHost,
+        el("section", { class: "card" }, [
+          el("div", { class: "card__header" }, [
+            el("h3", { class: "card__title", text: "Zone Availability" }),
+            el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadZones() } }, ["RELOAD"]),
           ]),
-
-          el("section", { class: "card card--dark" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Financial Dashboard" }),
-              el("button", { class: "btn btn--dark btn--sm", attrs: { type: "button" }, on: { click: () => void loadDashboard() } }, ["RELOAD"]),
-            ]),
-            dashboardHost,
-          ]),
-
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Real-time Queue" }),
-              el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadQueues() } }, ["RELOAD"]),
-            ]),
-            queueHost,
-          ]),
-
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Zone Availability" }),
-              el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadZones() } }, ["RELOAD"]),
-            ]),
-            concertZonesHost,
-          ]),
-
+          concertZonesHost,
         ]),
       ]),
+
+      // 3. Financial Dashboard (เต็มจอ อยู่ล่างสุดก่อนถึง Log)
+      el("section", { class: "card card--dark" }, [
+        el("div", { class: "card__header" }, [
+          el("h3", { class: "card__title", text: "Financial Dashboard" }),
+          el("button", { class: "btn btn--dark btn--sm", attrs: { type: "button" }, on: { click: () => void loadDashboard() } }, ["RELOAD"]),
+        ]),
+        dashboardHost,
+      ]),
+
     ]),
-  ]);
-}
-
-function input(id: string, type = "text"): HTMLInputElement {
-  return el("input", {
-    class: "input",
-    attrs: { id, type },
-  }) as HTMLInputElement;
-}
-
-function field(id: string, label: string, control: HTMLElement): HTMLElement {
-  return el("div", { class: "field" }, [
-    el("label", { class: "field__label", attrs: { for: id }, text: label }),
-    control,
-  ]);
-}
-
-function zoneField(
-  label: string,
-  value: string,
-  onChange: (v: string) => void,
-  type = "text"
-): HTMLElement {
-  const ctrl = el("input", {
-    class: "input",
-    attrs: { type, value },
-    on: { input: (e) => onChange((e.target as HTMLInputElement).value) },
-  });
-  return el("div", { class: "field" }, [
-    el("label", { class: "field__label", text: label }),
-    ctrl,
   ]);
 }
 
