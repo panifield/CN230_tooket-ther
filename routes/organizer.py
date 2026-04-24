@@ -508,6 +508,8 @@ class DashboardResponse(BaseModel):
     concert_id: int
     daily_stats: list[DailyStat]
     grand_totals: GrandTotals
+    pending_liability: Decimal  # ยอดที่อาจต้องคืน (booking สถานะ zone_closed_action_required)
+    pending_upgrade_revenue: Decimal  # ส่วนต่าง upgrade ที่รอชำระ (booking pending_payment)
 
 
 @organizer_router.get(
@@ -580,6 +582,33 @@ def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
             )
             rows = cur.fetchall()
 
+            # Pending liability — ยอดที่ organizer อาจต้องคืน เมื่อ customer ยังไม่ตัดสินใจ
+            # หลังโซนถูกปิด (เลือก rebook หรือ voucher refund)
+            cur.execute(
+                """
+                SELECT COALESCE(SUM(total_amount), 0)::numeric
+                FROM booking
+                WHERE concert_id = %s
+                  AND status = 'zone_closed_action_required'
+                """,
+                (concert_id,),
+            )
+            pending_liability = cur.fetchone()[0] or Decimal("0")
+
+            # Pending upgrade revenue — ส่วนต่างค่า upgrade ของ rebook ที่รอชำระ
+            cur.execute(
+                """
+                SELECT COALESCE(SUM(p.amount), 0)::numeric
+                FROM payment p
+                JOIN booking b ON b.id = p.booking_id
+                WHERE b.concert_id = %s
+                  AND b.status = 'pending_payment'
+                  AND p.status = 'pending'
+                """,
+                (concert_id,),
+            )
+            pending_upgrade_revenue = cur.fetchone()[0] or Decimal("0")
+
     daily_stats = [
         DailyStat(
             date=day.isoformat(),
@@ -600,4 +629,6 @@ def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
             total_expense=total_expense,
             total_net_profit=total_income - total_expense,
         ),
+        pending_liability=pending_liability,
+        pending_upgrade_revenue=pending_upgrade_revenue,
     )

@@ -1,4 +1,4 @@
--- ============================================================
+-- ============================ ================================
 -- queries.sql — Tooket-ther Core Queries (≥ 5 ข้อตามเกณฑ์)
 -- Schema: database/schema.sql (A1 — ลลิตา)
 -- Author: ปณิธาน (A2)
@@ -81,7 +81,7 @@ WHERE z.concert_id = %(concert_id)s
 GROUP BY z.id, z.zone_name, z.min_booking_threshold
 HAVING COUNT(b.id) < z.min_booking_threshold;
 
--- Q6: Priority Queue — เรียงลำดับคิวตาม priority_score DESC, entered_at ASC (ORDER BY)
+-- Q6:Priority Queue — เรียงลำดับคิวตาม priority_score DESC, entered_at ASC (ORDER BY)
 -- ใช้: หน้า Queue Status — แสดงลำดับคิวแต่ละ concert
 SELECT u.name,
        cp.location_score,

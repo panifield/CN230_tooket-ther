@@ -165,7 +165,7 @@ CREATE TABLE booking (
     total_amount     NUMERIC(10,2)   NOT NULL,
     total_tickets    INT,
     status           VARCHAR(20)     NOT NULL DEFAULT 'pending'
-                                     CHECK (status IN ('pending','paid','cancelled','expired','zone_closed_action_required','refund_pending')),
+                                     CHECK (status IN ('pending','paid','cancelled','expired','zone_closed_action_required','refund_pending','pending_payment')),
     delivery_type    VARCHAR(20)     NOT NULL DEFAULT 'digital'
                                      CHECK (delivery_type IN ('digital','pickup','postal'))
 );

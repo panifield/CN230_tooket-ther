@@ -17,6 +17,7 @@ Phase 4 — Seat Soft Lock & Booking:
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
@@ -418,6 +419,14 @@ def book_seats(body: BookBody, current_user: CurrentUser):
                     body.seat_ids,
                 )
 
+                # Drop orphaned ticket rows for these seats: expired/cancelled
+                # bookings release the seat but leave ticket rows behind, which
+                # would collide with UNIQUE(seat_id) on the INSERT below.
+                cur.execute(
+                    f"DELETE FROM ticket WHERE seat_id IN ({placeholders})",
+                    body.seat_ids,
+                )
+
                 # INSERT booking
                 expired_at = datetime.now(timezone.utc) + timedelta(minutes=15)
                 cur.execute(
@@ -481,15 +490,12 @@ def my_bookings(current_user: CurrentUser):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT booking_id, concert_title, concert_datetime,
-                       total_tickets, total_amount, status, created_at
-                FROM vw_booking_summary
-                WHERE user_name = (
-                    SELECT u.name FROM users u
-                    JOIN customer_profile cp ON cp.user_id = u.id
-                    WHERE cp.id = %s
-                )
-                ORDER BY created_at DESC
+                SELECT b.id, b.concert_id, c.title, c.concert_datetime,
+                       b.total_tickets, b.total_amount, b.status, b.created_at
+                FROM booking b
+                JOIN concert c ON c.id = b.concert_id
+                WHERE b.customer_id = %s
+                ORDER BY b.created_at DESC
                 """,
                 (customer_profile_id,),
             )
@@ -498,12 +504,13 @@ def my_bookings(current_user: CurrentUser):
     return [
         {
             "booking_id": r[0],
-            "concert_title": r[1],
-            "concert_datetime": r[2].isoformat() if r[2] else None,
-            "total_tickets": r[3],
-            "total_amount": float(r[4]) if r[4] else 0,
-            "status": r[5],
-            "created_at": r[6].isoformat() if r[6] else None,
+            "concert_id": r[1],
+            "concert_title": r[2],
+            "concert_datetime": r[3].isoformat() if r[3] else None,
+            "total_tickets": r[4],
+            "total_amount": float(r[5]) if r[5] else 0,
+            "status": r[6],
+            "created_at": r[7].isoformat() if r[7] else None,
         }
         for r in rows
     ]
@@ -647,12 +654,17 @@ def rebook_zone_closure(
     booking_id: int, body: RebookRequestBody, current_user: CurrentUser
 ):
     """
-    ใช้ voucher จาก zone closure เพื่อย้ายไปนั่งโซนอื่นแบบฟรี.
+    ใช้ voucher จาก zone closure เพื่อย้ายที่นั่งไปโซน active อื่น (มีกติกาเรื่องราคา):
     - booking ต้องเป็น 'zone_closed_action_required' และเป็นของ user เอง
     - new_seat_ids ต้องอยู่ในโซน active (is_active=TRUE), concert เดียวกัน, status='available'
     - จำนวน new_seat_ids ต้องเท่ากับจำนวน ticket เดิม
-    - transaction: lock seats (เก่า+ใหม่) → DELETE ticket เก่า → free seat เก่า →
-      seat ใหม่ → 'sold' → INSERT ticket ใหม่ → booking=paid
+    - Rule 1 (Block Downgrade): new_price < old_price → 400
+    - Rule 2 (Same Price): new_price == old_price → seat ใหม่ → 'sold', booking → 'paid'
+    - Rule 3 (Upgrade):   new_price > old_price  → seat ใหม่ → 'locked',
+          booking → 'pending_payment' (expired_at = NOW()+15m),
+          total_amount = new_price; คืน price_difference ให้ frontend ไปสร้าง QR
+          ผ่าน /payment/generate-qr (จำนวน = ส่วนต่าง) แล้ว webhook จะ flip seats → sold
+          และ booking → paid พร้อมเขียน finance income row ตามปกติ
     """
     if current_user["role"] != "customer":
         raise HTTPException(status_code=403, detail="เฉพาะลูกค้าเท่านั้น")
@@ -713,7 +725,7 @@ def rebook_zone_closure(
                 placeholders = ",".join(["%s"] * len(all_seat_ids))
                 cur.execute(
                     f"""
-                    SELECT s.id, s.status, s.zone_id, z.is_active, z.concert_id
+                    SELECT s.id, s.status, s.zone_id, z.is_active, z.concert_id, z.price
                     FROM seat s
                     JOIN zone z ON z.id = s.zone_id
                     WHERE s.id IN ({placeholders})
@@ -731,7 +743,7 @@ def rebook_zone_closure(
 
                 # Validate เฉพาะที่นั่งใหม่
                 for sid in new_seat_ids:
-                    _, s_status, _, z_active, z_concert = seat_map[sid]
+                    _, s_status, _, z_active, z_concert, _ = seat_map[sid]
                     if z_concert != b_concert_id:
                         raise HTTPException(
                             status_code=409,
@@ -748,6 +760,24 @@ def rebook_zone_closure(
                             detail=f"seat {sid} ไม่ว่าง (status='{s_status}')",
                         )
 
+                # Pricing: sum zone.price ของ old seats (ก่อนลบ ticket) และ new seats
+                old_price = sum(
+                    (Decimal(str(seat_map[sid][5])) for sid in old_seat_ids),
+                    Decimal("0"),
+                )
+                new_price = sum(
+                    (Decimal(str(seat_map[sid][5])) for sid in new_seat_ids),
+                    Decimal("0"),
+                )
+                price_difference = new_price - old_price
+
+                # Rule 1 — Block downgrade
+                if price_difference < 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="ย้ายไปโซนที่ถูกกว่าไม่ได้ / Cannot rebook to a cheaper zone.",
+                    )
+
                 # DELETE ticket เดิม
                 cur.execute("DELETE FROM ticket WHERE booking_id = %s", (b_id,))
 
@@ -758,10 +788,21 @@ def rebook_zone_closure(
                     old_seat_ids,
                 )
 
-                # lock seat ใหม่ → 'sold' ทันที (ถือว่า paid แล้ว)
+                # Rule 2 (same price) → 'sold' ทันที
+                # Rule 3 (upgrade)    → 'locked' รอชำระส่วนต่าง (webhook จะ flip เป็น 'sold')
+                is_upgrade = price_difference > 0
+                new_seat_status = "locked" if is_upgrade else "sold"
                 new_placeholders = ",".join(["%s"] * len(new_seat_ids))
                 cur.execute(
-                    f"UPDATE seat SET status = 'sold' WHERE id IN ({new_placeholders})",
+                    f"UPDATE seat SET status = %s WHERE id IN ({new_placeholders})",
+                    [new_seat_status, *new_seat_ids],
+                )
+
+                # Drop orphaned ticket rows for the new seats: expired/cancelled
+                # bookings release the seat but leave ticket rows behind, which
+                # would collide with UNIQUE(seat_id) on the INSERT below.
+                cur.execute(
+                    f"DELETE FROM ticket WHERE seat_id IN ({new_placeholders})",
                     new_seat_ids,
                 )
 
@@ -780,13 +821,31 @@ def rebook_zone_closure(
                     )
                     new_ticket_ids.append(cur.fetchone()[0])
 
-                cur.execute(
-                    """
-                    UPDATE booking SET status = 'paid', expired_at = NULL
-                    WHERE id = %s AND status = 'zone_closed_action_required'
-                    """,
-                    (b_id,),
-                )
+                if is_upgrade:
+                    # Rule 3 — Upgrade: booking รอชำระส่วนต่าง
+                    upgrade_expiry = datetime.now(timezone.utc) + timedelta(
+                        minutes=15
+                    )
+                    cur.execute(
+                        """
+                        UPDATE booking
+                        SET status = 'pending_payment',
+                            total_amount = %s,
+                            expired_at = %s
+                        WHERE id = %s AND status = 'zone_closed_action_required'
+                        """,
+                        (new_price, upgrade_expiry, b_id),
+                    )
+                else:
+                    # Rule 2 — Same price: ปิดเคสทันที
+                    cur.execute(
+                        """
+                        UPDATE booking
+                        SET status = 'paid', expired_at = NULL
+                        WHERE id = %s AND status = 'zone_closed_action_required'
+                        """,
+                        (b_id,),
+                    )
                 if cur.rowcount != 1:
                     raise HTTPException(
                         status_code=409, detail="booking ถูกเปลี่ยนสถานะไปแล้ว"
@@ -801,10 +860,24 @@ def rebook_zone_closure(
             conn.rollback()
             raise HTTPException(status_code=500, detail=f"rebook ไม่สำเร็จ: {exc}")
 
+    if is_upgrade:
+        return {
+            "message": "ย้ายที่นั่งสำเร็จ รอชำระส่วนต่าง",
+            "booking_id": b_id,
+            "status": "pending_payment",
+            "new_seat_ids": new_seat_ids,
+            "new_ticket_ids": new_ticket_ids,
+            "old_price": float(old_price),
+            "new_price": float(new_price),
+            "price_difference": float(price_difference),
+        }
     return {
-        "message": "ย้ายที่นั่งสำเร็จ (free upgrade)",
+        "message": "ย้ายที่นั่งสำเร็จ (same price)",
         "booking_id": b_id,
         "status": "paid",
         "new_seat_ids": new_seat_ids,
         "new_ticket_ids": new_ticket_ids,
+        "old_price": float(old_price),
+        "new_price": float(new_price),
+        "price_difference": 0.0,
     }

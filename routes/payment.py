@@ -33,6 +33,14 @@ logger = logging.getLogger("tooket-ther")
 payment_router = APIRouter(prefix="/api/v1/payments", tags=["payments"])
 
 
+def _iso_utc(dt):
+    """Serialize a DB-side naive TIMESTAMP (assumed UTC) as an ISO-8601 string
+    with an explicit +00:00 offset, so the browser doesn't parse it as local."""
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=timezone.utc).isoformat()
+
+
 # ---------------------------------------------------------------------------
 # PromptPay EMVCo QR payload builder
 # ---------------------------------------------------------------------------
@@ -195,7 +203,7 @@ def generate_qr(body: GenerateQrBody, current_user: CurrentUser):
         "transaction_ref": transaction_ref,
         "amount": f"{Decimal(amount):.2f}",
         "qr_payload": qr_payload,
-        "expired_at": b_expired_at.isoformat() if b_expired_at else None,
+        "expired_at": _iso_utc(b_expired_at),
     }
 
 
@@ -244,11 +252,6 @@ def payment_status(transaction_ref: str, current_user: CurrentUser):
     if b_customer_id != customer_profile_id:
         raise HTTPException(status_code=403, detail="ไม่ใช่ booking ของคุณ")
 
-    def _iso(dt):
-        if dt is None:
-            return None
-        return dt.replace(tzinfo=timezone.utc).isoformat()
-
     return {
         "transaction_ref": tx_ref,
         "payment_id": payment_id,
@@ -256,8 +259,8 @@ def payment_status(transaction_ref: str, current_user: CurrentUser):
         "payment_status": payment_status_v,
         "booking_status": booking_status_v,
         "amount": f"{Decimal(amount):.2f}",
-        "paid_at": _iso(paid_at),
-        "expired_at": _iso(booking_expired_at),
+        "paid_at": _iso_utc(paid_at),
+        "expired_at": _iso_utc(booking_expired_at),
         "seconds_remaining": int(seconds_remaining) if seconds_remaining is not None else 0,
     }
 
