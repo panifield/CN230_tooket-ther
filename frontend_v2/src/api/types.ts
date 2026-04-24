@@ -106,6 +106,10 @@ export interface BookResponse {
 }
 
 export interface BookingSummary {
+  zone: string;
+  event_date: string | null;
+  venue: string;
+  seat_label: string;
   booking_id: number;
   concert_title: string;
   concert_datetime: string | null;
@@ -124,6 +128,7 @@ export interface ConfirmBookingResponse {
 }
 
 export interface GenerateQrResponse {
+  payment_id: number;
   transaction_ref: string;
   qr_payload: string;
   qr_image_data_url?: string;
@@ -133,6 +138,8 @@ export interface GenerateQrResponse {
 }
 
 export interface PaymentStatus {
+  payment_status: any;
+  seconds_remaining: any;
   transaction_ref: string;
   status: "pending" | "paid" | "expired" | "failed";
   paid_at: string | null;

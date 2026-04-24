@@ -1,55 +1,139 @@
+import "./styles/tokens.css";
+import "./styles/base.css";
+import "./styles/components.css";
+
+import { renderHeader } from "./components/header";
+import { renderLogPanel } from "./components/logPanel";
+import { authStore } from "./state/auth";
 import { events } from "./state/events";
+import { clear, el, qs } from "./utils/dom";
+import { router } from "./router-instance";
 
-export type RouteHandler = () => Promise<void> | void;
+// Views - เช็คชื่อไฟล์ให้ตรงกับในเครื่องนะจ๊ะ (Landing vs landing)
+import { renderAuthView } from "./views/auth.view";
+import { renderCustomerDashboard } from "./views/Customer.view";
+import { renderForgotView } from "./views/Forgot.view";
+import { renderLandingView } from "./views/Landing.view";
+import { renderProfileView } from "./views/Profile.view";
+import { renderWaitingView } from "./views/Waiting.view";
+import { renderMyTicketsView } from "./views/MyTicketsView";
+import { renderBookingView } from "./views/Booking.view";
+import { renderZonesView } from "./views/Zones.view";
+import { renderSeatsView } from "./views/Seats.view";
+import { renderPaymentView } from "./views/Payment.view";
+import { renderControlRoomView } from "./views/ControlRoom.view";
+import { renderCreateConcertView } from "./views/CreateConcert.view";
 
-export interface Route {
-  path: string;
-  handler: RouteHandler;
-  /** If true, redirect anonymous users to /login */
-  authRequired?: boolean;
+const root = qs<HTMLDivElement>("#app");
+
+function render(view: HTMLElement): void {
+  if (!root) return;
+  clear(root);
+  root.append(
+    el("div", { class: "app-shell min-h-screen flex flex-col bg-white" }, [
+      renderHeader(),
+      el("main", { class: "flex-grow", attrs: { role: "main" } }, [view]),
+      
+      el("section", { class: "bg-cream-base/10 py-8 border-t border-black/5" }, [
+        el("div", { class: "max-w-7xl mx-auto px-6" }, [renderLogPanel()]),
+      ]),
+
+      el("footer", { 
+        class: "bg-[#010120] text-white py-12",
+        attrs: { style: "border-top: 1px solid rgba(255,255,255,0.1);" } 
+      }, [
+        el("div", { class: "max-w-7xl mx-auto px-6 flex justify-between items-center" }, [
+          el("div", {}, [
+            el("p", { class: "mono-label text-[#AAD6FA] text-[10px] mb-2", text: "TOOKET-THER / COASTAL EDITION" }),
+            el("p", { class: "text-[12px] opacity-40", text: "Built for CN230. © 2026. Infrastructure for Live Intelligence." }),
+          ]),
+          el("div", { class: "mono-label text-[10px] opacity-20" }, [
+            el("span", { text: "LAT: 13.7563 / LON: 100.5018" })
+          ])
+        ]),
+      ]),
+    ])
+  );
 }
 
-export class HashRouter {
-  private readonly routes: Route[] = [];
-  private fallback: RouteHandler = () => {};
-
-  register(route: Route): this {
-    this.routes.push(route);
-    return this;
-  }
-
-  setFallback(handler: RouteHandler): this {
-    this.fallback = handler;
-    return this;
-  }
-
-  start(): void {
-    window.addEventListener("hashchange", () => void this.dispatch());
-    void this.dispatch();
-  }
-
-  navigate(path: string): void {
-    if (window.location.hash !== `#${path}`) {
-      window.location.hash = path;
-    } else {
-      void this.dispatch();
-    }
-  }
-
-  current(): string {
-    return window.location.hash.replace(/^#/, "") || "/";
-  }
-
-  private async dispatch(): Promise<void> {
-    const path = this.current();
-    events.emit("route:change", { path });
-    const route = this.routes.find((r) => r.path === path);
-    if (route) {
-      await route.handler();
-    } else {
-      await this.fallback();
-    }
-  }
+// Auth guard และ Events (เหมือนเดิม)
+function requireAuth(role?: "customer" | "organizer" | "staff"): boolean {
+  if (!authStore.isAuthenticated()) { router.navigate("/login"); return false; }
+  if (role && authStore.getRole() !== role) { router.navigate("/login"); return false; }
+  return true;
 }
 
-export const router = new HashRouter();
+events.on("auth:logout", () => router.navigate("/login"));
+events.on("auth:login", () => {
+  router.navigate(authStore.getRole() === "organizer" ? "/organizer" : "/dashboard");
+});
+
+// Routes Registration
+router.register({ path: "/", handler: () => render(renderLandingView()) });
+router.register({ path: "/login", handler: () => render(renderAuthView()) });
+router.register({ path: "/forgot", handler: () => render(renderForgotView()) });
+router.register({ path: "/dashboard", handler: () => { if (requireAuth()) render(renderCustomerDashboard()); } });
+router.register({ path: "/waiting", handler: () => { 
+  if (!requireAuth("customer")) return;
+  const id = router.paramInt("concertId");
+  if (!id) { router.navigate("/dashboard"); return; }
+  render(renderWaitingView({ concertId: id }));
+}});
+router.register({ path: "/zones", handler: () => { 
+  if (!requireAuth("customer")) return;
+  const id = router.paramInt("concertId");
+  if (!id) { router.navigate("/dashboard"); return; }
+  render(renderZonesView({ concertId: id }));
+}});
+router.register({ path: "/seats", handler: () => { 
+  if (!requireAuth("customer")) return;
+  const cId = router.paramInt("concertId");
+  const zId = router.paramInt("zoneId");
+  if (!cId || !zId) { router.navigate("/dashboard"); return; }
+  render(renderSeatsView({ concertId: cId, zoneId: zId }));
+}});
+router.register({ path: "/payment", handler: () => { 
+  if (!requireAuth("customer")) return;
+  const bId = router.paramInt("bookingId");
+  if (!bId) { router.navigate("/my-tickets"); return; }
+  render(renderPaymentView({ bookingId: bId }));
+}});
+router.register({ path: "/my-tickets", handler: () => { if (requireAuth("customer")) render(renderMyTicketsView()); } });
+router.register({ path: "/profile", handler: () => { if (requireAuth()) render(renderProfileView()); } });
+// ─────────────────────────────────────────────────────────────
+// Route: /organizer (Control Room)
+// ─────────────────────────────────────────────────────────────
+router.register({
+  path: "/organizer",
+  handler: () => {
+    if (!requireAuth("organizer")) return;
+    render(renderControlRoomView());
+  },
+});
+
+// ─────────────────────────────────────────────────────────────
+// Route: /create-concert
+// ─────────────────────────────────────────────────────────────
+router.register({
+  path: "/create-concert",
+  handler: () => {
+    if (!requireAuth("organizer")) return;
+    render(renderCreateConcertView());
+  },
+});
+
+router.register({
+  path: "/payment",
+  handler: () => {
+    const bookingId = router.paramInt("bookingId");
+    if (!bookingId) { router.navigate("/my-tickets"); return; }
+    // ตรงนี้จะหายแดง เพราะเรา Import มาแล้วข้างบน
+    render(renderPaymentView({ bookingId })); 
+  }
+});
+
+router.setFallback(() => render(renderLandingView()));
+
+router.start(); // ต้องอยู่นอกสุดและเป็นบรรทัดสุดท้ายจ้ะ
+
+export { router };

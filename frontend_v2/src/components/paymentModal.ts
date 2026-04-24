@@ -20,22 +20,23 @@ export async function openPaymentModal(
     class: "label-mono",
     text: "Generating QR…",
   });
+
   const qrHolder = el("div", {
     attrs: {
       style:
         "min-height:220px;display:flex;align-items:center;justify-content:center;background:var(--color-cream);border-radius:var(--radius-control);margin-bottom:16px;",
-      "aria-label": "PromptPay QR code",
     },
   });
+
   const refLine = el("p", { class: "label-mono", text: "" });
 
   const actions = el("div", { class: "form-actions" }, []);
+
   const close = openModal({
     title: "Pay with PromptPay",
     body: el("div", {}, [
       el("p", {
-        text: `Amount due: ${formatBaht(amount)}. Scan the QR code below with any Thai banking app.`,
-        attrs: { style: "margin-bottom:16px;" },
+        text: `Amount due: ${formatBaht(amount)}`,
       }),
       qrHolder,
       refLine,
@@ -47,62 +48,80 @@ export async function openPaymentModal(
   let stopped = false;
 
   try {
+    // 🔥 generate QR
     const qr = await paymentApi.generateQr(bookingId, amount);
-    refLine.textContent = `Reference · ${qr.transaction_ref}`;
+
+    refLine.textContent = `Ref: ${qr.transaction_ref}`;
+
+    // 🧾 show QR
     if (qr.qr_image_data_url) {
-      qrHolder.innerHTML = "";
       qrHolder.append(
         el("img", {
           attrs: {
             src: qr.qr_image_data_url,
-            alt: "PromptPay QR code",
             style: "max-width:200px;",
           },
         })
       );
     } else {
       qrHolder.textContent = qr.qr_payload;
-      const existing = qrHolder.getAttribute("style") ?? "";
-      qrHolder.setAttribute(
-        "style",
-        `${existing};font-family:var(--font-mono);font-size:11px;padding:12px;text-align:center;word-break:break-all;`
-      );
     }
-    status.textContent = "Awaiting payment…";
 
-    const poll = async (): Promise<void> => {
+    status.textContent = "Waiting for payment...";
+
+    // 🔁 polling
+    const poll = async () => {
       if (stopped) return;
+
       try {
-        const result = await paymentApi.status(qr.transaction_ref);
-        if (result.status === "paid") {
+        const res = await paymentApi.status(qr.transaction_ref);
+
+        const paymentStatus = res.payment_status;
+
+        // ✅ SUCCESS
+        if (paymentStatus === "paid") {
           stopped = true;
-          status.textContent = "Payment received.";
+          status.textContent = "Payment success!";
           events.emit("log", { level: "info", message: "Payment confirmed" });
           onPaid();
           close();
           return;
         }
-        if (result.status === "expired" || result.status === "failed") {
+
+        // ❌ FAIL / EXPIRED
+        if (
+          paymentStatus === "expired" ||
+          paymentStatus === "failed"
+        ) {
           stopped = true;
-          status.textContent = `Payment ${result.status}.`;
+          status.textContent = "Payment expired.";
           return;
         }
+
+        // ⏳ countdown
+        if (res.seconds_remaining) {
+          status.textContent = `Waiting... (${res.seconds_remaining}s)`;
+        }
+
       } catch {
-        /* swallow polling errors */
+        // ignore
       }
-      window.setTimeout(() => void poll(), 4000);
+
+      setTimeout(poll, 3000);
     };
-    void poll();
+
+    poll();
+
   } catch (err) {
     status.textContent =
-      err instanceof Error ? err.message : "Could not generate QR.";
+      err instanceof Error ? err.message : "QR failed";
   }
 
+  // ❌ cancel
   const cancelBtn = el(
     "button",
     {
       class: "btn btn--ghost",
-      attrs: { type: "button" },
       on: {
         click: () => {
           stopped = true;
@@ -113,29 +132,28 @@ export async function openPaymentModal(
     ["Cancel"]
   );
 
+  // 🧪 manual confirm (dev only)
   const manualBtn = el(
     "button",
     {
       class: "btn btn--primary",
-      attrs: { type: "button" },
       on: {
         click: async () => {
           manualBtn.setAttribute("disabled", "true");
-          status.textContent = "Manually confirming…";
+          status.textContent = "Confirming...";
           try {
             await bookingApi.confirm(bookingId);
             stopped = true;
             onPaid();
             close();
           } catch (err) {
-            status.textContent =
-              err instanceof Error ? err.message : "Manual confirm failed.";
+            status.textContent = "Manual confirm failed";
             manualBtn.removeAttribute("disabled");
           }
         },
       },
     },
-    ["Manual confirm (testing)"]
+    ["Manual confirm"]
   );
 
   actions.append(cancelBtn, manualBtn);
