@@ -134,24 +134,30 @@ router.register({
   }
 });
 
-router.register({ 
-  path: "/zones", 
-  handler: () => { 
+router.register({
+  path: "/zones",
+  handler: () => {
     if (!requireAuth("customer")) return;
     const concertId = router.paramInt("concertId");
     if (!concertId) { router.navigate("/dashboard"); return; }
-    render(renderZonesView({ concertId }));
+    const rebookBookingId = router.paramInt("rebookBookingId");
+    render(renderZonesView(
+      rebookBookingId ? { concertId, rebookBookingId } : { concertId }
+    ));
   }
 });
 
-router.register({ 
-  path: "/seats", 
-  handler: () => { 
+router.register({
+  path: "/seats",
+  handler: () => {
     if (!requireAuth("customer")) return;
     const concertId = router.paramInt("concertId");
     const zoneId = router.paramInt("zoneId");
     if (!concertId || !zoneId) { router.navigate("/dashboard"); return; }
-    render(renderSeatsView({ concertId, zoneId }));
+    const rebookBookingId = router.paramInt("rebookBookingId");
+    render(renderSeatsView(
+      rebookBookingId ? { concertId, zoneId, rebookBookingId } : { concertId, zoneId }
+    ));
   }
 });
 

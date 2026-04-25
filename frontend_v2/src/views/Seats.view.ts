@@ -4,12 +4,17 @@ import { el, mount, clear } from "../utils/dom";
 import { formatBaht } from "../utils/format";
 import { events } from "../state/events";
 
-export function renderSeatsView(params: { concertId: number, zoneId: number }): HTMLElement {
+export function renderSeatsView(params: {
+  concertId: number;
+  zoneId: number;
+  rebookBookingId?: number;
+}): HTMLElement {
   const state = {
     seats: [] as any[],
     selectedSeats: new Set<number>(),
     zoneInfo: null as any,
-    isLoading: true
+    isLoading: true,
+    requiredSeatCount: null as number | null,
   };
 
   const gridHost = el("div", { attrs: { style: "width: 100%; position: relative;" } });
@@ -67,6 +72,14 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
 
   const renderGrid = () => {
     clear(gridHost);
+
+    if (state.requiredSeatCount !== null) {
+      mount(gridHost, el("div", {
+        class: "banner banner--warn",
+        attrs: { style: "padding: 12px 16px; margin-bottom: 16px;" },
+        text: `UPGRADE MODE: Please select exactly ${state.requiredSeatCount} seats.`,
+      }));
+    }
 
     if (state.isLoading) {
       mount(gridHost, el("div", { class: "empty-cart" }, [
@@ -129,8 +142,21 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
           on: {
             click: () => {
               if (isSold) return;
-              if (state.selectedSeats.has(seat.seat_id)) state.selectedSeats.delete(seat.seat_id);
-              else state.selectedSeats.add(seat.seat_id);
+              if (state.selectedSeats.has(seat.seat_id)) {
+                state.selectedSeats.delete(seat.seat_id);
+              } else {
+                if (
+                  state.requiredSeatCount !== null &&
+                  state.selectedSeats.size >= state.requiredSeatCount
+                ) {
+                  events.emit("log", {
+                    level: "warn",
+                    message: `Upgrade requires exactly ${state.requiredSeatCount} seats — deselect one to swap.`,
+                  });
+                  return;
+                }
+                state.selectedSeats.add(seat.seat_id);
+              }
               updateUI();
             },
             mouseenter: (e) => {
@@ -200,27 +226,52 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
       ]),
 
       el("div", { class: "summary-divider" }),
+      ...(state.requiredSeatCount !== null
+        ? [el("div", { class: "summary-row" }, [
+            el("span", { class: "label-mono", text: "Selected" }),
+            el("span", { attrs: { style: "font-weight: 500;" }, text: `${count} / ${state.requiredSeatCount}` }),
+          ])]
+        : []),
       el("div", { class: "summary-row total" }, [
         el("span", { text: "Total" }),
         el("span", { class: "summary-total-price", text: formatBaht(total) })
       ]),
       el("button", {
         class: "btn btn--primary btn--block",
-        attrs: { style: "margin-top: 24px; padding: 16px;", ...(count === 0 ? { disabled: "true" } : {}) },
+        attrs: {
+          style: "margin-top: 24px; padding: 16px;",
+          ...(proceedDisabled() ? { disabled: "true" } : {}),
+        },
         text: "CONFIRM SEATS →",
         on: { click: handleBooking }
       })
     );
   };
 
+  const proceedDisabled = (): boolean => {
+    const count = state.selectedSeats.size;
+    if (state.requiredSeatCount !== null) return count !== state.requiredSeatCount;
+    return count === 0;
+  };
+
   const handleBooking = async () => {
+    const seatIds = Array.from(state.selectedSeats);
     try {
-      const r = await bookingApi.book({
-        concert_id: params.concertId,
-        seat_ids: Array.from(state.selectedSeats)
-      });
-      events.emit("log", { level: "info", message: "Seats secured. Redirecting to checkout..." });
-      router.navigate(`/payment?bookingId=${r.booking_id}`);
+      if (params.rebookBookingId) {
+        const r = await bookingApi.rebook(params.rebookBookingId, seatIds);
+        events.emit("log", {
+          level: "info",
+          message: `Upgrade reserved. Pay difference of ${formatBaht(Number(r.difference_amount))} to confirm.`,
+        });
+        router.navigate(`/payment?bookingId=${r.booking_id}`);
+      } else {
+        const r = await bookingApi.book({
+          concert_id: params.concertId,
+          seat_ids: seatIds,
+        });
+        events.emit("log", { level: "info", message: "Seats secured. Redirecting to checkout..." });
+        router.navigate(`/payment?bookingId=${r.booking_id}`);
+      }
     } catch (err) {
       events.emit("log", { level: "error", message: String(err) });
     }
@@ -230,12 +281,18 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
     state.isLoading = true;
     updateUI();
     try {
-      const [zones, seats] = await Promise.all([
+      const [zones, seats, rebookBookings] = await Promise.all([
         bookingApi.listZones(params.concertId),
-        bookingApi.listSeats(params.concertId, params.zoneId)
+        bookingApi.listSeats(params.concertId, params.zoneId),
+        params.rebookBookingId ? bookingApi.myBookings() : Promise.resolve(null),
       ]);
       state.zoneInfo = zones.find(z => z.zone_id === params.zoneId);
       state.seats = seats || [];
+      if (params.rebookBookingId && rebookBookings) {
+        const b = rebookBookings.find(x => x.booking_id === params.rebookBookingId);
+        if (b && b.total_tickets) state.requiredSeatCount = b.total_tickets;
+        else events.emit("log", { level: "warn", message: "Could not resolve original ticket count for upgrade." });
+      }
       state.isLoading = false;
       updateUI();
     } catch (err) {
