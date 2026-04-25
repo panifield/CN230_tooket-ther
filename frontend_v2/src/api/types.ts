@@ -150,9 +150,7 @@ export interface PaymentStatus {
 export interface CreateZonePayload {
   zone_name: string;
   price: number;
-  total_seats: number;
-  rows: number;
-  cols: number;
+  seat_plan: string;
 }
 
 export interface CreateConcertPayload {

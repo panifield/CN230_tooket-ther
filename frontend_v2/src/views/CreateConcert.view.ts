@@ -34,9 +34,7 @@ export function renderCreateConcertView(): HTMLElement {
     state.zones.push({
       zone_name: `ZONE ${state.zones.length + 1}`,
       price: 1000,
-      total_seats: 50,
-      rows: 5,
-      cols: 10,
+      seat_plan: "10, 12, 12, 10",
     });
     renderZoneDrafts();
   };
@@ -48,8 +46,12 @@ export function renderCreateConcertView(): HTMLElement {
     }
     mount(
       zoneDraftHost,
-      ...state.zones.map((z, i) =>
-        el("div", { class: "card card--cream", attrs: { style: "margin-bottom: var(--space-3); padding: var(--space-4);" } }, [
+      ...state.zones.map((z, i) => {
+        const totalLabel = el("span", {
+          class: "label-mono",
+          text: `TOTAL SEATS: ${countSeats(z.seat_plan)}`,
+        });
+        return el("div", { class: "card card--cream", attrs: { style: "margin-bottom: var(--space-3); padding: var(--space-4);" } }, [
           el("div", { class: "form-grid" }, [
             zoneField(`ZONE NAME`, z.zone_name, (v) => {
               state.zones[i]!.zone_name = v;
@@ -58,42 +60,49 @@ export function renderCreateConcertView(): HTMLElement {
               `PRICE (THB)`,
               String(z.price),
               (v) => { state.zones[i]!.price = Number(v) || 0; },
-              "number"
+              "number",
             ),
-            zoneField(
-              `ROWS`,
-              String(z.rows),
-              (v) => {
-                state.zones[i]!.rows = Number(v) || 0;
-                state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
-                renderZoneDrafts();
-              },
-              "number"
-            ),
-            zoneField(
-              `COLUMNS`,
-              String(z.cols),
-              (v) => {
-                state.zones[i]!.cols = Number(v) || 0;
-                state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
-                renderZoneDrafts();
-              },
-              "number"
-            ),
+            el("div", { class: "form-grid--full" }, [
+              zoneField(
+                `SEAT PLAN`,
+                z.seat_plan,
+                (v) => {
+                  state.zones[i]!.seat_plan = v;
+                  totalLabel.textContent = `TOTAL SEATS: ${countSeats(v)}`;
+                },
+                "text",
+                "e.g. 10, 12, 12, 10  (use dashes for aisles: 5-2-5)",
+              ),
+            ]),
           ]),
           el("div", { class: "form-actions", attrs: { style: "justify-content: space-between; align-items: center;" } }, [
-            el("span", { class: "label-mono", text: `TOTAL SEATS: ${z.rows * z.cols}` }),
-            el("button", {
+            totalLabel,
+            el(
+              "button",
+              {
                 class: "btn btn--ghost btn--sm",
                 attrs: { type: "button" },
                 on: { click: () => { state.zones.splice(i, 1); renderZoneDrafts(); } },
               },
-              ["REMOVE ZONE"]
+              ["REMOVE ZONE"],
             ),
           ]),
-        ])
-      )
+        ]);
+      }),
     );
+  };
+
+  const countSeats = (plan: string): number => {
+    let total = 0;
+    for (const row of plan.split(",")) {
+      const tokens = row.split("-").map((t) => t.trim()).filter(Boolean);
+      for (let idx = 0; idx < tokens.length; idx++) {
+        if (idx % 2 !== 0) continue;
+        const n = Number(tokens[idx]);
+        if (Number.isFinite(n) && n > 0) total += n;
+      }
+    }
+    return total;
   };
 
   const submitConcert = async (): Promise<void> => {
@@ -181,11 +190,14 @@ function zoneField(
   label: string,
   value: string,
   onChange: (v: string) => void,
-  type = "text"
+  type = "text",
+  placeholder?: string,
 ): HTMLElement {
+  const attrs: Record<string, string> = { type, value };
+  if (placeholder) attrs.placeholder = placeholder;
   const ctrl = el("input", {
     class: "input",
-    attrs: { type, value },
+    attrs,
     on: { input: (e) => onChange((e.target as HTMLInputElement).value) },
   });
   return el("div", { class: "field" }, [

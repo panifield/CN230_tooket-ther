@@ -1,3 +1,5 @@
+import QRCode from "qrcode";
+
 import { bookingApi } from "../api/booking";
 import { paymentApi } from "../api/payment";
 import { events } from "../state/events";
@@ -9,12 +11,14 @@ export interface PaymentModalOptions {
   bookingId: number;
   amount: number;
   onPaid: () => void;
+  onClose?: () => void;
+  onExpired?: () => void;
 }
 
 export async function openPaymentModal(
   options: PaymentModalOptions
 ): Promise<void> {
-  const { bookingId, amount, onPaid } = options;
+  const { bookingId, amount, onPaid, onClose, onExpired } = options;
 
   const status = el("p", {
     class: "label-mono",
@@ -24,7 +28,7 @@ export async function openPaymentModal(
   const qrHolder = el("div", {
     attrs: {
       style:
-        "min-height:220px;display:flex;align-items:center;justify-content:center;background:var(--color-cream);border-radius:var(--radius-control);margin-bottom:16px;",
+        "min-height:220px;padding:16px;display:flex;align-items:center;justify-content:center;background:var(--color-cream);border-radius:var(--radius-control);margin-bottom:16px;overflow:hidden;word-break:break-all;overflow-wrap:anywhere;text-align:center;font-family:var(--font-mono),monospace;font-size:11px;line-height:1.4;max-width:100%;box-sizing:border-box;",
     },
   });
 
@@ -53,18 +57,41 @@ export async function openPaymentModal(
 
     refLine.textContent = `Ref: ${qr.transaction_ref}`;
 
-    // 🧾 show QR
-    if (qr.qr_image_data_url) {
+    // 🧾 show QR — prefer server-supplied data URL, otherwise render client-side from payload
+    let dataUrl: string | null = qr.qr_image_data_url ?? null;
+    if (!dataUrl && qr.qr_payload) {
+      try {
+        dataUrl = await QRCode.toDataURL(qr.qr_payload, {
+          errorCorrectionLevel: "M",
+          margin: 1,
+          width: 220,
+        });
+      } catch (err) {
+        events.emit("log", {
+          level: "error",
+          message: `[qr] render failed: ${String(err)}`,
+        });
+      }
+    }
+
+    qrHolder.textContent = "";
+    if (dataUrl) {
       qrHolder.append(
         el("img", {
           attrs: {
-            src: qr.qr_image_data_url,
-            style: "max-width:200px;",
+            src: dataUrl,
+            alt: "PromptPay QR",
+            style: "max-width:220px;width:100%;height:auto;display:block;",
           },
-        })
+        }),
       );
     } else {
-      qrHolder.textContent = qr.qr_payload;
+      qrHolder.append(
+        el("span", {
+          attrs: { style: "word-break:break-all;overflow-wrap:anywhere;max-width:100%;" },
+          text: qr.qr_payload,
+        }),
+      );
     }
 
     status.textContent = "Waiting for payment...";
@@ -95,12 +122,17 @@ export async function openPaymentModal(
         ) {
           stopped = true;
           status.textContent = "Payment expired.";
+          onExpired?.();
+          close();
           return;
         }
 
         // ⏳ countdown
-        if (res.seconds_remaining) {
-          status.textContent = `Waiting... (${res.seconds_remaining}s)`;
+        if (res.seconds_remaining != null) {
+          const total = Math.max(0, Math.floor(Number(res.seconds_remaining)));
+          const mm = String(Math.floor(total / 60)).padStart(2, "0");
+          const ss = String(total % 60).padStart(2, "0");
+          status.textContent = `Waiting... (${mm}:${ss})`;
         }
 
       } catch {
@@ -117,15 +149,32 @@ export async function openPaymentModal(
       err instanceof Error ? err.message : "QR failed";
   }
 
-  // ❌ cancel
+  // ❌ cancel — release seats on the backend, then close
   const cancelBtn = el(
     "button",
     {
       class: "btn btn--ghost",
       on: {
-        click: () => {
+        click: async () => {
+          if (cancelBtn.hasAttribute("disabled")) return;
+          cancelBtn.setAttribute("disabled", "true");
+          cancelBtn.textContent = "Cancelling...";
           stopped = true;
-          close();
+          try {
+            await bookingApi.cancelBooking(bookingId);
+            events.emit("log", {
+              level: "info",
+              message: `Booking #${bookingId} cancelled, seats released`,
+            });
+          } catch (err) {
+            events.emit("log", {
+              level: "error",
+              message: `[cancel] ${String(err)}`,
+            });
+          } finally {
+            close();
+            onClose?.();
+          }
         },
       },
     },
@@ -146,14 +195,14 @@ export async function openPaymentModal(
             stopped = true;
             onPaid();
             close();
-          } catch (err) {
+          } catch {
             status.textContent = "Manual confirm failed";
             manualBtn.removeAttribute("disabled");
           }
         },
       },
     },
-    ["Manual confirm"]
+    ["Manual confirm (testing)"]
   );
 
   actions.append(cancelBtn, manualBtn);

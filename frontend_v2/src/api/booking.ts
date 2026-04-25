@@ -58,6 +58,12 @@ export const bookingApi = {
     });
   },
 
+  cancelBooking(
+    bookingId: string | number,
+  ): Promise<{ message: string; booking_id: number; status: "cancelled" }> {
+    return request(`/booking/${bookingId}/cancel`, { method: "POST" });
+  },
+
   rebook(
     bookingId: number,
     newSeatIds: number[]

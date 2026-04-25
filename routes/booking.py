@@ -641,6 +641,95 @@ def confirm_booking(booking_id: int, current_user: CurrentUser):
 
 
 # ---------------------------------------------------------------------------
+# POST /booking/{id}/cancel — User-initiated cancellation
+# ---------------------------------------------------------------------------
+
+
+@booking_router.post("/{booking_id}/cancel")
+def cancel_booking(booking_id: int, current_user: CurrentUser):
+    """
+    ยกเลิก booking ที่ยัง 'pending' อยู่:
+      - booking → 'cancelled'
+      - seat → 'available'
+      - payment (pending) → 'expired'
+      - queue_session (admitted) → 'expired'
+    เจ้าของ booking เท่านั้นจึงยกเลิกได้
+    """
+    customer_profile_id = current_user.get("customer_profile_id")
+    if customer_profile_id is None:
+        raise HTTPException(status_code=403, detail="เฉพาะลูกค้าเท่านั้น")
+
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT customer_id, status FROM booking WHERE id = %s FOR UPDATE",
+                    (booking_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="ไม่พบ booking")
+                if row[0] != customer_profile_id:
+                    raise HTTPException(status_code=403, detail="ไม่ใช่ booking ของคุณ")
+                if row[1] != "pending":
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"booking สถานะ '{row[1]}' ยกเลิกไม่ได้",
+                    )
+
+                # คืน seat → available (ตามที่ ticket ผูกไว้)
+                cur.execute(
+                    """
+                    UPDATE seat SET status = 'available'
+                    WHERE id IN (
+                        SELECT seat_id FROM ticket WHERE booking_id = %s
+                    )
+                    """,
+                    (booking_id,),
+                )
+
+                # payment pending → expired
+                cur.execute(
+                    """
+                    UPDATE payment SET status = 'expired'
+                    WHERE booking_id = %s AND status = 'pending'
+                    """,
+                    (booking_id,),
+                )
+
+                # queue_session admitted → expired
+                cur.execute(
+                    """
+                    UPDATE queue_session SET status = 'expired'
+                    WHERE customer_id = %s
+                      AND concert_id = (SELECT concert_id FROM booking WHERE id = %s)
+                      AND status = 'admitted'
+                    """,
+                    (customer_profile_id, booking_id),
+                )
+
+                # booking → cancelled
+                cur.execute(
+                    "UPDATE booking SET status = 'cancelled' WHERE id = %s",
+                    (booking_id,),
+                )
+
+            conn.commit()
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            raise HTTPException(status_code=500, detail=f"ยกเลิกไม่สำเร็จ: {exc}")
+
+    return {
+        "message": "ยกเลิก booking แล้ว คืนที่นั่งให้ผู้อื่นเรียบร้อย",
+        "booking_id": booking_id,
+        "status": "cancelled",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Zone-closure voucher: Free upgrade (rebook) into an active zone
 # ---------------------------------------------------------------------------
 

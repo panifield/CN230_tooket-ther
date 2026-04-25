@@ -20,5 +20,9 @@
   "bugs": {
     "url": "https://github.com/panifield/CN230_tooket-ther/issues"
   },
-  "homepage": "https://github.com/panifield/CN230_tooket-ther#readme"
+  "homepage": "https://github.com/panifield/CN230_tooket-ther#readme",
+  "dependencies": {
+    "@types/qrcode": "^1.5.6",
+    "qrcode": "^1.5.4"
+  }
 }

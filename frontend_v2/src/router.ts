@@ -11,16 +11,14 @@ import { router } from "./router-instance";
 
 // Views - เช็คชื่อไฟล์ให้ตรงกับในเครื่องนะจ๊ะ (Landing vs landing)
 import { renderAuthView } from "./views/auth.view";
-import { renderCustomerDashboard } from "./views/Customer.view";
-import { renderForgotView } from "./views/Forgot.view";
-import { renderLandingView } from "./views/Landing.view";
-import { renderProfileView } from "./views/Profile.view";
+import { renderCustomerDashboard } from "./views/customer.view";
+import { renderForgotView } from "./views/forgot.view";
+import { renderLandingView } from "./views/landing.view";
+import { renderProfileView } from "./views/profile.view";
 import { renderWaitingView } from "./views/Waiting.view";
 import { renderMyTicketsView } from "./views/MyTicketsView";
-import { renderBookingView } from "./views/Booking.view";
 import { renderZonesView } from "./views/Zones.view";
 import { renderSeatsView } from "./views/Seats.view";
-import { renderPaymentView } from "./views/Payment.view";
 import { renderControlRoomView } from "./views/ControlRoom.view";
 import { renderCreateConcertView } from "./views/CreateConcert.view";
 
@@ -92,12 +90,6 @@ router.register({ path: "/seats", handler: () => {
   if (!cId || !zId) { router.navigate("/dashboard"); return; }
   render(renderSeatsView({ concertId: cId, zoneId: zId }));
 }});
-router.register({ path: "/payment", handler: () => { 
-  if (!requireAuth("customer")) return;
-  const bId = router.paramInt("bookingId");
-  if (!bId) { router.navigate("/my-tickets"); return; }
-  render(renderPaymentView({ bookingId: bId }));
-}});
 router.register({ path: "/my-tickets", handler: () => { if (requireAuth("customer")) render(renderMyTicketsView()); } });
 router.register({ path: "/profile", handler: () => { if (requireAuth()) render(renderProfileView()); } });
 // ─────────────────────────────────────────────────────────────
@@ -120,16 +112,6 @@ router.register({
     if (!requireAuth("organizer")) return;
     render(renderCreateConcertView());
   },
-});
-
-router.register({
-  path: "/payment",
-  handler: () => {
-    const bookingId = router.paramInt("bookingId");
-    if (!bookingId) { router.navigate("/my-tickets"); return; }
-    // ตรงนี้จะหายแดง เพราะเรา Import มาแล้วข้างบน
-    render(renderPaymentView({ bookingId })); 
-  }
 });
 
 router.setFallback(() => render(renderLandingView()));

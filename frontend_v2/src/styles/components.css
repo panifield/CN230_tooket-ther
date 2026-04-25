@@ -1017,6 +1017,7 @@
   background: radial-gradient(circle, #C5F6FA 0%, transparent 70%);
   opacity: 0.4;
   z-index: 0;
+  pointer-events: none;
 }
 
 /* Typography (PP Neue Montreal Mono) */

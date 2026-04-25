@@ -136,16 +136,49 @@ from typing import List
 
 class ZoneInput(BaseModel):
     zone_name: str
-    total_seats: int
     price: Decimal
-    row_prefix: str = "A"
+    seat_plan: str  # "10, 12, 12, 10"  — comma = new row, dash = alternating seats/gap
 
-    @property
-    def validate_fields(self):
-        if self.total_seats <= 0:
-            raise ValueError("total_seats ต้องมากกว่า 0")
-        if self.price < 0:
-            raise ValueError("price ต้องไม่ติดลบ")
+
+def _row_letter(idx: int) -> str:
+    """0→A, 25→Z, 26→AA, 27→AB, ..."""
+    label, n = "", idx
+    while True:
+        label = chr(ord("A") + (n % 26)) + label
+        n = n // 26 - 1
+        if n < 0:
+            return label
+
+
+def _parse_seat_plan(spec: str) -> list[int]:
+    """
+    '10, 12, 12, 10' → [10, 12, 12, 10]
+    '5-2-5'           → [10]  (dash-separated: odd-indexed tokens treated as aisle gaps)
+    """
+    rows: list[int] = []
+    for raw in spec.split(","):
+        part = raw.strip()
+        if not part:
+            continue
+        tokens = [t.strip() for t in part.split("-") if t.strip()]
+        if not tokens:
+            continue
+        seats = 0
+        for i, tok in enumerate(tokens):
+            try:
+                n = int(tok)
+            except ValueError as exc:
+                raise ValueError(f"seat_plan '{part}' ไม่ใช่ตัวเลข") from exc
+            if n < 0:
+                raise ValueError(f"seat_plan '{part}' ต้องไม่ติดลบ")
+            if i % 2 == 0:
+                seats += n
+        if seats <= 0:
+            raise ValueError(f"แถว '{part}' ต้องมีที่นั่งอย่างน้อย 1")
+        rows.append(seats)
+    if not rows:
+        raise ValueError("seat_plan ว่างเปล่า")
+    return rows
 
 
 class CreateConcertBody(BaseModel):
@@ -209,13 +242,16 @@ def create_concert(
         
         image_url = f"database/image/{filename}"
 
-    # ตรวจสอบ zone ก่อน hit DB
+    # ตรวจสอบ zone ก่อน hit DB + parse seat_plan
     seen_names = set()
+    zone_row_counts: list[list[int]] = []  # per-zone parsed row counts
     for z in zones:
-        if z.total_seats <= 0:
+        try:
+            row_counts = _parse_seat_plan(z.seat_plan)
+        except ValueError as exc:
             raise HTTPException(
                 status_code=422,
-                detail=f"Zone '{z.zone_name}': total_seats ต้องมากกว่า 0",
+                detail=f"Zone '{z.zone_name}': {exc}",
             )
         if z.price < 0:
             raise HTTPException(
@@ -228,6 +264,7 @@ def create_concert(
                 detail=f"ชื่อ zone '{z.zone_name}' ซ้ำกัน",
             )
         seen_names.add(z.zone_name)
+        zone_row_counts.append(row_counts)
 
     with get_db_connection() as conn:
         try:
@@ -254,7 +291,8 @@ def create_concert(
 
                 # 2) สร้าง zone + seat (ถ้ามี)
                 zones_created = []
-                for z in zones:
+                for z, row_counts in zip(zones, zone_row_counts):
+                    total_seats = sum(row_counts)
                     cur.execute(
                         """
                         INSERT INTO zone
@@ -262,18 +300,17 @@ def create_concert(
                         VALUES (%s, %s, %s, %s, TRUE)
                         RETURNING id
                         """,
-                        (concert_id, z.zone_name, z.total_seats, z.price),
+                        (concert_id, z.zone_name, total_seats, z.price),
                     )
                     zone_id = cur.fetchone()[0]
 
-                    # สร้าง seat ทีละแถวตามจำนวน total_seats
-                    if z.total_seats > 0:
-                        # สร้าง seat_number เช่น A1, A2, ... ตาม row_prefix
-                        prefix = z.row_prefix if z.row_prefix else "A"
-                        seat_rows = [
-                            (zone_id, f"{prefix}{i+1}", prefix, "available")
-                            for i in range(z.total_seats)
-                        ]
+                    # สร้าง seat ตาม seat_plan: แถว i → letter, ที่นั่ง 1..n
+                    seat_rows = [
+                        (zone_id, f"{_row_letter(i)}{j + 1}", _row_letter(i), "available")
+                        for i, count in enumerate(row_counts)
+                        for j in range(count)
+                    ]
+                    if seat_rows:
                         cur.executemany(
                             "INSERT INTO seat (zone_id, seat_number, seat_row, status) VALUES (%s, %s, %s, %s)",
                             seat_rows,
@@ -282,7 +319,7 @@ def create_concert(
                     zones_created.append({
                         "zone_id": zone_id,
                         "zone_name": z.zone_name,
-                        "total_seats": z.total_seats,
+                        "total_seats": total_seats,
                         "price": float(z.price),
                     })
 
