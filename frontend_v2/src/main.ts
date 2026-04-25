@@ -2,7 +2,9 @@ import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/components.css";
 
+import { authApi } from "./api/auth";
 import { renderHeader } from "./components/header";
+
 import { renderLogPanel } from "./components/logPanel";
 import { router } from "./router";
 import { authStore } from "./state/auth";
@@ -194,6 +196,40 @@ router.register({
 
 router.setFallback(() => render(renderLandingView()));
 
-router.start();
+// ─────────────────────────────────────────────────────────────
+// OAuth Callback Handler
+// ─────────────────────────────────────────────────────────────
+async function handleOAuthCallback() {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  const state = params.get("state"); // ในที่นี้คือ 'google' หรือ 'line'
+
+  if (code && state) {
+    // ล้าง URL params เพื่อความสะอาด
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
+    
+    try {
+      // เรียก Backend เพื่อแลก code เป็น JWT
+      const auth = await authApi.oauthCallback(state, code, state);
+      authStore.setSession(auth);
+      
+      // ดึงข้อมูลตัวตน
+      const me = await authApi.me();
+      authStore.setUser(me);
+      
+      // แจ้ง Event เพื่อเปลี่ยนหน้าไปยัง Dashboard
+      events.emit("auth:login", { user_id: auth.user_id });
+      console.log("OAuth Login Success:", me.name);
+    } catch (err) {
+      console.error("OAuth Callback Error:", err);
+    }
+  }
+}
+
+// เริ่มต้นระบบ
+handleOAuthCallback().then(() => {
+  router.start();
+});
+
 
 export { router };
