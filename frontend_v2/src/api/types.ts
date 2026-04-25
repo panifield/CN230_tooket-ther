@@ -119,6 +119,14 @@ export interface BookingSummary {
   created_at: string | null;
 }
 
+export interface Ticket {
+  ticket_id: number;
+  qr_hash: string;
+  seat_number: string;
+  zone_name: string;
+  is_used: boolean;
+}
+
 export interface ConfirmBookingResponse {
   message: string;
   booking_id: number;
@@ -201,6 +209,14 @@ export interface OrganizerDashboard {
   concert_id: number;
   daily_stats: DailyStat[];
   grand_totals: GrandTotals;
+}
+
+export interface VerifyTicketResponse {
+  message: string;
+  ticket_id: number;
+  concert_title: string;
+  zone_name: string;
+  seat_number: string;
 }
 
 export interface RefundRequestPayload {

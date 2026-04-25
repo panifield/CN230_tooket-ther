@@ -24,6 +24,7 @@ import { renderSeatsView } from "./views/Seats.view";
 import { renderPaymentView } from "./views/Payment.view";
 import { renderControlRoomView } from "./views/ControlRoom.view";
 import { renderCreateConcertView } from "./views/CreateConcert.view";
+import { renderStaffView } from "./views/Staff.view";
 
 const root = qs<HTMLDivElement>("#app");
 
@@ -97,6 +98,8 @@ events.on("auth:login", () => {
   const role = authStore.getRole();
   if (role === "organizer") {
     router.navigate("/organizer");
+  } else if (role === "staff") {
+    router.navigate("/staff");
   } else {
     router.navigate("/dashboard");
   }
@@ -191,6 +194,13 @@ router.register({
   path: "/create-concert", 
   handler: () => { 
     if (requireAuth("organizer")) render(renderCreateConcertView()); 
+  } 
+});
+
+router.register({ 
+  path: "/staff", 
+  handler: () => { 
+    if (requireAuth("staff")) render(renderStaffView()); 
   } 
 });
 

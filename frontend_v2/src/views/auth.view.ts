@@ -155,6 +155,7 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
     [
       el("option", { attrs: { value: "customer" }, text: "Customer" }),
       el("option", { attrs: { value: "organizer" }, text: "Organizer" }),
+      el("option", { attrs: { value: "staff" }, text: "Gate Staff" }),
     ]
   ) as HTMLSelectElement;
 
@@ -282,5 +283,6 @@ function labelled(id: string, label: string, ctrl: HTMLElement): HTMLElement {
 
 function routeForRole(role: Role): void {
   if (role === "organizer") router.navigate("/organizer");
+  else if (role === "staff") router.navigate("/staff");
   else router.navigate("/dashboard");
 }

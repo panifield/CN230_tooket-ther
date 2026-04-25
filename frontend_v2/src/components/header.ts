@@ -15,6 +15,8 @@ export function renderHeader(): HTMLElement {
     } else if (user.role === "organizer") {
       navLinks.push(navLink("Dashboard", "/organizer"));
       navLinks.push(navLink("Create Concert", "/create-concert"));
+    } else if (user.role === "staff") {
+      navLinks.push(navLink("Staff Gate", "/staff"));
     }
     navLinks.push(navLink("Profile", "/profile"));
   }
