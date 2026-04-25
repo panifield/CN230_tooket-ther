@@ -116,7 +116,12 @@ export function renderMyTicketsView(): HTMLElement {
             ]),
 
             el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
-              el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "PDF" }),
+              el("button", { 
+                class: "btn-outline-sm", 
+                attrs: { style: "flex: 1;" }, 
+                text: "DOWNLOAD",
+                on: { click: () => downloadTicket(t) }
+              }),
               el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
             ]),
 
@@ -134,6 +139,25 @@ export function renderMyTicketsView(): HTMLElement {
       mount(host, el("p", { class: "banner banner--err", text: "SYSTEM ERROR: Failed to retrieve assets." }));
     }
   };
+
+  async function downloadTicket(ticket: any) {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${ticket.qr_hash}`;
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `TICKET-${ticket.booking.concert_title.replace(/\s+/g, '-')}-${ticket.seat_number}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Download failed", err);
+      alert("Failed to download ticket. Please try again.");
+    }
+  }
 
   function renderDetailItem(label: string, value: string) {
     return el("div", {}, [
