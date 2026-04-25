@@ -6,7 +6,7 @@ import { authApi } from "./api/auth";
 import { renderHeader } from "./components/header";
 
 import { renderLogPanel } from "./components/logPanel";
-import { router } from "./router";
+import { router } from "./router-instance";
 import { authStore } from "./state/auth";
 import { events } from "./state/events";
 import { clear, el, qs } from "./utils/dom";

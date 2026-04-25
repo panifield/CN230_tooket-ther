@@ -667,18 +667,40 @@
   background: var(--color-white);
   border-radius: var(--radius-container); /* 8px */
   box-shadow: var(--shadow-modal);
-  max-width: 480px;
+  max-width: 640px; /* Increased from 480px for better visibility */
   width: 100%;
-  padding: var(--space-5);
+  padding: var(--space-6);
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-4);
 }
 
 .modal__title {
   font-size: 28px;
   letter-spacing: -0.6px;
   font-weight: 500;
-  margin-bottom: var(--space-3);
+  margin-bottom: 0;
+}
+
+.modal__close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-2);
+  line-height: 1;
+  transition: color 0.15s ease;
+}
+
+.modal__close:hover {
+  color: var(--color-midnight);
 }
 
 /* ============================================================
@@ -818,6 +840,115 @@
 .btn-book-now:hover {
   background: rgba(1, 1, 32, 0.85);
   transform: translateY(-1px);
+}
+
+.ticket-card__actions {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-4);
+}
+
+.btn-view-details {
+  background: var(--color-sky-tint);
+  color: var(--color-midnight);
+  border: none;
+  border-radius: var(--radius-control);
+  padding: 12px var(--space-2);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--ls-mono);
+  text-transform: uppercase;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-view-details:hover {
+  background: var(--color-primary-blue);
+  transform: translateY(-1px);
+}
+
+/* Concert Details Modal */
+.concert-details-modal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.concert-details-modal__img {
+  width: 100%;
+  height: 420px; /* Even taller to allow contain to shine */
+  object-fit: contain;
+  background: var(--color-midnight);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-card);
+}
+
+.concert-details-modal__content {
+  display: flex;
+  flex-direction: column;
+}
+
+.concert-details-modal__meta {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.modal-zone-list {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-sky-tint);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.modal-zone-header,
+.modal-zone-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  padding: 10px 16px;
+  font-size: 14px;
+}
+
+.modal-zone-header {
+  background: rgba(1, 1, 32, 0.05);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: var(--ls-mono);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-zone-row {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  align-items: center;
+}
+
+.modal-zone-row:last-child {
+  border-bottom: none;
+}
+
+.modal-zone-name {
+  font-weight: 500;
+  color: var(--color-midnight);
+}
+
+.modal-zone-price {
+  color: var(--color-midnight);
+}
+
+.modal-zone-avail {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.text-danger {
+  color: var(--color-danger);
 }
 
 /* ============================================================

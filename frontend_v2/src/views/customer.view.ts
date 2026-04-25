@@ -1,10 +1,11 @@
 import { bookingApi } from "../api/booking";
-import type { Concert } from "../api/types";
+import type { Concert, Zone } from "../api/types";
 import { authStore } from "../state/auth";
 import { events } from "../state/events";
 import { router } from "../router";
 import { clear, el, mount } from "../utils/dom";
-import { formatDateTime, statusLabel } from "../utils/format";
+import { formatDateTime, statusLabel, formatBaht } from "../utils/format";
+import { openModal } from "../components/modal";
 
 interface CustomerState {
   concerts: Concert[];
@@ -29,6 +30,107 @@ export function renderCustomerDashboard(): HTMLElement {
       renderConcerts();
     } catch (err) {
       events.emit("log", { level: "error", message: String(err) });
+    }
+  };
+
+  const showConcertDetails = async (c: Concert) => {
+    // 1. Fetch zones info
+    let zones: Zone[] = [];
+    try {
+      zones = await bookingApi.listZones(c.concert_id);
+    } catch (err) {
+      events.emit("log", { level: "error", message: "Failed to load zones info" });
+    }
+
+    const zonesHost = el("div", { class: "concert-details-modal__zones" });
+    
+    if (zones.length === 0) {
+      mount(zonesHost, el("p", { class: "label-mono", text: "No zone information available." }));
+    } else {
+      mount(zonesHost, el("div", { class: "modal-zone-list" }, [
+        el("div", { class: "modal-zone-header" }, [
+          el("span", { text: "ZONE" }),
+          el("span", { text: "PRICE" }),
+          el("span", { text: "AVAILABLE" }),
+        ]),
+        ...zones.map(z => el("div", { class: "modal-zone-row" }, [
+          el("span", { class: "modal-zone-name", text: z.zone_name }),
+          el("span", { class: "modal-zone-price", text: formatBaht(z.price) }),
+          el("span", { 
+            class: `modal-zone-avail ${z.available_count === 0 ? "text-danger" : ""}`, 
+            text: `${z.available_count} / ${z.total_seats}` 
+          }),
+        ]))
+      ]));
+    }
+
+    const body = el("div", { class: "concert-details-modal" }, [
+      el("img", {
+        class: "concert-details-modal__img",
+        attrs: { src: c.image_url ? `/${c.image_url}` : `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=800&q=80` }
+      }),
+      el("div", { class: "concert-details-modal__content" }, [
+        el("div", { class: "concert-details-modal__meta" }, [
+          el("div", { class: "ticket-card__info" }, [
+            el("span", { class: "ticket-card__info-icon", text: "🎤" }),
+            el("span", { class: "ticket-card__info-label", text: "Artist:" }),
+            el("span", { class: "ticket-card__info-value", text: c.artist })
+          ]),
+          el("div", { class: "ticket-card__info" }, [
+            el("span", { class: "ticket-card__info-icon", text: "🗓️" }),
+            el("span", { class: "ticket-card__info-label", text: "Date:" }),
+            el("span", { class: "ticket-card__info-value", text: formatDateTime(c.concert_datetime) })
+          ]),
+          el("div", { class: "ticket-card__info" }, [
+            el("span", { class: "ticket-card__info-icon", text: "📍" }),
+            el("span", { class: "ticket-card__info-label", text: "Venue:" }),
+            el("span", { class: "ticket-card__info-value", text: c.venue })
+          ]),
+        ]),
+
+        el("div", { attrs: { style: "margin-top: 24px;" } }, [
+          el("h4", { class: "label-mono", attrs: { style: "margin-bottom: 12px; color: var(--color-midnight);" }, text: "TICKET ZONES" }),
+          zonesHost
+        ]),
+
+        el("div", { attrs: { style: "margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--color-border);" } }, [
+          el("button", {
+            class: "btn btn--primary btn--block",
+            text: "CONTINUE TO BOOKING"
+          })
+        ])
+      ])
+    ]);
+
+    const close = openModal({
+      title: c.title,
+      body: body
+    });
+
+    const continueBtn = body.querySelector(".btn--primary") as HTMLElement;
+    if (continueBtn) {
+      continueBtn.onclick = () => {
+        close();
+        handleBooking(c);
+      };
+    }
+  };
+
+  const handleBooking = async (c: Concert) => {
+    const statusStr = String(c.status).toLowerCase();
+    const isOnSale = statusStr === "on_sale" || statusStr === "on sale";
+    
+    if (isOnSale) {
+      try {
+        const r = await bookingApi.joinQueue(c.concert_id);
+        events.emit("log", { level: "info", message: r.message });
+        router.navigate(`/waiting?concertId=${c.concert_id}`);
+      } catch (err) {
+        events.emit("log", { level: "error", message: String(err) });
+        router.navigate(`/waiting?concertId=${c.concert_id}`);
+      }
+    } else {
+      router.navigate(`/zones?concertId=${c.concert_id}`);
     }
   };
 
@@ -91,35 +193,29 @@ export function renderCustomerDashboard(): HTMLElement {
                 el("span", { class: "ticket-card__info-value", text: c.artist })
               ]),
 
-              // Book Button (คลิกแล้วเด้งไปหน้าถัดไปทันที)
-              el(
-                "button",
-                {
-                  class: "btn-book-now",
-                  on: {
-                    click: async () => {
-                      const isOnSale = statusStr === "on_sale" || statusStr === "on sale";
-                      
-                      if (isOnSale) {
-                        try {
-                          // ถ้ากำลัง On Sale ให้ดึงเข้าคิว แล้วเด้งไปหน้า Waiting Room
-                          const r = await bookingApi.joinQueue(c.concert_id);
-                          events.emit("log", { level: "info", message: r.message });
-                          router.navigate(`/waiting?concertId=${c.concert_id}`);
-                        } catch (err) {
-                          events.emit("log", { level: "error", message: String(err) });
-                          // ถึงจะมี Error (เช่น อยู่ในคิวแล้ว) ก็ให้เข้าไปหน้า Waiting Room อยู่ดี
-                          router.navigate(`/waiting?concertId=${c.concert_id}`);
-                        }
-                      } else {
-                        // ถ้าเป็นสถานะอื่น (เช่น Upcoming) เด้งไปหน้า Zones เพื่อดูผังโซนเฉยๆ ได้
-                        router.navigate(`/zones?concertId=${c.concert_id}`);
-                      }
+              // Action Buttons
+              el("div", { class: "ticket-card__actions" }, [
+                el(
+                  "button",
+                  {
+                    class: "btn-view-details",
+                    on: {
+                      click: () => showConcertDetails(c)
+                    }
+                  },
+                  ["DETAILS"]
+                ),
+                el(
+                  "button",
+                  {
+                    class: "btn-book-now",
+                    on: {
+                      click: () => handleBooking(c),
                     },
                   },
-                },
-                ["BOOK SEATS →"]
-              ),
+                  ["BOOK SEATS →"]
+                ),
+              ]),
             ]),
           ]
         );

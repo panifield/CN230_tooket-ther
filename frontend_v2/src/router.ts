@@ -11,13 +11,12 @@ import { router } from "./router-instance";
 
 // Views - เช็คชื่อไฟล์ให้ตรงกับในเครื่องนะจ๊ะ (Landing vs landing)
 import { renderAuthView } from "./views/auth.view";
-import { renderCustomerDashboard } from "./views/Customer.view";
-import { renderForgotView } from "./views/Forgot.view";
-import { renderLandingView } from "./views/Landing.view";
-import { renderProfileView } from "./views/Profile.view";
+import { renderCustomerDashboard } from "./views/customer.view";
+import { renderForgotView } from "./views/forgot.view";
+import { renderLandingView } from "./views/landing.view";
+import { renderProfileView } from "./views/profile.view";
 import { renderWaitingView } from "./views/Waiting.view";
 import { renderMyTicketsView } from "./views/MyTicketsView";
-import { renderBookingView } from "./views/Booking.view";
 import { renderZonesView } from "./views/Zones.view";
 import { renderSeatsView } from "./views/Seats.view";
 import { renderPaymentView } from "./views/Payment.view";
@@ -33,14 +32,14 @@ function render(view: HTMLElement): void {
     el("div", { class: "app-shell min-h-screen flex flex-col bg-white" }, [
       renderHeader(),
       el("main", { class: "flex-grow", attrs: { role: "main" } }, [view]),
-      
+
       el("section", { class: "bg-cream-base/10 py-8 border-t border-black/5" }, [
         el("div", { class: "max-w-7xl mx-auto px-6" }, [renderLogPanel()]),
       ]),
 
-      el("footer", { 
+      el("footer", {
         class: "bg-[#010120] text-white py-12",
-        attrs: { style: "border-top: 1px solid rgba(255,255,255,0.1);" } 
+        attrs: { style: "border-top: 1px solid rgba(255,255,255,0.1);" }
       }, [
         el("div", { class: "max-w-7xl mx-auto px-6 flex justify-between items-center" }, [
           el("div", {}, [
@@ -73,31 +72,39 @@ router.register({ path: "/", handler: () => render(renderLandingView()) });
 router.register({ path: "/login", handler: () => render(renderAuthView()) });
 router.register({ path: "/forgot", handler: () => render(renderForgotView()) });
 router.register({ path: "/dashboard", handler: () => { if (requireAuth()) render(renderCustomerDashboard()); } });
-router.register({ path: "/waiting", handler: () => { 
-  if (!requireAuth("customer")) return;
-  const id = router.paramInt("concertId");
-  if (!id) { router.navigate("/dashboard"); return; }
-  render(renderWaitingView({ concertId: id }));
-}});
-router.register({ path: "/zones", handler: () => { 
-  if (!requireAuth("customer")) return;
-  const id = router.paramInt("concertId");
-  if (!id) { router.navigate("/dashboard"); return; }
-  render(renderZonesView({ concertId: id }));
-}});
-router.register({ path: "/seats", handler: () => { 
-  if (!requireAuth("customer")) return;
-  const cId = router.paramInt("concertId");
-  const zId = router.paramInt("zoneId");
-  if (!cId || !zId) { router.navigate("/dashboard"); return; }
-  render(renderSeatsView({ concertId: cId, zoneId: zId }));
-}});
-router.register({ path: "/payment", handler: () => { 
-  if (!requireAuth("customer")) return;
-  const bId = router.paramInt("bookingId");
-  if (!bId) { router.navigate("/my-tickets"); return; }
-  render(renderPaymentView({ bookingId: bId }));
-}});
+router.register({
+  path: "/waiting", handler: () => {
+    if (!requireAuth("customer")) return;
+    const id = router.paramInt("concertId");
+    if (!id) { router.navigate("/dashboard"); return; }
+    render(renderWaitingView({ concertId: id }));
+  }
+});
+router.register({
+  path: "/zones", handler: () => {
+    if (!requireAuth("customer")) return;
+    const id = router.paramInt("concertId");
+    if (!id) { router.navigate("/dashboard"); return; }
+    render(renderZonesView({ concertId: id }));
+  }
+});
+router.register({
+  path: "/seats", handler: () => {
+    if (!requireAuth("customer")) return;
+    const cId = router.paramInt("concertId");
+    const zId = router.paramInt("zoneId");
+    if (!cId || !zId) { router.navigate("/dashboard"); return; }
+    render(renderSeatsView({ concertId: cId, zoneId: zId }));
+  }
+});
+router.register({
+  path: "/payment", handler: () => {
+    if (!requireAuth("customer")) return;
+    const bId = router.paramInt("bookingId");
+    if (!bId) { router.navigate("/my-tickets"); return; }
+    render(renderPaymentView({ bookingId: bId }));
+  }
+});
 router.register({ path: "/my-tickets", handler: () => { if (requireAuth("customer")) render(renderMyTicketsView()); } });
 router.register({ path: "/profile", handler: () => { if (requireAuth()) render(renderProfileView()); } });
 // ─────────────────────────────────────────────────────────────
@@ -128,7 +135,7 @@ router.register({
     const bookingId = router.paramInt("bookingId");
     if (!bookingId) { router.navigate("/my-tickets"); return; }
     // ตรงนี้จะหายแดง เพราะเรา Import มาแล้วข้างบน
-    render(renderPaymentView({ bookingId })); 
+    render(renderPaymentView({ bookingId }));
   }
 });
 

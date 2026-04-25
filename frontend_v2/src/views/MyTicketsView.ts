@@ -133,6 +133,38 @@ export function renderMyTicketsView(): HTMLElement {
                   text: "PREVIEW SCANNER ›"
                 })
               ])
+          // ── ฝั่ง QR Code (ขวา) ──
+          el("div", { 
+            class: "ticket-card-v2__qr-area", 
+            attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" } 
+          }, [
+            el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
+              el("img", {
+                attrs: {
+                  // ใช้ hash จริงจาก backend
+                  src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
+                  alt: "Verification QR",
+                  style: "width: 100%; height: 100%;"
+                }
+              })
+            ]),
+
+            el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
+              el("button", { 
+                class: "btn-outline-sm", 
+                attrs: { style: "flex: 1;" }, 
+                text: "DOWNLOAD",
+                on: { click: () => downloadTicket(t) }
+              }),
+              el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
+            ]),
+
+            el("span", {
+              class: "label-mono",
+              attrs: { style: "color: var(--color-primary-blue); font-size: 10px; cursor: pointer;" },
+              text: "PREVIEW SCANNER ›"
+            })
+          ])
         ])
       ));
 
@@ -141,6 +173,25 @@ export function renderMyTicketsView(): HTMLElement {
       mount(host, el("p", { class: "banner banner--err", text: "SYSTEM ERROR: Failed to retrieve assets." }));
     }
   };
+
+  async function downloadTicket(ticket: any) {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${ticket.qr_hash}`;
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `TICKET-${ticket.booking.concert_title.replace(/\s+/g, '-')}-${ticket.seat_number}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Download failed", err);
+      alert("Failed to download ticket. Please try again.");
+    }
+  }
 
   function renderDetailItem(label: string, value: string) {
     return el("div", {}, [

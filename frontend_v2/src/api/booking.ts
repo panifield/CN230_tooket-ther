@@ -8,6 +8,7 @@ import type {
   QueueStatus,
   RebookResponse,
   Seat,
+  Ticket,
   Zone,
 } from "./types";
 
