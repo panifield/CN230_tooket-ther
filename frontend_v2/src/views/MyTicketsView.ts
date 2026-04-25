@@ -108,13 +108,14 @@ export function renderMyTicketsView(): HTMLElement {
           // ── ฝั่ง QR Code หรือ Action ──
           t.booking.status === ZONE_CLOSED
             ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id, loadTickets)
-            : el("div", {
-                class: "ticket-card-v2__qr-area",
-                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" }
+            : el("div", { 
+                class: "ticket-card-v2__qr-area", 
+                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" } 
               }, [
                 el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
                   el("img", {
                     attrs: {
+                      // ใช้ hash จริงจาก backend
                       src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
                       alt: "Verification QR",
                       style: "width: 100%; height: 100%;"
@@ -123,7 +124,12 @@ export function renderMyTicketsView(): HTMLElement {
                 ]),
 
                 el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
-                  el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "PDF" }),
+                  el("button", { 
+                    class: "btn-outline-sm", 
+                    attrs: { style: "flex: 1;" }, 
+                    text: "DOWNLOAD",
+                    on: { click: () => downloadTicket(t) }
+                  }),
                   el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
                 ]),
 
@@ -133,38 +139,6 @@ export function renderMyTicketsView(): HTMLElement {
                   text: "PREVIEW SCANNER ›"
                 })
               ])
-          // ── ฝั่ง QR Code (ขวา) ──
-          el("div", { 
-            class: "ticket-card-v2__qr-area", 
-            attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" } 
-          }, [
-            el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
-              el("img", {
-                attrs: {
-                  // ใช้ hash จริงจาก backend
-                  src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
-                  alt: "Verification QR",
-                  style: "width: 100%; height: 100%;"
-                }
-              })
-            ]),
-
-            el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
-              el("button", { 
-                class: "btn-outline-sm", 
-                attrs: { style: "flex: 1;" }, 
-                text: "DOWNLOAD",
-                on: { click: () => downloadTicket(t) }
-              }),
-              el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
-            ]),
-
-            el("span", {
-              class: "label-mono",
-              attrs: { style: "color: var(--color-primary-blue); font-size: 10px; cursor: pointer;" },
-              text: "PREVIEW SCANNER ›"
-            })
-          ])
         ])
       ));
 
