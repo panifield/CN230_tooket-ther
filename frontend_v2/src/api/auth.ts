@@ -43,8 +43,17 @@ export const authApi = {
 
   oauthAuthorizeUrl(provider: "line" | "google"): Promise<OAuthAuthorizeResponse> {
     return request<OAuthAuthorizeResponse>(
-      `/auth/oauth/${provider}/authorize-url`,
+      `/auth/oauth/${provider}/authorize-url?state=${provider}`,
+      { auth: false }
+    );
+  },
+
+
+  oauthCallback(provider: string, code: string, state: string): Promise<AuthResponse> {
+    return request<AuthResponse>(
+      `/auth/oauth/${provider}/callback?code=${code}&state=${state}`,
       { auth: false }
     );
   },
 };
+

@@ -45,7 +45,7 @@ function renderLoginCard(onGoToRegister: () => void): HTMLElement {
   const submit = async (): Promise<void> => {
     error.textContent = "";
     if (!isEmail(emailInput.value) || !isPassword(passwordInput.value)) {
-      error.textContent = "Enter a valid email and a password (6+ chars).";
+      error.textContent = "Enter a valid email and a password (4+ chars).";
       return;
     }
     submitBtn.disabled = true;
@@ -155,6 +155,7 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
     [
       el("option", { attrs: { value: "customer" }, text: "Customer" }),
       el("option", { attrs: { value: "organizer" }, text: "Organizer" }),
+      el("option", { attrs: { value: "staff" }, text: "Gate Staff" }),
     ]
   ) as HTMLSelectElement;
 
@@ -190,7 +191,7 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
     if (!isEmail(payload.email)) return showError("Enter a valid email address.");
     if (!nonEmpty(payload.phone)) return showError("Phone number is required.");
     if (!nonEmpty(payload.address)) return showError("Address is required.");
-    if (!isPassword(payload.password)) return showError("Password must be at least 6 characters.");
+    if (!isPassword(payload.password)) return showError("Password must be at least 4 characters.");
 
     submitBtn.disabled = true;
     submitBtn.textContent = "CREATING ACCOUNT...";
@@ -282,5 +283,6 @@ function labelled(id: string, label: string, ctrl: HTMLElement): HTMLElement {
 
 function routeForRole(role: Role): void {
   if (role === "organizer") router.navigate("/organizer");
+  else if (role === "staff") router.navigate("/staff");
   else router.navigate("/dashboard");
 }

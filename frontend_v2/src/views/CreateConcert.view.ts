@@ -26,6 +26,7 @@ export function renderCreateConcertView(): HTMLElement {
     concert_datetime: input("c-when", "datetime-local"),
     sale_open_at: input("c-sale-open", "datetime-local"),
     sale_close_at: input("c-sale-close", "datetime-local"),
+    image: input("c-image", "file"),
   };
   
   const formStatus = el("p", { class: "field__error", attrs: { style: "margin-top: var(--space-3); text-align: center;" } });
@@ -99,28 +100,40 @@ export function renderCreateConcertView(): HTMLElement {
   const submitConcert = async (): Promise<void> => {
     formStatus.textContent = "";
     formStatus.style.color = "var(--color-danger)";
-    const payload: CreateConcertPayload = {
-      title: inputs.title.value.trim(),
-      artist: inputs.artist.value.trim(),
-      venue: inputs.venue.value.trim(),
-      address: inputs.address.value.trim(),
-      concert_datetime: inputs.concert_datetime.value,
-      sale_open_at: inputs.sale_open_at.value,
-      sale_close_at: inputs.sale_close_at.value,
-      zones: state.zones,
-    };
+    
+    const title = inputs.title.value.trim();
+    const artist = inputs.artist.value.trim();
+    const venue = inputs.venue.value.trim();
+    const address = inputs.address.value.trim();
+    const concert_datetime = inputs.concert_datetime.value;
+    const sale_open_at = inputs.sale_open_at.value;
+    const sale_close_at = inputs.sale_close_at.value;
 
-    if (!payload.title || !payload.artist || !payload.venue || !payload.concert_datetime || payload.zones.length === 0) {
+    if (!title || !artist || !venue || !concert_datetime || state.zones.length === 0) {
       formStatus.textContent = "PLEASE PROVIDE TITLE, ARTIST, VENUE, DATETIME, AND AT LEAST ONE ZONE.";
       return;
     }
 
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("artist", artist);
+    formData.append("venue", venue);
+    formData.append("address", address);
+    formData.append("concert_datetime", concert_datetime);
+    formData.append("sale_open_at", sale_open_at);
+    if (sale_close_at) formData.append("sale_close_at", sale_close_at);
+    formData.append("status", "on_sale");
+    formData.append("zones_json", JSON.stringify(state.zones));
+    
+    if (inputs.image.files?.[0]) {
+      formData.append("image", inputs.image.files[0]);
+    }
+
     try {
-      const r = await organizerApi.createConcert(payload);
+      const r = await organizerApi.createConcert(formData as unknown as CreateConcertPayload);
       formStatus.style.color = "var(--color-midnight)";
       formStatus.textContent = `${r.message.toUpperCase()} (CONCERT #${r.concert_id}) - REDIRECTING...`;
       
-      // เมื่อสร้างเสร็จให้เตะกลับไปหน้า Control Room อัตโนมัติ (เปลี่ยนเส้นทางให้ตรงกับ Router ของเธอได้เลย)
       setTimeout(() => router.navigate("/control-room"), 1500); 
     } catch (err) {
       formStatus.textContent = err instanceof Error ? err.message.toUpperCase() : "COULD NOT CREATE CONCERT.";
@@ -148,6 +161,7 @@ export function renderCreateConcertView(): HTMLElement {
           el("div", { class: "form-grid--full" }, [ field("c-when", "WHEN (DATE & TIME)", inputs.concert_datetime) ]),
           field("c-sale-open", "SALE OPENS", inputs.sale_open_at),
           field("c-sale-close", "SALE CLOSES", inputs.sale_close_at),
+          el("div", { class: "form-grid--full" }, [ field("c-image", "CONCERT IMAGE (POSTER)", inputs.image) ]),
         ]),
         
         el("div", { class: "divider", text: "ZONE CONFIGURATION" }),

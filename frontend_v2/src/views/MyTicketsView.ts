@@ -1,6 +1,19 @@
 import { el, mount, clear } from "../utils/dom";
 import { formatDateTime } from "../utils/format";
 import { bookingApi } from "../api/booking";
+import { refundApi } from "../api/payment";
+import { ApiError } from "../api/client";
+import { events } from "../state/events";
+import { router } from "../router-instance";
+
+const ZONE_CLOSED = "zone_closed_action_required";
+const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function parseAsUtc(s: string | null | undefined): number {
+  if (!s) return NaN;
+  const hasOffset = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+  return new Date(hasOffset ? s : `${s}Z`).getTime();
+}
 
 export function renderMyTicketsView(): HTMLElement {
   // ── 🛠️ ปรับพื้นหลังของหน้าเพจให้เป็นสีขาว ──
@@ -42,13 +55,33 @@ export function renderMyTicketsView(): HTMLElement {
         return;
       }
 
-      mount(host, ...bookings.map(b =>
+      // Fetch tickets for all bookings in parallel
+      const ticketGroups = await Promise.all(
+        bookings.map(async (b) => {
+          try {
+            const tickets = await bookingApi.getBookingTickets(b.booking_id);
+            return tickets.map(t => ({ ...t, booking: b }));
+          } catch (e) {
+            console.error(`Failed to fetch tickets for booking ${b.booking_id}`, e);
+            return [];
+          }
+        })
+      );
+
+      const allTickets = ticketGroups.flat();
+
+      if (allTickets.length === 0) {
+        mount(host, el("div", { class: "empty-cart", text: "NO TICKETS FOUND." }));
+        return;
+      }
+
+      mount(host, ...allTickets.map(t =>
         el("article", { class: "ticket-card-v2", attrs: { style: "background: #FFFFFF; border: 1px solid var(--color-border);" } }, [
           
           // ── ฝั่งข้อมูล (ซ้าย) ──
           el("div", { class: "ticket-card-v2__info", attrs: { style: "position: relative; background: #def6ff;" } }, [
             
-            // ── วงกลมรอยฉีกสีขาว เพื่อให้เนียนไปกับพื้นหลังหน้าเพจ ──
+            // ── วงกลมรอยฉีกสีขาว ──
             el("div", { 
               attrs: { 
                 style: "position: absolute; top: -14px; right: -14px; width: 28px; height: 28px; background: #FFFFFF; border-radius: 50%; z-index: 10;" 
@@ -62,49 +95,60 @@ export function renderMyTicketsView(): HTMLElement {
 
             // Status Badge
             el("div", { attrs: { style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;" } }, [
-              el("span", { class: "pill pill--ok" }, [
+              el("span", { class: `pill ${t.booking.status === 'paid' ? 'pill--ok' : 'pill--warn'}` }, [
                 el("span", { attrs: { style: "display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-midnight); margin-right: 8px; vertical-align: middle;" } }),
-                document.createTextNode("VALID TICKET")
+                document.createTextNode(t.booking.status.toUpperCase())
               ]),
-              el("span", { class: "label-mono", attrs: { style: "opacity: 0.3;" }, text: `TKT-${b.booking_id}` })
+              el("span", { class: "label-mono", attrs: { style: "opacity: 0.3;" }, text: `TKT-${t.ticket_id}` })
             ]),
 
-            el("h2", { class: "ticket-card-v2__title", text: b.concert_title }),
+            el("h2", { class: "ticket-card-v2__title", text: t.booking.concert_title }),
 
             el("div", { class: "ticket-card-v2__grid" }, [
-              renderDetailItem("DATE & TIME", formatDateTime(b.event_date ?? b.created_at)),
-              renderDetailItem("LOCATION", b.venue ?? "MAIN AUDITORIUM"),
-              renderDetailItem("SEAT", b.seat_label ?? `${b.total_tickets}`),
-              renderDetailItem("ZONE", b.zone ?? b.status.toUpperCase())
+              renderDetailItem("DATE & TIME", formatDateTime(t.booking.concert_datetime ?? t.booking.created_at)),
+              renderDetailItem("LOCATION", t.booking.venue ?? "MAIN AUDITORIUM"),
+              renderDetailItem("SEAT", t.seat_number),
+              renderDetailItem("ZONE", t.zone_name)
             ])
           ]),
 
-          // ── ฝั่ง QR Code (ขวา) ปรับเป็นพื้นหลังสีขาว ──
-          el("div", { 
-            class: "ticket-card-v2__qr-area", 
-            attrs: { style: "background: #FFFFFF border-left: 1px dashed var(--color-border);" } 
-          }, [
-            el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
-              el("img", {
-                attrs: {
-                  src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TKT-${b.booking_id}`,
-                  alt: "Verification QR",
-                  style: "width: 100%; height: 100%;"
-                }
-              })
-            ]),
+          // ── ฝั่ง QR Code หรือ Action ──
+          t.booking.status === ZONE_CLOSED
+            ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id, loadTickets)
+            : el("div", {
+                class: "ticket-card-v2__qr-area",
+                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" }
+              }, [
+                el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
+                  el("img", {
+                    attrs: {
+                      src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
+                      alt: "Verification QR",
+                      style: "width: 100%; height: 100%;"
+                    }
+                  })
+                ]),
 
-            el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
-              el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "PDF" }),
-              el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
-            ]),
+                el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
+                  el("button", {
+                    class: "btn-outline-sm",
+                    attrs: { style: "flex: 1;" },
+                    text: "DOWNLOAD",
+                    on: { click: () => downloadTicket(t) }
+                  }),
+                  el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
+                ]),
 
-            el("span", {
-              class: "label-mono",
-              attrs: { style: "color: var(--color-primary-blue); font-size: 10px; cursor: pointer;" },
-              text: "PREVIEW SCANNER ›"
-            })
-          ])
+                ...(isRefundEligible(t.booking)
+                  ? [renderRequestRefundButton(t.booking.booking_id, t.booking.total_tickets, loadTickets)]
+                  : []),
+
+                el("span", {
+                  class: "label-mono",
+                  attrs: { style: "color: var(--color-primary-blue); font-size: 10px; cursor: pointer;" },
+                  text: "PREVIEW SCANNER ›"
+                })
+              ])
         ])
       ));
 
@@ -114,11 +158,153 @@ export function renderMyTicketsView(): HTMLElement {
     }
   };
 
+  async function downloadTicket(ticket: any) {
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${ticket.qr_hash}`;
+    try {
+      const response = await fetch(qrUrl);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `TICKET-${ticket.booking.concert_title.replace(/\s+/g, '-')}-${ticket.seat_number}.png`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error("Download failed", err);
+      alert("Failed to download ticket. Please try again.");
+    }
+  }
+
   function renderDetailItem(label: string, value: string) {
     return el("div", {}, [
       el("label", { class: "label-mono", attrs: { style: "display: block; margin-bottom: 4px; opacity: 0.5;" }, text: label }),
       el("p", { attrs: { style: "font-size: 16px; font-weight: 500; color: var(--color-midnight);" }, text: value })
     ]);
+  }
+
+  function renderZoneClosedActions(
+    bookingId: number,
+    concertId: number,
+    reload: () => void
+  ): HTMLElement {
+    const refundBtn = el("button", {
+      class: "btn btn--primary btn--block",
+      attrs: { style: "padding: 12px;" },
+      text: "REQUEST REFUND",
+    }) as HTMLButtonElement;
+
+    const upgradeBtn = el("button", {
+      class: "btn btn--ghost btn--block",
+      attrs: { style: "padding: 12px;" },
+      text: "UPGRADE SEAT",
+    }) as HTMLButtonElement;
+
+    refundBtn.addEventListener("click", async () => {
+      if (!window.confirm("Request a full refund for this booking? This cannot be undone.")) return;
+      const bank_name = window.prompt("Bank name:")?.trim();
+      if (!bank_name) return;
+      const account_number = window.prompt("Account number:")?.trim();
+      if (!account_number) return;
+      const account_name = window.prompt("Account holder name:")?.trim();
+      if (!account_name) return;
+      const reason = window.prompt("Reason (optional):")?.trim();
+
+      refundBtn.disabled = true;
+      upgradeBtn.disabled = true;
+      refundBtn.textContent = "SUBMITTING...";
+      try {
+        const payload = reason
+          ? { bank_name, account_number, account_name, reason }
+          : { bank_name, account_number, account_name };
+        const res = await refundApi.voucher(bookingId, payload);
+        events.emit("log", { level: "info", message: res.message ?? "Refund request submitted" });
+        reload();
+      } catch (err) {
+        const detail =
+          err instanceof ApiError ? err.detail :
+          err instanceof Error ? err.message : "Refund failed";
+        events.emit("log", { level: "error", message: `Refund failed: ${detail}` });
+        refundBtn.disabled = false;
+        upgradeBtn.disabled = false;
+        refundBtn.textContent = "REQUEST REFUND";
+      }
+    });
+
+    upgradeBtn.addEventListener("click", () => {
+      if (!window.confirm("Pick new seats for free in another zone?")) return;
+      router.navigate(`/zones?concertId=${concertId}&rebookBookingId=${bookingId}`);
+    });
+
+    return el("div", {
+      class: "ticket-card-v2__qr-area",
+      attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border); display: flex; flex-direction: column; justify-content: center; gap: 16px; padding: 24px;" }
+    }, [
+      el("div", {
+        class: "banner banner--err",
+        attrs: { style: "padding: 12px; font-size: 13px; line-height: 1.4;" },
+        text: "This zone has been closed by the organizer. Please choose an option below."
+      }),
+      refundBtn,
+      upgradeBtn,
+    ]);
+  }
+
+  function isRefundEligible(booking: { status: string; created_at: string | null }): boolean {
+    if (booking.status !== "paid") return false;
+    const paidAt = parseAsUtc(booking.created_at);
+    if (isNaN(paidAt)) return false;
+    return Date.now() - paidAt <= REFUND_WINDOW_MS;
+  }
+
+  function renderRequestRefundButton(
+    bookingId: number,
+    totalTickets: number,
+    reload: () => void
+  ): HTMLElement {
+    const isMulti = totalTickets > 1;
+    const label = isMulti ? "REFUND ENTIRE BOOKING" : "REQUEST REFUND";
+    const btn = el("button", {
+      class: "btn btn--ghost btn--block",
+      attrs: { style: "padding: 10px; margin-bottom: 12px; color: var(--color-danger); border-color: var(--color-danger);" },
+      text: label,
+    }) as HTMLButtonElement;
+
+    btn.addEventListener("click", async () => {
+      const confirmMsg = isMulti
+        ? `This action will refund the ENTIRE booking (${totalTickets} tickets). You cannot refund individual tickets. Are you sure you want to proceed?`
+        : "Are you sure you want to request a refund?";
+      if (!window.confirm(confirmMsg)) return;
+      const bank_name = window.prompt("Bank name:")?.trim();
+      if (!bank_name) return;
+      const account_number = window.prompt("Account number:")?.trim();
+      if (!account_number) return;
+      const account_name = window.prompt("Account holder name:")?.trim();
+      if (!account_name) return;
+      const reason = window.prompt("Reason (optional):")?.trim();
+
+      btn.disabled = true;
+      btn.textContent = "SUBMITTING...";
+      try {
+        const payload = reason
+          ? { booking_id: bookingId, bank_name, account_number, account_name, reason }
+          : { booking_id: bookingId, bank_name, account_number, account_name };
+        const res = await refundApi.request(payload);
+        events.emit("log", { level: "info", message: res.message ?? "Refund requested" });
+        reload();
+      } catch (err) {
+        const detail =
+          err instanceof ApiError ? err.detail :
+          err instanceof Error ? err.message : "Refund failed";
+        alert(`Refund failed: ${detail}`);
+        events.emit("log", { level: "error", message: `Refund failed: ${detail}` });
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    });
+
+    return btn;
   }
 
   loadTickets();

@@ -60,6 +60,7 @@ export interface Concert {
   address: string;
   concert_datetime: string | null;
   status: ConcertStatus;
+  image_url: string | null;
 }
 
 export interface Zone {
@@ -111,6 +112,7 @@ export interface BookingSummary {
   venue: string;
   seat_label: string;
   booking_id: number;
+  concert_id: number;
   concert_title: string;
   concert_datetime: string | null;
   total_tickets: number;
@@ -119,12 +121,32 @@ export interface BookingSummary {
   created_at: string | null;
 }
 
+export interface Ticket {
+  ticket_id: number;
+  qr_hash: string;
+  seat_number: string;
+  zone_name: string;
+  is_used: boolean;
+}
+
 export interface ConfirmBookingResponse {
   message: string;
   booking_id: number;
   status: "paid";
   payment_id: number;
   transaction_ref: string;
+}
+
+export interface RebookResponse {
+  message: string;
+  booking_id: number;
+  status: "pending";
+  new_seat_ids: number[];
+  new_ticket_ids: number[];
+  original_total: string;
+  new_total: string;
+  difference_amount: string;
+  expired_at: string;
 }
 
 export interface GenerateQrResponse {
@@ -201,6 +223,37 @@ export interface OrganizerDashboard {
   concert_id: number;
   daily_stats: DailyStat[];
   grand_totals: GrandTotals;
+}
+
+export interface PendingRefund {
+  booking_id: number;
+  total_amount: number;
+  total_tickets: number;
+  created_at: string | null;
+  customer_name: string;
+  customer_email: string;
+  refund_id: number | null;
+  bank_name: string | null;
+  account_number: string | null;
+  account_name: string | null;
+  reason: string | null;
+  requested_at: string | null;
+}
+
+export interface ApproveRefundResponse {
+  message: string;
+  booking_id: number;
+  status: "refunded";
+  seats_released: number;
+  amount: string;
+}
+
+export interface VerifyTicketResponse {
+  message: string;
+  ticket_id: number;
+  concert_title: string;
+  zone_name: string;
+  seat_number: string;
 }
 
 export interface RefundRequestPayload {

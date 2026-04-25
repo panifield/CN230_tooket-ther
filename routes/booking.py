@@ -237,7 +237,8 @@ def get_concerts():
                     WHEN NOW() < sale_open_at THEN 'upcoming'
                     WHEN (NOW() >= sale_open_at AND (sale_close_at IS NULL OR NOW() <= sale_close_at)) THEN 'on_sale'
                     ELSE 'closed'
-                  END as dynamic_status
+                  END as dynamic_status,
+                  image_url
                 FROM concert
                 ORDER BY concert_datetime DESC
                 """
@@ -253,6 +254,7 @@ def get_concerts():
             "address": r[4],
             "concert_datetime": r[5].isoformat() if r[5] else None,
             "status": r[6],
+            "image_url": r[7],
         }
         for r in rows
     ]
@@ -479,15 +481,12 @@ def my_bookings(current_user: CurrentUser):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT booking_id, concert_title, concert_datetime,
-                       total_tickets, total_amount, status, created_at
-                FROM vw_booking_summary
-                WHERE user_name = (
-                    SELECT u.name FROM users u
-                    JOIN customer_profile cp ON cp.user_id = u.id
-                    WHERE cp.id = %s
-                )
-                ORDER BY created_at DESC
+                SELECT b.id, b.concert_id, c.title, c.concert_datetime, c.venue, c.address,
+                       b.total_tickets, b.total_amount, b.status, b.created_at
+                FROM booking b
+                JOIN concert c ON c.id = b.concert_id
+                WHERE b.customer_id = %s
+                ORDER BY b.created_at DESC
                 """,
                 (customer_profile_id,),
             )
@@ -496,12 +495,56 @@ def my_bookings(current_user: CurrentUser):
     return [
         {
             "booking_id": r[0],
-            "concert_title": r[1],
-            "concert_datetime": r[2].isoformat() if r[2] else None,
-            "total_tickets": r[3],
-            "total_amount": float(r[4]) if r[4] else 0,
-            "status": r[5],
-            "created_at": r[6].isoformat() if r[6] else None,
+            "concert_id": r[1],
+            "concert_title": r[2],
+            "concert_datetime": r[3].isoformat() if r[3] else None,
+            "venue": r[4],
+            "address": r[5],
+            "total_tickets": r[6],
+            "total_amount": float(r[7]) if r[7] else 0,
+            "status": r[8],
+            "created_at": r[9].isoformat() if r[9] else None,
+        }
+        for r in rows
+    ]
+
+
+@booking_router.get("/{booking_id}/tickets")
+def get_booking_tickets(booking_id: int, current_user: CurrentUser):
+    """ดึงข้อมูลตั๋วรายใบใน Booking (รวม qr_hash)"""
+    customer_profile_id = current_user.get("customer_profile_id")
+    if not customer_profile_id:
+        raise HTTPException(status_code=400, detail="ไม่พบ customer profile")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # เช็คว่าเป็นเจ้าของ booking จริงไหม
+            cur.execute(
+                "SELECT id FROM booking WHERE id = %s AND customer_id = %s",
+                (booking_id, customer_profile_id)
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์เข้าถึงตั๋วใน Booking นี้")
+
+            cur.execute(
+                """
+                SELECT t.id, t.qr_hash, s.seat_number, z.zone_name, t.is_used
+                FROM ticket t
+                JOIN seat s ON t.seat_id = s.id
+                JOIN zone z ON s.zone_id = z.id
+                WHERE t.booking_id = %s
+                """,
+                (booking_id,)
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "ticket_id": r[0],
+            "qr_hash": r[1],
+            "seat_number": r[2],
+            "zone_name": r[3],
+            "is_used": r[4]
         }
         for r in rows
     ]
@@ -645,12 +688,13 @@ def rebook_zone_closure(
     booking_id: int, body: RebookRequestBody, current_user: CurrentUser
 ):
     """
-    ใช้ voucher จาก zone closure เพื่อย้ายไปนั่งโซนอื่นแบบฟรี.
+    Paid upgrade flow: ย้ายไปนั่งโซนที่ "แพงกว่าเดิม" และจ่ายส่วนต่าง.
     - booking ต้องเป็น 'zone_closed_action_required' และเป็นของ user เอง
-    - new_seat_ids ต้องอยู่ในโซน active (is_active=TRUE), concert เดียวกัน, status='available'
-    - จำนวน new_seat_ids ต้องเท่ากับจำนวน ticket เดิม
-    - transaction: lock seats (เก่า+ใหม่) → DELETE ticket เก่า → free seat เก่า →
-      seat ใหม่ → 'sold' → INSERT ticket ใหม่ → booking=paid
+    - new_seat_ids ต้องอยู่ในโซน active, concert เดียวกัน, status='available'
+    - new_total ต้องมากกว่า original_total (รับเฉพาะ upgrade ที่แพงกว่า)
+    - transaction: lock seats → DELETE ticket เก่า → free seat เก่า → seat ใหม่ → 'locked'
+      → INSERT ticket ใหม่ → booking.total_amount = ส่วนต่าง, status='pending', expired_at=15min
+    - คืน difference_amount เพื่อให้ user เข้า payment flow ต่อจ่ายส่วนต่าง
     """
     if current_user["role"] != "customer":
         raise HTTPException(status_code=403, detail="เฉพาะลูกค้าเท่านั้น")
@@ -668,7 +712,7 @@ def rebook_zone_closure(
             with conn.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT id, customer_id, concert_id, status
+                    SELECT id, customer_id, concert_id, status, total_amount
                     FROM booking WHERE id = %s FOR UPDATE
                     """,
                     (booking_id,),
@@ -677,7 +721,7 @@ def rebook_zone_closure(
                 if not booking:
                     raise HTTPException(status_code=404, detail="ไม่พบ booking")
 
-                b_id, b_customer_id, b_concert_id, b_status = booking
+                b_id, b_customer_id, b_concert_id, b_status, b_original_total = booking
                 if b_customer_id != customer_profile_id:
                     raise HTTPException(status_code=403, detail="ไม่ใช่ booking ของคุณ")
                 if b_status != "zone_closed_action_required":
@@ -711,7 +755,7 @@ def rebook_zone_closure(
                 placeholders = ",".join(["%s"] * len(all_seat_ids))
                 cur.execute(
                     f"""
-                    SELECT s.id, s.status, s.zone_id, z.is_active, z.concert_id
+                    SELECT s.id, s.status, s.zone_id, z.is_active, z.concert_id, z.price
                     FROM seat s
                     JOIN zone z ON z.id = s.zone_id
                     WHERE s.id IN ({placeholders})
@@ -727,9 +771,11 @@ def rebook_zone_closure(
                 if missing:
                     raise HTTPException(status_code=404, detail=f"ไม่พบที่นั่ง {missing}")
 
-                # Validate เฉพาะที่นั่งใหม่
+                # Validate เฉพาะที่นั่งใหม่ + รวม new_total
+                from decimal import Decimal as _Decimal
+                new_total = _Decimal("0")
                 for sid in new_seat_ids:
-                    _, s_status, _, z_active, z_concert = seat_map[sid]
+                    _, s_status, _, z_active, z_concert, z_price = seat_map[sid]
                     if z_concert != b_concert_id:
                         raise HTTPException(
                             status_code=409,
@@ -745,6 +791,19 @@ def rebook_zone_closure(
                             status_code=409,
                             detail=f"seat {sid} ไม่ว่าง (status='{s_status}')",
                         )
+                    new_total += _Decimal(z_price)
+
+                # Upgrade-only: new_total ต้องมากกว่า original_total เสมอ
+                original_total = _Decimal(b_original_total)
+                if new_total <= original_total:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"ที่นั่งใหม่ราคารวม {new_total} ไม่สูงกว่ายอดเดิม {original_total} "
+                            "— upgrade ต้องเลือกโซนที่แพงกว่าเดิมเท่านั้น"
+                        ),
+                    )
+                difference_amount = new_total - original_total
 
                 # DELETE ticket เดิม
                 cur.execute("DELETE FROM ticket WHERE booking_id = %s", (b_id,))
@@ -756,10 +815,10 @@ def rebook_zone_closure(
                     old_seat_ids,
                 )
 
-                # lock seat ใหม่ → 'sold' ทันที (ถือว่า paid แล้ว)
+                # lock seat ใหม่ → 'locked' (รอ user จ่ายส่วนต่างใน /payment)
                 new_placeholders = ",".join(["%s"] * len(new_seat_ids))
                 cur.execute(
-                    f"UPDATE seat SET status = 'sold' WHERE id IN ({new_placeholders})",
+                    f"UPDATE seat SET status = 'locked' WHERE id IN ({new_placeholders})",
                     new_seat_ids,
                 )
 
@@ -778,12 +837,20 @@ def rebook_zone_closure(
                     )
                     new_ticket_ids.append(cur.fetchone()[0])
 
+                # booking เข้าสู่ payment flow รอบใหม่: total_amount = ส่วนต่าง,
+                # status='pending', expired_at=NOW()+15min. payment เดิม (paid)
+                # ยังเก็บไว้ในตาราง payment เพื่อ accounting.
+                new_expired_at = datetime.now(timezone.utc) + timedelta(minutes=15)
                 cur.execute(
                     """
-                    UPDATE booking SET status = 'paid', expired_at = NULL
+                    UPDATE booking
+                    SET status = 'pending',
+                        total_amount = %s,
+                        total_tickets = %s,
+                        expired_at = %s
                     WHERE id = %s AND status = 'zone_closed_action_required'
                     """,
-                    (b_id,),
+                    (difference_amount, len(new_seat_ids), new_expired_at, b_id),
                 )
                 if cur.rowcount != 1:
                     raise HTTPException(
@@ -800,9 +867,13 @@ def rebook_zone_closure(
             raise HTTPException(status_code=500, detail=f"rebook ไม่สำเร็จ: {exc}")
 
     return {
-        "message": "ย้ายที่นั่งสำเร็จ (free upgrade)",
+        "message": "ย้ายที่นั่งสำเร็จ — กรุณาชำระส่วนต่างภายใน 15 นาที",
         "booking_id": b_id,
-        "status": "paid",
+        "status": "pending",
         "new_seat_ids": new_seat_ids,
         "new_ticket_ids": new_ticket_ids,
+        "original_total": f"{original_total:.2f}",
+        "new_total": f"{new_total:.2f}",
+        "difference_amount": f"{difference_amount:.2f}",
+        "expired_at": new_expired_at.isoformat(),
     }

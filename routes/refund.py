@@ -150,7 +150,9 @@ def request_refund(body: RefundRequestBody, current_user: CurrentUser):
 
                 refund_id = inserted[0]
 
-                # Side effects: booking → refund_pending, seat คืนให้ขายใหม่, finance บันทึก
+                # Side effects: booking → refund_pending, seat คืนให้ขายใหม่.
+                # หมายเหตุ: ห้ามเขียน finance ในขั้น "ขอคืน" — รอ organizer approve เท่านั้น
+                # (ดู organizer.approve_refund) เพื่อป้องกัน dashboard แสดงรายจ่ายก่อนเวลา
                 cur.execute(
                     "UPDATE booking SET status = 'refund_pending' WHERE id = %s",
                     (b_id,),
@@ -162,16 +164,10 @@ def request_refund(body: RefundRequestBody, current_user: CurrentUser):
                     """,
                     (b_id,),
                 )
-                cur.execute(
-                    """
-                    INSERT INTO finance
-                      (concert_id, booking_id, type, amount, description)
-                    VALUES (%s, %s, 'refund', %s, 'refund requested')
-                    """,
-                    (concert_id, b_id, paid_amount),
-                )
 
             conn.commit()
+            # ป้องกัน F401 — concert_id ใช้เพียง audit log (ไม่มี finance insert แล้ว)
+            _ = concert_id
             logger.info(
                 "Refund requested: refund_id=%s booking=%s payment=%s amount=%s",
                 refund_id, b_id, payment_id, paid_amount,
@@ -298,16 +294,11 @@ def refund_voucher(booking_id: int, body: VoucherRefundRequestBody, current_user
                 if cur.rowcount != 1:
                     raise HTTPException(status_code=409, detail="booking ถูกเปลี่ยนสถานะไปแล้ว")
 
-                cur.execute(
-                    """
-                    INSERT INTO finance
-                      (concert_id, booking_id, type, amount, description)
-                    VALUES (%s, %s, 'refund', %s, 'Zone closure voucher refund')
-                    """,
-                    (concert_id, b_id, paid_amount),
-                )
+                # หมายเหตุ: ห้ามเขียน finance ในขั้น "ขอคืน voucher" — รอ organizer approve
+                # (ดู organizer.approve_refund) เพื่อป้องกัน dashboard แสดงรายจ่ายก่อนเวลา
 
             conn.commit()
+            _ = concert_id
             logger.info(
                 "Voucher refund requested: refund_id=%s booking=%s payment=%s amount=%s",
                 refund_id, b_id, payment_id, paid_amount,

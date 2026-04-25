@@ -1,8 +1,10 @@
 import { request } from "./client";
 import type {
+  ApproveRefundResponse,
   CreateConcertPayload,
   OrganizerDashboard,
   OrganizerQueueRow,
+  PendingRefund,
 } from "./types";
 
 export const organizerApi = {
@@ -27,7 +29,7 @@ export const organizerApi = {
   },
 
   createConcert(
-    payload: CreateConcertPayload
+    payload: CreateConcertPayload | FormData
   ): Promise<{ message: string; concert_id: number }> {
     return request("/organizer/concerts", { method: "POST", body: payload });
   },
@@ -47,6 +49,19 @@ export const organizerApi = {
   dashboard(concertId: number): Promise<OrganizerDashboard> {
     return request<OrganizerDashboard>(
       `/organizer/concerts/${concertId}/dashboard`
+    );
+  },
+
+  listPendingRefunds(concertId: number): Promise<PendingRefund[]> {
+    return request<PendingRefund[]>(
+      `/organizer/concerts/${concertId}/refund-pending`
+    );
+  },
+
+  approveRefund(bookingId: number): Promise<ApproveRefundResponse> {
+    return request<ApproveRefundResponse>(
+      `/organizer/bookings/${bookingId}/approve-refund`,
+      { method: "POST" }
     );
   },
 };

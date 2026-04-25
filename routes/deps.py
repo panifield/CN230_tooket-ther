@@ -56,10 +56,12 @@ def get_current_user(
                        cp.id AS customer_profile_id,
                        cp.location_score,
                        op.id AS organizer_profile_id,
-                       u.phone, u.address, u.id_card
+                       u.phone, u.address, u.id_card,
+                       sp.id AS staff_profile_id
                 FROM users u
                 LEFT JOIN customer_profile cp ON cp.user_id = u.id
                 LEFT JOIN organizer_profile op ON op.user_id = u.id
+                LEFT JOIN staff_profile sp ON sp.user_id = u.id
                 WHERE u.id = %s
                 """,
                 (user_id,),
@@ -83,6 +85,7 @@ def get_current_user(
         "phone": row[7],
         "address": row[8],
         "id_card": row[9],
+        "staff_profile_id": row[10],
     }
 
 

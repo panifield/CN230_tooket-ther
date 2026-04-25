@@ -11,6 +11,7 @@ import uvicorn
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from config import Config
 from models import close_db_pool, get_db_connection, init_db_pool
@@ -19,6 +20,7 @@ from routes.booking import booking_router
 from routes.organizer import organizer_router
 from routes.payment import payment_router
 from routes.refund import refund_router
+from routes.staff import staff_router
 
 logger = logging.getLogger("tooket-ther")
 
@@ -133,7 +135,13 @@ app = FastAPI(
 # CORS — อนุญาต A4 frontend (ปรับ origins ตามที่ A4 ใช้จริง)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:5500", "http://localhost:5500"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:5500",
+        "http://localhost:5500",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -144,6 +152,10 @@ app.include_router(booking_router)
 app.include_router(organizer_router)
 app.include_router(payment_router)
 app.include_router(refund_router)
+app.include_router(staff_router)
+
+# Serve static images for concerts
+app.mount("/database/image", StaticFiles(directory="database/image"), name="images")
 
 
 @app.get("/")

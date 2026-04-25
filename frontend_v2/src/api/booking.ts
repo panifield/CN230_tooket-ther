@@ -6,7 +6,9 @@ import type {
   ConfirmBookingResponse,
   JoinQueueResponse,
   QueueStatus,
+  RebookResponse,
   Seat,
+  Ticket,
   Zone,
 } from "./types";
 
@@ -58,13 +60,14 @@ export const bookingApi = {
     });
   },
 
-  rebook(
-    bookingId: number,
-    newSeatIds: number[]
-  ): Promise<{ booking_id: number; status: string }> {
-    return request(`/booking/${bookingId}/rebook`, {
+  rebook(bookingId: number, newSeatIds: number[]): Promise<RebookResponse> {
+    return request<RebookResponse>(`/booking/${bookingId}/rebook`, {
       method: "POST",
       body: { new_seat_ids: newSeatIds },
     });
+  },
+
+  getBookingTickets(bookingId: number): Promise<Ticket[]> {
+    return request<Ticket[]>(`/booking/${bookingId}/tickets`);
   },
 };

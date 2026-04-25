@@ -7,7 +7,7 @@ export function isPhone(value: string): boolean {
 }
 
 export function isPassword(value: string): boolean {
-  return value.length >= 6;
+  return value.length >= 4;
 }
 
 export function isIdCard(value: string): boolean {

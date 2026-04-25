@@ -3,7 +3,7 @@ Website for booking tickets for concerts
 
 ##  Project Description
 CN230_tooket-ther is a web application developed for booking concert tickets.  
-Users can browse concerts, select seats, and make reservations بسهولةผ่านระบบออนไลน์.
+Users can browse concerts, select seats, and make reservations ผ่านระบบออนไลน์.
 
 ##  Features
 -  Browse available concerts

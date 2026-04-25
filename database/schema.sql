@@ -103,8 +103,8 @@ CREATE TABLE concert (
     concert_datetime TIMESTAMP       NOT NULL,
     sale_open_at     TIMESTAMP,
     sale_close_at    TIMESTAMP,
-    status           VARCHAR(20)     NOT NULL CHECK (status IN ('draft','on_sale','closed','cancelled'))
-                                     -- status: draft คือ ยังไม่เปิดให้ user เห็นมีแค่ organizer ที่ไปแก้ไขข้อมูลได้
+    status           VARCHAR(20)     NOT NULL CHECK (status IN ('draft','on_sale','closed','cancelled')),
+    image_url        TEXT
 );
 
 -- =========================
@@ -165,7 +165,7 @@ CREATE TABLE booking (
     total_amount     NUMERIC(10,2)   NOT NULL,
     total_tickets    INT,
     status           VARCHAR(20)     NOT NULL DEFAULT 'pending'
-                                     CHECK (status IN ('pending','paid','cancelled','expired','zone_closed_action_required','refund_pending')),
+                                     CHECK (status IN ('pending','paid','cancelled','expired','zone_closed_action_required','refund_pending','refunded')),
     delivery_type    VARCHAR(20)     NOT NULL DEFAULT 'digital'
                                      CHECK (delivery_type IN ('digital','pickup','postal'))
 );
@@ -299,6 +299,8 @@ SELECT
     u.name AS user_name,
     c.title AS concert_title,
     c.concert_datetime,
+    c.venue AS concert_venue,
+    c.address AS concert_address,
     b.total_tickets,
     b.total_amount,
     b.status,
