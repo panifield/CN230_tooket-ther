@@ -7,6 +7,13 @@ import { events } from "../state/events";
 import { router } from "../router-instance";
 
 const ZONE_CLOSED = "zone_closed_action_required";
+const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function parseAsUtc(s: string | null | undefined): number {
+  if (!s) return NaN;
+  const hasOffset = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+  return new Date(hasOffset ? s : `${s}Z`).getTime();
+}
 
 export function renderMyTicketsView(): HTMLElement {
   // ── 🛠️ ปรับพื้นหลังของหน้าเพจให้เป็นสีขาว ──
@@ -108,14 +115,13 @@ export function renderMyTicketsView(): HTMLElement {
           // ── ฝั่ง QR Code หรือ Action ──
           t.booking.status === ZONE_CLOSED
             ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id, loadTickets)
-            : el("div", { 
-                class: "ticket-card-v2__qr-area", 
-                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" } 
+            : el("div", {
+                class: "ticket-card-v2__qr-area",
+                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" }
               }, [
                 el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
                   el("img", {
                     attrs: {
-                      // ใช้ hash จริงจาก backend
                       src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
                       alt: "Verification QR",
                       style: "width: 100%; height: 100%;"
@@ -124,14 +130,18 @@ export function renderMyTicketsView(): HTMLElement {
                 ]),
 
                 el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
-                  el("button", { 
-                    class: "btn-outline-sm", 
-                    attrs: { style: "flex: 1;" }, 
+                  el("button", {
+                    class: "btn-outline-sm",
+                    attrs: { style: "flex: 1;" },
                     text: "DOWNLOAD",
                     on: { click: () => downloadTicket(t) }
                   }),
                   el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
                 ]),
+
+                ...(isRefundEligible(t.booking)
+                  ? [renderRequestRefundButton(t.booking.booking_id, t.booking.total_tickets, loadTickets)]
+                  : []),
 
                 el("span", {
                   class: "label-mono",
@@ -239,6 +249,62 @@ export function renderMyTicketsView(): HTMLElement {
       refundBtn,
       upgradeBtn,
     ]);
+  }
+
+  function isRefundEligible(booking: { status: string; created_at: string | null }): boolean {
+    if (booking.status !== "paid") return false;
+    const paidAt = parseAsUtc(booking.created_at);
+    if (isNaN(paidAt)) return false;
+    return Date.now() - paidAt <= REFUND_WINDOW_MS;
+  }
+
+  function renderRequestRefundButton(
+    bookingId: number,
+    totalTickets: number,
+    reload: () => void
+  ): HTMLElement {
+    const isMulti = totalTickets > 1;
+    const label = isMulti ? "REFUND ENTIRE BOOKING" : "REQUEST REFUND";
+    const btn = el("button", {
+      class: "btn btn--ghost btn--block",
+      attrs: { style: "padding: 10px; margin-bottom: 12px; color: var(--color-danger); border-color: var(--color-danger);" },
+      text: label,
+    }) as HTMLButtonElement;
+
+    btn.addEventListener("click", async () => {
+      const confirmMsg = isMulti
+        ? `This action will refund the ENTIRE booking (${totalTickets} tickets). You cannot refund individual tickets. Are you sure you want to proceed?`
+        : "Are you sure you want to request a refund?";
+      if (!window.confirm(confirmMsg)) return;
+      const bank_name = window.prompt("Bank name:")?.trim();
+      if (!bank_name) return;
+      const account_number = window.prompt("Account number:")?.trim();
+      if (!account_number) return;
+      const account_name = window.prompt("Account holder name:")?.trim();
+      if (!account_name) return;
+      const reason = window.prompt("Reason (optional):")?.trim();
+
+      btn.disabled = true;
+      btn.textContent = "SUBMITTING...";
+      try {
+        const payload = reason
+          ? { booking_id: bookingId, bank_name, account_number, account_name, reason }
+          : { booking_id: bookingId, bank_name, account_number, account_name };
+        const res = await refundApi.request(payload);
+        events.emit("log", { level: "info", message: res.message ?? "Refund requested" });
+        reload();
+      } catch (err) {
+        const detail =
+          err instanceof ApiError ? err.detail :
+          err instanceof Error ? err.message : "Refund failed";
+        alert(`Refund failed: ${detail}`);
+        events.emit("log", { level: "error", message: `Refund failed: ${detail}` });
+        btn.disabled = false;
+        btn.textContent = label;
+      }
+    });
+
+    return btn;
   }
 
   loadTickets();

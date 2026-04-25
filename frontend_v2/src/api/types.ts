@@ -225,6 +225,29 @@ export interface OrganizerDashboard {
   grand_totals: GrandTotals;
 }
 
+export interface PendingRefund {
+  booking_id: number;
+  total_amount: number;
+  total_tickets: number;
+  created_at: string | null;
+  customer_name: string;
+  customer_email: string;
+  refund_id: number | null;
+  bank_name: string | null;
+  account_number: string | null;
+  account_name: string | null;
+  reason: string | null;
+  requested_at: string | null;
+}
+
+export interface ApproveRefundResponse {
+  message: string;
+  booking_id: number;
+  status: "refunded";
+  seats_released: number;
+  amount: string;
+}
+
 export interface VerifyTicketResponse {
   message: string;
   ticket_id: number;

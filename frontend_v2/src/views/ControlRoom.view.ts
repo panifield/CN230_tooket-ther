@@ -4,6 +4,7 @@ import type {
   Concert,
   OrganizerDashboard,
   OrganizerQueueRow,
+  PendingRefund,
   Zone,
 } from "../api/types";
 import { authStore } from "../state/auth";
@@ -28,12 +29,14 @@ export function renderControlRoomView(): HTMLElement {
     queues: [] as OrganizerQueueRow[],
     dashboard: null as OrganizerDashboard | null,
     concertZones: [] as Zone[],
+    pendingRefunds: [] as PendingRefund[],
   };
 
   const concertListHost = el("div");
   const queueHost = el("div");
   const dashboardHost = el("div");
   const concertZonesHost = el("div");
+  const refundsHost = el("div");
 
   const refreshConcerts = async (): Promise<void> => {
     state.concerts = await bookingApi.listConcerts();
@@ -97,7 +100,7 @@ export function renderControlRoomView(): HTMLElement {
                           click: () => {
                             state.selectedConcertId = c.concert_id;
                             renderConcerts();
-                            void Promise.all([loadQueues(), loadDashboard(), loadZones()]);
+                            void Promise.all([loadQueues(), loadDashboard(), loadZones(), loadPendingRefunds()]);
                           },
                         },
                       },
@@ -308,6 +311,95 @@ export function renderControlRoomView(): HTMLElement {
     renderDashboard();
   };
 
+  const loadPendingRefunds = async (): Promise<void> => {
+    if (state.selectedConcertId === null) return;
+    try {
+      state.pendingRefunds = await organizerApi.listPendingRefunds(state.selectedConcertId);
+    } catch {
+      state.pendingRefunds = [];
+    }
+    renderPendingRefunds();
+  };
+
+  const renderPendingRefunds = (): void => {
+    if (state.selectedConcertId === null) {
+      mount(refundsHost, el("div", { class: "empty-cart", text: "SELECT A CONCERT TO VIEW REFUND REQUESTS." }));
+      return;
+    }
+    if (state.pendingRefunds.length === 0) {
+      mount(refundsHost, el("div", { class: "empty-cart", text: "NO PENDING REFUNDS." }));
+      return;
+    }
+    mount(
+      refundsHost,
+      el("div", { class: "table-wrap", attrs: { style: "max-height: 400px; overflow-y: auto;" } }, [
+        el("table", { class: "table" }, [
+          el("thead", {}, [
+            el("tr", {}, [
+              el("th", { text: "Booking" }),
+              el("th", { text: "Customer" }),
+              el("th", { text: "Bank Info" }),
+              el("th", { text: "Amount" }),
+              el("th", { attrs: { style: "text-align: right;" }, text: "Action" }),
+            ]),
+          ]),
+          el(
+            "tbody",
+            {},
+            state.pendingRefunds.map((r) =>
+              el("tr", {}, [
+                el("td", {}, [
+                  el("div", { attrs: { style: "font-weight: 500;" }, text: `BKG-${r.booking_id}` }),
+                  el("div", { class: "label-mono", attrs: { style: "margin-top: 4px;" }, text: `${r.total_tickets} ticket(s)` }),
+                ]),
+                el("td", {}, [
+                  el("div", { text: r.customer_name }),
+                  el("div", { class: "label-mono", attrs: { style: "margin-top: 4px;" }, text: r.customer_email }),
+                ]),
+                el("td", { class: "label-mono" }, [
+                  el("div", { text: r.bank_name ?? "—" }),
+                  el("div", { attrs: { style: "margin-top: 4px;" }, text: r.account_number ?? "—" }),
+                  el("div", { attrs: { style: "margin-top: 4px;" }, text: r.account_name ?? "" }),
+                ]),
+                el("td", { attrs: { style: "font-weight: 500;" }, text: formatBaht(r.total_amount) }),
+                el("td", { attrs: { style: "text-align: right;" } }, [
+                  el(
+                    "button",
+                    {
+                      class: "btn btn--primary btn--sm",
+                      attrs: { type: "button" },
+                      on: {
+                        click: async () => {
+                          if (!window.confirm(
+                            `Approve refund of ${formatBaht(r.total_amount)} for BKG-${r.booking_id}? Seats will be released and revenue deducted.`
+                          )) return;
+                          try {
+                            const res = await organizerApi.approveRefund(r.booking_id);
+                            events.emit("log", {
+                              level: "info",
+                              message: `${res.message} — ${res.seats_released} seat(s) released, ฿${res.amount} deducted`,
+                            });
+                            await Promise.all([loadPendingRefunds(), loadDashboard(), loadZones()]);
+                          } catch (err) {
+                            events.emit("log", {
+                              level: "error",
+                              message: err instanceof Error ? err.message : String(err),
+                            });
+                          }
+                        },
+                      },
+                    },
+                    ["APPROVE REFUND"]
+                  ),
+                ]),
+              ])
+            )
+          ),
+        ]),
+      ])
+    );
+  };
+
   const renderDashboard = (): void => {
     if (!state.dashboard) {
       mount(
@@ -368,6 +460,7 @@ export function renderControlRoomView(): HTMLElement {
   renderQueues();
   renderConcertZones();
   renderDashboard();
+  renderPendingRefunds();
 
   return el("div", { class: "coastal-page" }, [
     el("div", { attrs: { style: "max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: var(--space-6);" } }, [
@@ -407,7 +500,16 @@ export function renderControlRoomView(): HTMLElement {
         ]),
       ]),
 
-      // 3. Financial Dashboard (เต็มจอ อยู่ล่างสุดก่อนถึง Log)
+      // 3. Pending Refunds (เต็มจอ — รอ organizer อนุมัติ)
+      el("section", { class: "card" }, [
+        el("div", { class: "card__header" }, [
+          el("h3", { class: "card__title", text: "Pending Refunds" }),
+          el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadPendingRefunds() } }, ["RELOAD"]),
+        ]),
+        refundsHost,
+      ]),
+
+      // 4. Financial Dashboard (เต็มจอ อยู่ล่างสุดก่อนถึง Log)
       el("section", { class: "card card--dark" }, [
         el("div", { class: "card__header" }, [
           el("h3", { class: "card__title", text: "Financial Dashboard" }),
