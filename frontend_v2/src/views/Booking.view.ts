@@ -63,6 +63,7 @@ export function renderBookingView(concertId: number): HTMLElement {
 
   // --- 4. Render Functions ---
   const renderQueue = () => {
+    clear(queueHost);
     mount(queueHost, el("div", { class: "p-4 bg-sky-tint/10 border border-sky-tint/20 rounded-sharp flex items-center gap-4" }, [
       el("div", { class: "w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-blue shadow-sm" }, [
         el("span", { class: "font-bold text-sm", text: `#${state.queuePosition}` })
@@ -86,7 +87,7 @@ export function renderBookingView(concertId: number): HTMLElement {
             const isSelected = state.selectedSeats.find(s => s.id === seat.id);
             return el("button", {
               class: `w-8 h-8 rounded-sharp transition-all relative ${
-                seat.status === 'occupied' ? 'bg-midnight/5 cursor-not-allowed' : 
+                seat.status === 'occupied' ? 'bg-midnight/5 cursor-not-allowed opacity-40' : 
                 isSelected ? 'bg-brand-blue text-midnight shadow-lg scale-110' : 
                 'bg-white border border-black/10 hover:border-brand-blue'
               }`,
@@ -108,24 +109,26 @@ export function renderBookingView(concertId: number): HTMLElement {
     const total = subtotal + fee;
 
     const content: HTMLElement[] = [
-      el("h3", { class: "mono-label text-brand-blue mb-6", text: "ORDER SUMMARY" }),
-      
-      state.selectedSeats.length === 0 
-        ? el("div", { class: "py-12 text-center border-2 border-dashed border-black/5 rounded-card" }, [
-            el("p", { class: "text-sm text-midnight/40", text: "No seats selected yet" })
-          ])
-        : el("div", { class: "space-y-4 mb-8" }, state.selectedSeats.map(seat => 
-            el("div", { class: "flex justify-between items-center pb-4 border-b border-black/5" }, [
-              el("div", {}, [
-                el("div", { class: "font-medium", text: `Seat ${seat.id}` }),
-                el("div", { class: "text-[10px] mono-label text-midnight/40", text: seat.zone })
-              ]),
-              el("div", { class: "font-medium", text: `$${seat.price}` })
-            ])
-          ))
+      el("h3", { class: "mono-label text-brand-blue mb-6", text: "ORDER SUMMARY" })
     ];
 
-    if (state.selectedSeats.length > 0) {
+    if (state.selectedSeats.length === 0) {
+      content.push(el("div", { class: "py-12 text-center border-2 border-dashed border-black/5 rounded-card" }, [
+        el("p", { class: "text-sm text-midnight/40", text: "No seats selected yet" })
+      ]));
+    } else {
+      content.push(el("div", { class: "space-y-4 mb-8" }, 
+        state.selectedSeats.map(seat => 
+          el("div", { class: "flex justify-between items-center pb-4 border-b border-black/5" }, [
+            el("div", {}, [
+              el("div", { class: "font-medium", text: `Seat ${seat.id}` }),
+              el("div", { class: "text-[10px] mono-label text-midnight/40", text: seat.zone })
+            ]),
+            el("div", { class: "font-medium", text: `$${seat.price}` })
+          ])
+        )
+      ));
+
       content.push(
         el("div", { class: "space-y-2 my-8" }, [
           el("div", { class: "flex justify-between text-sm" }, [el("span", { text: "Subtotal" }), el("span", { text: `$${subtotal}` })]),
@@ -135,7 +138,6 @@ export function renderBookingView(concertId: number): HTMLElement {
             el("span", { text: `$${total}` })
           ])
         ]),
-
         el("button", {
           class: "w-full btn-primary",
           on: { click: () => router.navigate('/payment') },
