@@ -11,10 +11,10 @@ import { clear, el, qs } from "./utils/dom";
 
 // Views Import
 import { renderAuthView } from "./views/auth.view";
-import { renderCustomerDashboard } from "./views/Customer.view";
-import { renderForgotView } from "./views/Forgot.view";
-import { renderLandingView } from "./views/Landing.view";
-import { renderProfileView } from "./views/Profile.view";
+import { renderCustomerDashboard } from "./views/customer.view";
+import { renderForgotView } from "./views/forgot.view";
+import { renderLandingView } from "./views/landing.view";
+import { renderProfileView } from "./views/profile.view";
 import { renderWaitingView } from "./views/Waiting.view";
 import { renderMyTicketsView } from "./views/MyTicketsView";
 import { renderZonesView } from "./views/Zones.view";
