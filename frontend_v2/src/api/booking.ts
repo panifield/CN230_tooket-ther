@@ -67,4 +67,8 @@ export const bookingApi = {
       body: { new_seat_ids: newSeatIds },
     });
   },
+
+  getBookingTickets(bookingId: number): Promise<Ticket[]> {
+    return request<Ticket[]>(`/booking/${bookingId}/tickets`);
+  },
 };

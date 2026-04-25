@@ -42,13 +42,33 @@ export function renderMyTicketsView(): HTMLElement {
         return;
       }
 
-      mount(host, ...bookings.map(b =>
+      // Fetch tickets for all bookings in parallel
+      const ticketGroups = await Promise.all(
+        bookings.map(async (b) => {
+          try {
+            const tickets = await bookingApi.getBookingTickets(b.booking_id);
+            return tickets.map(t => ({ ...t, booking: b }));
+          } catch (e) {
+            console.error(`Failed to fetch tickets for booking ${b.booking_id}`, e);
+            return [];
+          }
+        })
+      );
+
+      const allTickets = ticketGroups.flat();
+
+      if (allTickets.length === 0) {
+        mount(host, el("div", { class: "empty-cart", text: "NO TICKETS FOUND." }));
+        return;
+      }
+
+      mount(host, ...allTickets.map(t =>
         el("article", { class: "ticket-card-v2", attrs: { style: "background: #FFFFFF; border: 1px solid var(--color-border);" } }, [
           
           // ── ฝั่งข้อมูล (ซ้าย) ──
           el("div", { class: "ticket-card-v2__info", attrs: { style: "position: relative; background: #def6ff;" } }, [
             
-            // ── วงกลมรอยฉีกสีขาว เพื่อให้เนียนไปกับพื้นหลังหน้าเพจ ──
+            // ── วงกลมรอยฉีกสีขาว ──
             el("div", { 
               attrs: { 
                 style: "position: absolute; top: -14px; right: -14px; width: 28px; height: 28px; background: #FFFFFF; border-radius: 50%; z-index: 10;" 
@@ -62,32 +82,33 @@ export function renderMyTicketsView(): HTMLElement {
 
             // Status Badge
             el("div", { attrs: { style: "display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;" } }, [
-              el("span", { class: "pill pill--ok" }, [
+              el("span", { class: `pill ${t.booking.status === 'paid' ? 'pill--ok' : 'pill--warn'}` }, [
                 el("span", { attrs: { style: "display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-midnight); margin-right: 8px; vertical-align: middle;" } }),
-                document.createTextNode("VALID TICKET")
+                document.createTextNode(t.booking.status.toUpperCase())
               ]),
-              el("span", { class: "label-mono", attrs: { style: "opacity: 0.3;" }, text: `TKT-${b.booking_id}` })
+              el("span", { class: "label-mono", attrs: { style: "opacity: 0.3;" }, text: `TKT-${t.ticket_id}` })
             ]),
 
-            el("h2", { class: "ticket-card-v2__title", text: b.concert_title }),
+            el("h2", { class: "ticket-card-v2__title", text: t.booking.concert_title }),
 
             el("div", { class: "ticket-card-v2__grid" }, [
-              renderDetailItem("DATE & TIME", formatDateTime(b.event_date ?? b.created_at)),
-              renderDetailItem("LOCATION", b.venue ?? "MAIN AUDITORIUM"),
-              renderDetailItem("SEAT", b.seat_label ?? `${b.total_tickets}`),
-              renderDetailItem("ZONE", b.zone ?? b.status.toUpperCase())
+              renderDetailItem("DATE & TIME", formatDateTime(t.booking.event_date ?? t.booking.created_at)),
+              renderDetailItem("LOCATION", t.booking.venue ?? "MAIN AUDITORIUM"),
+              renderDetailItem("SEAT", t.seat_number),
+              renderDetailItem("ZONE", t.zone_name)
             ])
           ]),
 
-          // ── ฝั่ง QR Code (ขวา) ปรับเป็นพื้นหลังสีขาว ──
+          // ── ฝั่ง QR Code (ขวา) ──
           el("div", { 
             class: "ticket-card-v2__qr-area", 
-            attrs: { style: "background: #FFFFFF border-left: 1px dashed var(--color-border);" } 
+            attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" } 
           }, [
             el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
               el("img", {
                 attrs: {
-                  src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=TKT-${b.booking_id}`,
+                  // ใช้ hash จริงจาก backend
+                  src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
                   alt: "Verification QR",
                   style: "width: 100%; height: 100%;"
                 }
