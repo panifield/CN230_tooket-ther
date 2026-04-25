@@ -154,6 +154,7 @@
     #authPanel,
     #customerPanel,
     #organizerPanel,
+    #staffPanel,
     #profilePanel,
     #forgotPasswordPanel {
       display: none;
@@ -602,7 +603,25 @@
       </section>
     </div>
 
-    <!-- 4. PROFILE PANEL -->
+    <!-- 4. STAFF PANEL -->
+    <div id="staffPanel" class="card">
+      <h2>Gate Staff Control</h2>
+      <section>
+        <h3>Ticket Scanner / Validation</h3>
+        <p style="color:#888; font-size:0.9rem;">Scan or enter the ticket QR hash to verify entry.</p>
+        <div style="margin-bottom: 15px;">
+          <input type="file" id="qrFileInput" accept="image/*" style="display:none;" onchange="handleQrUpload(event)">
+          <button onclick="document.getElementById('qrFileInput').click()" class="primary">Upload QR Image</button>
+        </div>
+        <div class="flex-row">
+          <input type="text" id="scannerInput" placeholder="Scan or Enter QR Hash" style="flex:2">
+          <button onclick="scanTicket()" class="success" style="flex:1">Verify Ticket</button>
+        </div>
+        <div id="scanResult" style="margin-top: 20px; padding: 15px; border-radius: 8px; display: none;"></div>
+      </section>
+    </div>
+
+    <!-- 5. PROFILE PANEL -->
     <div id="profilePanel" class="card">
       <h2>My Profile</h2>
       <div class="flex-row">
@@ -708,7 +727,20 @@
     </div>
   </div>
 
+  <!-- QR Modal for Customer -->
+  <div id="myQrModal" class="modal">
+    <div class="modal-content" style="max-width: 400px; max-height: 85vh; overflow-y: auto; text-align:center;">
+      <h3 style="margin-top:0;">Your Tickets</h3>
+      <p style="color:#888; font-size:0.85rem; margin-bottom: 20px;">Show these QR codes to the staff at the gate.</p>
+      <div id="myQrContainer" style="color: black;"></div>
+      <div style="margin-top: 20px; position: sticky; bottom: 0; background: var(--surface); padding-top: 10px;">
+        <button onclick="closeMyQrModal()" class="secondary" style="width:100%;">Close</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
   <script>
     const API_URL = "http://127.0.0.1:8000";
     let token = null;
@@ -751,10 +783,11 @@
 
     // ----------- Auth -----------
     function setupUI(role) {
-      const panels = { authPanel: 0, customerPanel: 0, organizerPanel: 0, profilePanel: 0, forgotPasswordPanel: 0 };
+      const panels = { authPanel: 0, customerPanel: 0, organizerPanel: 0, staffPanel: 0, profilePanel: 0, forgotPasswordPanel: 0 };
       if (!role) panels.authPanel = 1;
       else if (role === 'customer') panels.customerPanel = 1;
       else if (role === 'organizer') panels.organizerPanel = 1;
+      else if (role === 'staff') panels.staffPanel = 1;
       else if (role === 'profile') panels.profilePanel = 1;
       else if (role === 'forgot') panels.forgotPasswordPanel = 1;
 
@@ -1069,7 +1102,10 @@
           if (b.status === 'pending') {
             actions = `<button class="success" style="padding:4px 8px; font-size:11px;" onclick="startPaymentFlow(${b.booking_id}, ${b.total_amount})">Pay Now</button>`;
           } else if (b.status === 'paid') {
-            actions = `<button class="danger" style="padding:4px 8px; font-size:11px;" onclick="openRefundModal(${b.booking_id}, false)">Refund</button>`;
+            actions = `
+               <button class="primary" style="padding:4px 8px; font-size:11px; margin-bottom:5px;" onclick="showMyQr('${b.booking_id}')">Show QR</button><br>
+               <button class="danger" style="padding:4px 8px; font-size:11px;" onclick="openRefundModal(${b.booking_id}, false)">Refund</button>
+            `;
           } else if (b.status === 'zone_closed_action_required') {
             actions = `
                <button class="warning" style="padding:4px 8px; font-size:11px; margin-bottom:5px;" onclick="startRebookFlow(${b.booking_id})">Re-select Seats</button><br>
@@ -1426,6 +1462,130 @@
         log("Concert created successfully with image and zones!");
         fetchConcertsForOrganizer();
       } catch (e) { }
+    }
+
+    // ----------- Staff Logic -----------
+    async function scanTicket() {
+      const val = document.getElementById("scannerInput").value;
+      if(!val) return log("Please enter ticket ID or QR hash", true);
+      
+      const resDiv = document.getElementById("scanResult");
+      try {
+        const res = await api("/staff/verify-ticket", {
+          method: "POST",
+          body: JSON.stringify({ qr_hash: val })
+        });
+        
+        resDiv.style.display = 'block';
+        resDiv.style.backgroundColor = 'rgba(129, 199, 132, 0.2)';
+        resDiv.style.border = '1px solid var(--success)';
+        resDiv.innerHTML = `
+          <h3 style="color:var(--success); margin-top:0;">✅ Ticket Verified</h3>
+          <p><strong>Concert:</strong> ${res.concert_title}</p>
+          <p><strong>Zone:</strong> ${res.zone_name}</p>
+          <p><strong>Seat:</strong> ${res.seat_number}</p>
+          <p><strong>Status:</strong> ${res.message}</p>
+        `;
+        log(`Ticket ${val} verified successfully (ID: ${res.ticket_id}).`);
+        document.getElementById("scannerInput").value = "";
+      } catch (e) {
+        resDiv.style.display = 'block';
+        resDiv.style.backgroundColor = 'rgba(207, 102, 121, 0.2)';
+        resDiv.style.border = '1px solid var(--error)';
+        resDiv.innerHTML = `
+          <h3 style="color:var(--error); margin-top:0;">❌ Verification Failed</h3>
+          <p>${e.message}</p>
+        `;
+        log(`Scan failed: ${e.message}`, true);
+      }
+    }
+
+    // QR Generate
+    async function showMyQr(bookingId) {
+      document.getElementById('myQrModal').style.display = 'block';
+      const container = document.getElementById('myQrContainer');
+      container.innerHTML = "<p style='color:var(--primary)'>Fetching tickets...</p>";
+      
+      try {
+        const tickets = await api(`/booking/${bookingId}/tickets`);
+        container.innerHTML = "";
+        
+        if (tickets.length === 0) {
+          container.innerHTML = "<p style='color:var(--error)'>No tickets found for this booking.</p>";
+          return;
+        }
+
+        tickets.forEach((t, index) => {
+          const ticketDiv = document.createElement('div');
+          ticketDiv.className = "card";
+          ticketDiv.style.background = "#fff";
+          ticketDiv.style.color = "#333";
+          ticketDiv.style.marginBottom = "20px";
+          ticketDiv.style.padding = "15px";
+          ticketDiv.style.borderRadius = "8px";
+          
+          ticketDiv.innerHTML = `
+            <div style="font-weight:bold; margin-bottom:10px; font-size:1.1rem; color: #121212;">
+              Seat: ${t.seat_number} (${t.zone_name})
+            </div>
+            <div id="qrcode-${t.ticket_id}" style="display:inline-block; padding:10px; background:white;"></div>
+            <div style="font-family:monospace; font-size:0.65rem; color:#666; margin-top:10px; word-break:break-all; border: 1px dashed #ccc; padding: 5px;">
+              ${t.qr_hash}
+            </div>
+            ${t.is_used ? '<div style="color:var(--error); font-weight:bold; margin-top:10px;">ALREADY USED</div>' : ''}
+          `;
+          container.appendChild(ticketDiv);
+
+          new QRCode(document.getElementById(`qrcode-${t.ticket_id}`), {
+            text: t.qr_hash,
+            width: 180,
+            height: 180,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.H
+          });
+        });
+      } catch (e) {
+        container.innerHTML = `<p style='color:var(--error)'>Error: ${e.message}</p>`;
+        log(`Failed to fetch tickets: ${e.message}`, true);
+      }
+    }
+
+    function closeMyQrModal() {
+      document.getElementById('myQrModal').style.display = 'none';
+    }
+
+    // QR Decode
+    function handleQrUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const context = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          context.drawImage(img, 0, 0, img.width, img.height);
+          
+          const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert",
+          });
+
+          if (code) {
+            log("QR Code decoded successfully!");
+            document.getElementById("scannerInput").value = code.data;
+            scanTicket();
+          } else {
+            log("Failed to decode QR code. Please ensure the image is clear.", true);
+          }
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
     }
 
     // ----------- Initialization -----------

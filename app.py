@@ -20,6 +20,7 @@ from routes.booking import booking_router
 from routes.organizer import organizer_router
 from routes.payment import payment_router
 from routes.refund import refund_router
+from routes.staff import staff_router
 
 logger = logging.getLogger("tooket-ther")
 
@@ -145,6 +146,7 @@ app.include_router(booking_router)
 app.include_router(organizer_router)
 app.include_router(payment_router)
 app.include_router(refund_router)
+app.include_router(staff_router)
 
 # Serve static images for concerts
 app.mount("/database/image", StaticFiles(directory="database/image"), name="images")
