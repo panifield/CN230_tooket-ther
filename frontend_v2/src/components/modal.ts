@@ -39,11 +39,19 @@ export function openModal(options: ModalOptions): () => void {
           },
         },
         [
-          el("h2", {
-            id: "modal-title",
-            class: "modal__title",
-            text: options.title,
-          }),
+          el("div", { class: "modal__header" }, [
+            el("h2", {
+              id: "modal-title",
+              class: "modal__title",
+              text: options.title,
+            }),
+            el("button", {
+              class: "modal__close",
+              attrs: { type: "button", "aria-label": "Close" },
+              on: { click: close },
+              text: "✕",
+            }),
+          ]),
           options.body,
         ]
       ),

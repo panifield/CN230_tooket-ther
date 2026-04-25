@@ -34,6 +34,9 @@ export async function openPaymentModal(
 
   const close = openModal({
     title: "Pay with PromptPay",
+    onClose: () => {
+      stopped = true;
+    },
     body: el("div", {}, [
       el("p", {
         text: `Amount due: ${formatBaht(amount)}`,
