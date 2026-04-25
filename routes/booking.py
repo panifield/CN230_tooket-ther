@@ -509,6 +509,47 @@ def my_bookings(current_user: CurrentUser):
     ]
 
 
+@booking_router.get("/{booking_id}/tickets")
+def get_booking_tickets(booking_id: int, current_user: CurrentUser):
+    """ดึงข้อมูลตั๋วรายใบใน Booking (รวม qr_hash)"""
+    customer_profile_id = current_user.get("customer_profile_id")
+    if not customer_profile_id:
+        raise HTTPException(status_code=400, detail="ไม่พบ customer profile")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # เช็คว่าเป็นเจ้าของ booking จริงไหม
+            cur.execute(
+                "SELECT id FROM booking WHERE id = %s AND customer_id = %s",
+                (booking_id, customer_profile_id)
+            )
+            if not cur.fetchone():
+                raise HTTPException(status_code=403, detail="ไม่มีสิทธิ์เข้าถึงตั๋วใน Booking นี้")
+
+            cur.execute(
+                """
+                SELECT t.id, t.qr_hash, s.seat_number, z.zone_name, t.is_used
+                FROM ticket t
+                JOIN seat s ON t.seat_id = s.id
+                JOIN zone z ON s.zone_id = z.id
+                WHERE t.booking_id = %s
+                """,
+                (booking_id,)
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "ticket_id": r[0],
+            "qr_hash": r[1],
+            "seat_number": r[2],
+            "zone_name": r[3],
+            "is_used": r[4]
+        }
+        for r in rows
+    ]
+
+
 @booking_router.post("/{booking_id}/confirm")
 def confirm_booking(booking_id: int, current_user: CurrentUser):
     """
