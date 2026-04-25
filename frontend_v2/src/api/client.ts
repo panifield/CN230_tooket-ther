@@ -42,7 +42,9 @@ export async function request<T>(
   const headers: Record<string, string> = {
     Accept: "application/json",
   };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (body !== undefined && !(body instanceof FormData)) {
+    headers["Content-Type"] = "application/json";
+  }
 
   if (auth) {
     const token = authStore.getToken();
@@ -50,7 +52,9 @@ export async function request<T>(
   }
 
   const init: RequestInit = { method, headers };
-  if (body !== undefined) init.body = JSON.stringify(body);
+  if (body !== undefined) {
+    init.body = body instanceof FormData ? body : JSON.stringify(body);
+  }
 
   let response: Response;
   try {

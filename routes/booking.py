@@ -481,7 +481,7 @@ def my_bookings(current_user: CurrentUser):
         with conn.cursor() as cur:
             cur.execute(
                 """
-                SELECT booking_id, concert_title, concert_datetime,
+                SELECT booking_id, concert_title, concert_datetime, concert_venue, concert_address,
                        total_tickets, total_amount, status, created_at
                 FROM vw_booking_summary
                 WHERE user_name = (
@@ -500,10 +500,12 @@ def my_bookings(current_user: CurrentUser):
             "booking_id": r[0],
             "concert_title": r[1],
             "concert_datetime": r[2].isoformat() if r[2] else None,
-            "total_tickets": r[3],
-            "total_amount": float(r[4]) if r[4] else 0,
-            "status": r[5],
-            "created_at": r[6].isoformat() if r[6] else None,
+            "venue": r[3],
+            "address": r[4],
+            "total_tickets": r[5],
+            "total_amount": float(r[6]) if r[6] else 0,
+            "status": r[7],
+            "created_at": r[8].isoformat() if r[8] else None,
         }
         for r in rows
     ]

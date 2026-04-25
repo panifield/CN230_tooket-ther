@@ -59,8 +59,8 @@ export function renderCustomerDashboard(): HTMLElement {
             // 1. Image Header
             el("img", { 
               class: "ticket-card__img",
-              // ถ้า API ไม่มีรูป ส่งรูป Default ของ Coastal Theme ไปแทน
-              attrs: { src: (c as any).poster_url || `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80` } 
+              // ใช้รูปจาก DB ถ้ามี โดยเติม / ข้างหน้าเพื่อให้ชี้ไปที่ Proxy (localhost:5173/database/image/...)
+              attrs: { src: c.image_url ? `/${c.image_url}` : `https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&w=500&q=80` } 
             }),
 
             // 2. Content Body

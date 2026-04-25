@@ -299,6 +299,8 @@ SELECT
     u.name AS user_name,
     c.title AS concert_title,
     c.concert_datetime,
+    c.venue AS concert_venue,
+    c.address AS concert_address,
     b.total_tickets,
     b.total_amount,
     b.status,

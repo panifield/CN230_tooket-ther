@@ -27,7 +27,7 @@ export const organizerApi = {
   },
 
   createConcert(
-    payload: CreateConcertPayload
+    payload: CreateConcertPayload | FormData
   ): Promise<{ message: string; concert_id: number }> {
     return request("/organizer/concerts", { method: "POST", body: payload });
   },

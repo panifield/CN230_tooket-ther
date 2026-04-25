@@ -60,6 +60,7 @@ export interface Concert {
   address: string;
   concert_datetime: string | null;
   status: ConcertStatus;
+  image_url: string | null;
 }
 
 export interface Zone {

@@ -92,7 +92,7 @@ export function renderMyTicketsView(): HTMLElement {
             el("h2", { class: "ticket-card-v2__title", text: t.booking.concert_title }),
 
             el("div", { class: "ticket-card-v2__grid" }, [
-              renderDetailItem("DATE & TIME", formatDateTime(t.booking.event_date ?? t.booking.created_at)),
+              renderDetailItem("DATE & TIME", formatDateTime(t.booking.concert_datetime ?? t.booking.created_at)),
               renderDetailItem("LOCATION", t.booking.venue ?? "MAIN AUDITORIUM"),
               renderDetailItem("SEAT", t.seat_number),
               renderDetailItem("ZONE", t.zone_name)

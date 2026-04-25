@@ -21,6 +21,7 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path: string) => path.replace(/^\/refund/, "/api/v1/refunds"),
       },
+      "/database/image": { target: "http://127.0.0.1:5000", changeOrigin: true },
       "/health": { target: "http://127.0.0.1:5000", changeOrigin: true },
     },
   },
