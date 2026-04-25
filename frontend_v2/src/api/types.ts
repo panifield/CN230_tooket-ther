@@ -112,6 +112,7 @@ export interface BookingSummary {
   venue: string;
   seat_label: string;
   booking_id: number;
+  concert_id: number;
   concert_title: string;
   concert_datetime: string | null;
   total_tickets: number;
@@ -134,6 +135,18 @@ export interface ConfirmBookingResponse {
   status: "paid";
   payment_id: number;
   transaction_ref: string;
+}
+
+export interface RebookResponse {
+  message: string;
+  booking_id: number;
+  status: "pending";
+  new_seat_ids: number[];
+  new_ticket_ids: number[];
+  original_total: string;
+  new_total: string;
+  difference_amount: string;
+  expired_at: string;
 }
 
 export interface GenerateQrResponse {
