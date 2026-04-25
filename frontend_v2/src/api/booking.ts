@@ -7,6 +7,7 @@ import type {
   JoinQueueResponse,
   QueueStatus,
   Seat,
+  Ticket,
   Zone,
 } from "./types";
 
