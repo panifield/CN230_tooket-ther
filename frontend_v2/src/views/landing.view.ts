@@ -1,7 +1,7 @@
 import { authStore } from "../state/auth";
 import { el } from "../utils/dom";
 
-export function renderLanding(): HTMLElement {
+export function renderLandingView(): HTMLElement {
   const isAuthed = authStore.isAuthenticated();
   return el("section", { class: "section" }, [
     el("div", { class: "container" }, [

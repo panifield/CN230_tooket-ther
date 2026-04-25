@@ -10,9 +10,11 @@ export function renderHeader(): HTMLElement {
   const navLinks: HTMLElement[] = [];
   if (isAuthed && user) {
     if (user.role === "customer") {
-      navLinks.push(navLink("Dashboard", "/dashboard"));
+      navLinks.push(navLink("Events", "/dashboard"));
+      navLinks.push(navLink("My Tickets", "/my-tickets"));
     } else if (user.role === "organizer") {
-      navLinks.push(navLink("Control Room", "/organizer"));
+      navLinks.push(navLink("Dashboard", "/organizer"));
+      navLinks.push(navLink("Create Concert", "/create-concert"));
     }
     navLinks.push(navLink("Profile", "/profile"));
   }
@@ -68,7 +70,8 @@ export function renderHeader(): HTMLElement {
 
 function navLink(label: string, path: string): HTMLAnchorElement {
   const current = window.location.hash.replace(/^#/, "") || "/";
-  const isActive = current === path;
+  // ทำให้เมนูยังคง Active อยู่แม้จะมี Query params (เช่น /zones?concertId=1)
+  const isActive = current === path || current.startsWith(path + "?");
   return el(
     "a",
     {

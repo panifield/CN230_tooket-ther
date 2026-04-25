@@ -8,79 +8,192 @@ import { router } from "./router";
 import { authStore } from "./state/auth";
 import { events } from "./state/events";
 import { clear, el, qs } from "./utils/dom";
+
+// Views Import
 import { renderAuthView } from "./views/auth.view";
 import { renderCustomerDashboard } from "./views/customer.view";
 import { renderForgotView } from "./views/forgot.view";
-import { renderLanding } from "./views/landing.view";
-import { renderOrganizerView } from "./views/organizer.view";
+import { renderLandingView } from "./views/landing.view";
 import { renderProfileView } from "./views/profile.view";
+import { renderWaitingView } from "./views/Waiting.view";
+import { renderMyTicketsView } from "./views/MyTicketsView";
+import { renderZonesView } from "./views/Zones.view";
+import { renderSeatsView } from "./views/Seats.view";
+import { renderPaymentView } from "./views/Payment.view";
+import { renderControlRoomView } from "./views/ControlRoom.view";
+import { renderCreateConcertView } from "./views/CreateConcert.view";
 
 const root = qs<HTMLDivElement>("#app");
 
 function render(view: HTMLElement): void {
+  if (!root) return;
   clear(root);
+  
   root.append(
-    el("div", { class: "app-shell" }, [
+    el("div", { 
+      class: "app-shell", 
+      attrs: { style: "display: flex; flex-direction: column; min-height: 100vh; background: #FFFFFF;" } 
+    }, [
       renderHeader(),
-      el("main", { class: "app-main", attrs: { role: "main" } }, [view]),
-      el(
-        "section",
-        {
-          attrs: { style: "padding: 0 0 32px;" },
-        },
-        [el("div", { class: "container" }, [renderLogPanel()])]
-      ),
-      el("footer", { class: "app-footer" }, [
-        el("div", { class: "container" }, [
-          el("p", { class: "label-mono", text: "Tooket-ther / Coastal Edition" }),
-          el("p", {
-            attrs: { style: "margin-top:8px;" },
-            text: "Built for CN230. © 2026 Tooket-ther.",
-          }),
-        ]),
+      
+      // Main Content Area
+      el("main", { 
+        class: "app-main", 
+        attrs: { role: "main", style: "flex-grow: 1;" } 
+      }, [view]),
+      
+      // Log Panel Section (เอาพื้นหลังสี Cream ออกแล้ว)
+      el("section", { 
+        attrs: { style: "padding: var(--space-6) 0; border-top: 1px solid var(--color-border);" } 
+      }, [
+        el("div", { attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 var(--space-5);" } }, [renderLogPanel()]),
       ]),
+
+      // Footer (Coastal Edition - คืนค่า Font แบบเดิม)
+      // ในไฟล์ main.ts ตรงส่วน Footer
+el("footer", { 
+  attrs: { style: "background: var(--color-midnight); color: var(--color-white); padding: 64px 0; border-top: 1px solid rgba(255,255,255,0.1);" } 
+}, [
+  el("div", { 
+    attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center;" } 
+  }, [
+    el("div", {}, [
+      el("p", { 
+        class: "label-mono", 
+        attrs: { style: "color: var(--color-primary-blue); margin-bottom: 8px;" }, 
+        text: "TOOKET-THER / COASTAL EDITION" 
+      }),
+      el("p", { 
+        attrs: { style: "font-size: 12px; opacity: 0.4; font-family: var(--font-display);" }, 
+        text: "Built for CN230. © 2026. Infrastructure for Live Intelligence." 
+      }),
+    ]),
+    el("div", { class: "label-mono", attrs: { style: "opacity: 0.2;" } }, [
+      el("span", { text: "LAT: 13.7563 / LON: 100.5018" })
+    ])
+  ]),
+])
     ])
   );
 }
 
-router.register({ path: "/", handler: () => render(renderLanding()) });
-router.register({ path: "/login", handler: () => render(renderAuthView()) });
-router.register({ path: "/forgot", handler: () => render(renderForgotView()) });
-router.register({
-  path: "/dashboard",
-  handler: () => {
-    if (!authStore.isAuthenticated()) {
-      router.navigate("/login");
-      return;
-    }
-    render(renderCustomerDashboard());
-  },
-});
-router.register({
-  path: "/organizer",
-  handler: () => {
-    if (
-      !authStore.isAuthenticated() ||
-      authStore.getRole() !== "organizer"
-    ) {
-      router.navigate("/login");
-      return;
-    }
-    render(renderOrganizerView());
-  },
-});
-router.register({
-  path: "/profile",
-  handler: () => {
-    if (!authStore.isAuthenticated()) {
-      router.navigate("/login");
-      return;
-    }
-    render(renderProfileView());
-  },
-});
-router.setFallback(() => render(renderLanding()));
+// Auth Guard & Global Events
+function requireAuth(role?: "customer" | "organizer" | "staff"): boolean {
+  if (!authStore.isAuthenticated()) {
+    router.navigate("/login");
+    return false;
+  }
+  if (role && authStore.getRole() !== role) {
+    router.navigate("/login");
+    return false;
+  }
+  return true;
+}
 
 events.on("auth:logout", () => router.navigate("/login"));
+events.on("auth:login", () => {
+  const role = authStore.getRole();
+  if (role === "organizer") {
+    router.navigate("/organizer");
+  } else {
+    router.navigate("/dashboard");
+  }
+});
+
+// Routes Registration
+router.register({ path: "/", handler: () => render(renderLandingView()) });
+router.register({ path: "/login", handler: () => render(renderAuthView()) });
+router.register({ path: "/forgot", handler: () => render(renderForgotView()) });
+
+router.register({ 
+  path: "/dashboard", 
+  handler: () => { 
+    if (requireAuth("customer")) render(renderCustomerDashboard()); 
+  } 
+});
+
+router.register({ 
+  path: "/my-tickets", 
+  handler: () => { 
+    if (requireAuth("customer")) render(renderMyTicketsView()); 
+  } 
+});
+
+router.register({ 
+  path: "/waiting", 
+  handler: () => { 
+    if (!requireAuth("customer")) return;
+    const concertId = router.paramInt("concertId");
+    if (!concertId) { router.navigate("/dashboard"); return; }
+    render(renderWaitingView({ concertId }));
+  }
+});
+
+router.register({ 
+  path: "/zones", 
+  handler: () => { 
+    if (!requireAuth("customer")) return;
+    const concertId = router.paramInt("concertId");
+    if (!concertId) { router.navigate("/dashboard"); return; }
+    render(renderZonesView({ concertId }));
+  }
+});
+
+router.register({ 
+  path: "/seats", 
+  handler: () => { 
+    if (!requireAuth("customer")) return;
+    const concertId = router.paramInt("concertId");
+    const zoneId = router.paramInt("zoneId");
+    if (!concertId || !zoneId) { router.navigate("/dashboard"); return; }
+    render(renderSeatsView({ concertId, zoneId }));
+  }
+});
+
+router.register({ 
+  path: "/payment", 
+  handler: () => { 
+    if (!requireAuth("customer")) return;
+    const bookingId = router.paramInt("bookingId");
+    if (!bookingId) { router.navigate("/my-tickets"); return; }
+    render(renderPaymentView({ bookingId }));
+  }
+});
+
+// Alias for old booking route
+router.register({
+  path: "/booking",
+  handler: () => {
+    if (!requireAuth("customer")) return;
+    const bookingId = router.paramInt("bookingId");
+    if (!bookingId) { router.navigate("/my-tickets"); return; }
+    router.navigate(`/payment?bookingId=${bookingId}`);
+  },
+});
+
+router.register({ 
+  path: "/profile", 
+  handler: () => { 
+    if (requireAuth()) render(renderProfileView()); 
+  } 
+});
+
+router.register({ 
+  path: "/organizer", 
+  handler: () => { 
+    if (requireAuth("organizer")) render(renderControlRoomView()); 
+  } 
+});
+
+router.register({ 
+  path: "/create-concert", 
+  handler: () => { 
+    if (requireAuth("organizer")) render(renderCreateConcertView()); 
+  } 
+});
+
+router.setFallback(() => render(renderLandingView()));
 
 router.start();
+
+export { router };

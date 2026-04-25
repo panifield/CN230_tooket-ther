@@ -19,7 +19,7 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
     el("div", { class: "booking-layout" }, [
       
       // ── Left: Seat Map ──
-      el("section", { attrs: { style: "min-width: 0;" } }, [ // min-width: 0 ป้องกัน Grid ทะลุ Layout
+      el("section", { attrs: { style: "min-width: 0;" } }, [
         el("div", { class: "selection-header", attrs: { style: "align-items: flex-end; margin-bottom: 40px;" } }, [
           el("div", {}, [
             el("button", { 
@@ -82,36 +82,39 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
       return;
     }
 
-    // จัดกลุ่มตามแถว
     const rowLabels = Array.from(new Set(state.seats.map(s => s.seat_row || s.row || "A"))).sort();
 
-    // สร้างกล่องกั้น Scroll แนวนอน (เพื่อไม่ให้เบราว์เซอร์บีบที่นั่ง)
     const scrollWrapper = el("div", { attrs: { style: "width: 100%; overflow-x: auto; padding-bottom: 24px;" } });
     const mapContainer = el("div", { attrs: { style: "display: flex; flex-direction: column; gap: 12px; min-width: max-content; margin: 0 auto; padding: 0 32px;" } });
+
+    // 💡 ดึงค่า Cols (จำนวนที่นั่งสูงสุดต่อแถว) จาก Database มาใช้เป็นตัวจำกัด Grid
+    const maxCols = state.zoneInfo.cols || 10; 
 
     rowLabels.forEach(rowLabel => {
       const rowSeats = state.seats.filter(s => (s.seat_row || s.row || "A") === rowLabel);
       
-      // 🛠️ FIX 1: ดึงเฉพาะ "ตัวเลข" ออกมาแปลงเป็น Number เพื่อให้เรียง 1, 2, 3 ได้ถูกต้อง (ไม่เอา 1, 10, 11)
       rowSeats.sort((a, b) => {
         const numA = parseInt(String(a.seat_label || a.seat_number || a.column || "").match(/\d+/)?.[0] || "0", 10);
         const numB = parseInt(String(b.seat_label || b.seat_number || b.column || "").match(/\d+/)?.[0] || "0", 10);
         return numA - numB;
       });
 
-      const rowEl = el("div", { attrs: { style: "display: flex; align-items: center; gap: 12px; flex-wrap: nowrap;" } }, [
-        el("span", { class: "label-mono", attrs: { style: "width: 32px; text-align: right; color: var(--color-midnight); opacity: 0.4; font-weight: bold; flex-shrink: 0;" }, text: String(rowLabel) })
+      const rowEl = el("div", { attrs: { style: "display: flex; align-items: flex-start; gap: 12px; flex-wrap: nowrap;" } }, [
+        el("span", { class: "label-mono", attrs: { style: "width: 32px; text-align: right; color: var(--color-midnight); opacity: 0.4; font-weight: bold; flex-shrink: 0; line-height: 44px;" }, text: String(rowLabel) })
       ]);
+
+      // 🛠️ FIX: ใช้ CSS Grid ช่วยบังคับจำนวนที่นั่งต่อแถวให้ไม่เกิน cols จาก Database
+      const seatsGrid = el("div", { 
+        attrs: { style: `display: grid; grid-template-columns: repeat(${maxCols}, 44px); gap: 12px; justify-content: start;` } 
+      });
 
       rowSeats.forEach(seat => {
         const isSold = seat.status ? seat.status !== 'available' : !seat.is_available;
         const isSelected = state.selectedSeats.has(seat.seat_id);
         
-        // 🛠️ FIX 2: ลบตัวอักษรภาษาอังกฤษที่ติดมา (เช่น A13) ให้เหลือแค่ตัวเลข (13) เพื่อไม่ให้ล้นกล่อง
         const rawSeatNum = String(seat.seat_label || seat.seat_number || seat.column || "");
         const displayNum = rawSeatNum.replace(/^[A-Za-z_-]+/, '').trim() || rawSeatNum;
 
-        // 🛠️ FIX 3: บังคับ min-width, min-height และ flex-shrink: 0 เพื่อห้ามเบราว์เซอร์บีบกล่องเด็ดขาด
         let style = "width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--color-white); border: 1px solid var(--color-border); color: var(--color-midnight); border-radius: 4px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; cursor: pointer; padding: 0; box-sizing: border-box; transition: all 0.2s ease;"; 
         
         if (isSold) {
@@ -130,7 +133,6 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
               else state.selectedSeats.add(seat.seat_id);
               updateUI();
             },
-            // เพิ่ม Hover Effect แบบ Inline
             mouseenter: (e) => {
                if (!isSold && !isSelected) {
                   (e.target as HTMLElement).style.borderColor = "var(--color-primary-blue)";
@@ -148,15 +150,16 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
           }
         });
 
-        // จุดตรงกลางสำหรับที่นั่งที่ขายไปแล้ว
         if (isSold) {
           seatBtn.append(el("div", { attrs: { style: "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 4px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 50%;" } }));
         }
 
-        rowEl.append(seatBtn);
+        seatsGrid.append(seatBtn);
       });
 
-      rowEl.append(el("span", { class: "label-mono", attrs: { style: "width: 32px; text-align: left; color: var(--color-midnight); opacity: 0.4; font-weight: bold; flex-shrink: 0;" }, text: String(rowLabel) }));
+      rowEl.append(seatsGrid);
+      rowEl.append(el("span", { class: "label-mono", attrs: { style: "width: 32px; text-align: left; color: var(--color-midnight); opacity: 0.4; font-weight: bold; flex-shrink: 0; line-height: 44px;" }, text: String(rowLabel) }));
+      
       mapContainer.append(rowEl);
     });
 
@@ -179,7 +182,6 @@ export function renderSeatsView(params: { concertId: number, zoneId: number }): 
         count > 0 
           ? el("div", { attrs: { style: "display: flex; flex-direction: column; gap: 16px;" } }, 
               selectedSeatObjects.map(s => {
-                // ตัดตัวอักษรออกในหน้า Summary ด้วย
                 const rawSeatNum = String(s.seat_label || s.seat_number || s.column || "");
                 const displayNum = rawSeatNum.replace(/^[A-Za-z_-]+/, '').trim() || rawSeatNum;
                 
