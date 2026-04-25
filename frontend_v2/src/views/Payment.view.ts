@@ -1,58 +1,183 @@
-// src/views/Payment.view.ts
 import { el, mount, clear } from "../utils/dom";
-import { router } from "../router-instance"; // ใช้คนกลางเพื่อกัน Circular Redline
+import { router } from "../router"; 
 import { paymentApi } from "../api/payment";
 import type { GenerateQrResponse } from "../api/payment";
+import { formatBaht } from "../utils/format";
+import { events } from "../state/events";
 
 export function renderPaymentView(props: { bookingId: number }): HTMLElement {
   const { bookingId } = props;
-  const container = el("div", { class: "bg-white min-h-screen pt-32 pb-20" });
+  const container = el("div", { class: "coastal-page" });
+
+  let timerInterval: ReturnType<typeof setInterval>;
+
+  // CSS Animation สำหรับจุดกระพริบ (Pulse) ของ Timer
+  if (!document.getElementById("pulse-keyframes")) {
+    const style = document.createElement("style");
+    style.id = "pulse-keyframes";
+    style.textContent = `@keyframes coastal-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }`;
+    document.head.appendChild(style);
+  }
 
   const init = async () => {
     try {
+      mount(container, el("div", { class: "booking-layout", attrs: { style: "display: flex; justify-content: center; padding-top: 100px;" } }, [
+        el("div", { class: "empty-cart" }, [
+          el("p", { class: "label-mono", text: "GENERATING SECURE PAYMENT GATEWAY..." })
+        ])
+      ]));
+
+      // ยิงไปที่ Backend เพื่อขอ QR Payload (ค่า 7000 คือยอดเงินจำลองในกรณีที่ API ต้องการ)
       const data: GenerateQrResponse = await paymentApi.generateQr(bookingId, 7000);
       renderUI(data);
     } catch (err) {
-      container.textContent = "PAYMENT INITIALIZATION FAILED.";
+      clear(container);
+      mount(container, el("div", { class: "booking-layout", attrs: { style: "display: flex; justify-content: center; padding-top: 100px;" } }, [
+        el("div", { class: "empty-cart" }, [
+          el("p", { class: "banner banner--err", text: "PAYMENT INITIALIZATION FAILED." }),
+          el("button", { 
+            class: "btn btn--ghost", 
+            attrs: { style: "margin-top: 24px;" },
+            on: { click: () => router.navigate("/dashboard") }, 
+            text: "← RETURN TO EVENTS" 
+          })
+        ])
+      ]));
     }
   };
 
   const renderUI = (data: GenerateQrResponse) => {
     clear(container);
-    mount(container, el("div", { class: "max-w-md mx-auto px-6 text-center" }, [
-      el("span", { class: "mono-label text-brand-blue mb-4 block", text: "ASSET / PAYMENT" }),
-      el("h1", { 
-        class: "text-[40px] font-medium tracking-[-0.8px] mb-8", 
-        text: "Finalize Transaction" 
-      }),
+
+    const timerHost = el("span", { attrs: { style: "font-variant-numeric: tabular-nums; font-size: 14px;" }, text: "10:00" });
+
+    // ── ระบบนับเวลาถอยหลัง (Countdown Timer) ──
+    // อ่านเวลาหมดอายุจาก Backend หากข้อมูลเสีย ให้บังคับนับ 10 นาที (600,000 ms) จากเวลาปัจจุบัน
+    let expiredAtTime = new Date(data.expired_at).getTime();
+    if (isNaN(expiredAtTime)) {
+        expiredAtTime = Date.now() + 10 * 60 * 1000; 
+    }
+    
+    timerInterval = setInterval(() => {
+      const now = Date.now();
+      const diff = Math.floor((expiredAtTime - now) / 1000);
+
+      if (diff <= 0) {
+        clearInterval(timerInterval);
+        timerHost.textContent = "EXPIRED";
+        timerHost.style.color = "var(--color-danger)";
+        events.emit("log", { level: "warn", message: "Payment session expired." });
+      } else {
+        const m = Math.floor(diff / 60).toString().padStart(2, "0");
+        const s = (diff % 60).toString().padStart(2, "0");
+        timerHost.textContent = `${m}:${s}`;
+      }
+    }, 1000);
+
+    // ล้าง Timer ทิ้งหากผู้ใช้ออกจากหน้านี้ไปที่อื่น
+    const originalNavigate = router.navigate;
+    router.navigate = (path: string) => {
+      clearInterval(timerInterval);
+      originalNavigate(path);
+    };
+
+    const ui = el("div", { class: "booking-layout" }, [
       
-      // QR Section
-      el("div", { class: "card-coastal p-10 bg-white mb-8 border border-black/5" }, [
-        el("div", { class: "w-56 h-56 mx-auto mb-6 bg-white p-4 border border-black/5 rounded-sharp" }, [
-          el("img", { 
-            attrs: { 
-              // ใช้ Google Charts เพื่อสร้าง QR จาก qr_payload ที่เธอส่งมา
-              src: `https://chart.googleapis.com/chart?cht=qr&chs=300x300&chl=${encodeURIComponent(data.qr_payload)}`,
-              style: "width:100%; height:100%; object-fit:contain;"
-            } 
-          })
+      // ── Left: Payment Interface (QR Code) ──
+      el("section", { attrs: { style: "min-width: 0;" } }, [
+        
+        el("div", { class: "selection-header", attrs: { style: "align-items: flex-end; margin-bottom: 40px;" } }, [
+          el("div", {}, [
+            el("button", { 
+              class: "btn btn--ghost btn--sm", 
+              attrs: { style: "margin-bottom: 16px;" },
+              on: { click: () => router.navigate("/my-tickets") },
+              text: "← CANCEL & GO BACK" 
+            }),
+            el("span", { class: "label-mono", text: "STEP 04 / ASSET PAYMENT" }),
+            el("h1", { class: "concert-title", attrs: { style: "margin-top: 8px;" }, text: "Secure Checkout" }),
+          ]),
+          
+          // กล่อง Timer มุมขวา
+          el("div", { attrs: { style: "display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: rgba(170, 214, 250, 0.15); border: 1px solid var(--color-primary-blue); border-radius: var(--radius-control);" } }, [
+            el("div", { attrs: { style: "width: 8px; height: 8px; background: var(--color-primary-blue); border-radius: 50%; box-shadow: 0 0 8px var(--color-primary-blue); animation: coastal-pulse 2s infinite;" } }),
+            el("span", { class: "label-mono", attrs: { style: "color: var(--color-midnight);" } }, [
+              "TIME REMAINING: ",
+              timerHost
+            ])
+          ])
         ]),
-        el("div", { class: "space-y-1 mb-6" }, [
-          el("span", { class: "mono-label text-[9px] text-midnight/40", text: "TOTAL AMOUNT" }),
-          el("div", { class: "text-3xl font-medium tracking-tighter", text: `฿${data.amount}` })
+
+        // กล่องแสดง QR Code
+        el("div", { class: "card card--cream", attrs: { style: "text-align: center; padding: 48px 24px; border: 2px solid var(--color-primary-blue);" } }, [
+          el("span", { class: "label-mono", attrs: { style: "color: var(--color-primary-blue); margin-bottom: 32px; display: block;" }, text: "PAYMENT METHOD: PROMPTPAY QR CODE" }),
+          
+          el("div", { class: "qr-box", attrs: { style: "margin: 0 auto 32px auto; width: 280px; height: 280px; padding: 16px; background: var(--color-white); border-radius: 8px; box-shadow: var(--shadow-card);" } }, [
+            el("img", { 
+              attrs: { 
+                // ใช้ api.qrserver แทน Google Charts เพื่อความเสถียร
+                src: `https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${encodeURIComponent(data.qr_payload)}`,
+                alt: "PromptPay QR Code",
+                style: "width: 100%; height: 100%; object-fit: contain; mix-blend-mode: multiply;"
+              } 
+            })
+          ]),
+
+          el("h3", { attrs: { style: "font-size: 24px; font-weight: 500; margin-bottom: 8px; color: var(--color-midnight);" }, text: "Scan to Pay" }),
+          el("p", { attrs: { style: "color: var(--color-text-muted); font-size: 14px; margin-bottom: 24px;" }, text: "Open your banking app or e-wallet to scan this QR code." }),
+          
+          el("div", { attrs: { style: "display: inline-block; padding: 12px 24px; background: rgba(170, 214, 250, 0.2); border-radius: var(--radius-control);" } }, [
+            el("span", { class: "label-mono", attrs: { style: "font-size: 24px; color: var(--color-midnight); font-weight: 500;" }, text: formatBaht(data.amount) })
+          ])
         ]),
-        el("p", { 
-          class: "mono-label text-[9px] text-red-400 animate-pulse", 
-          text: `EXPIRES AT: ${new Date(data.expired_at).toLocaleTimeString()}` 
-        })
+
+        // ปุ่ม ยืนยัน
+        el("div", { attrs: { style: "margin-top: 32px;" } }, [
+          el("button", {
+            class: "btn btn--primary btn--block",
+            attrs: { style: "padding: 16px; font-size: 16px;" },
+            on: { click: () => {
+              clearInterval(timerInterval);
+              router.navigate("/my-tickets");
+            }},
+            text: "I HAVE PAID • VERIFY TRANSACTION"
+          }),
+          el("p", { class: "label-mono", attrs: { style: "text-align: center; margin-top: 16px; opacity: 0.4;" }, text: "TRANSACTION WILL BE AUTOMATICALLY VERIFIED ON THE SECURE GATEWAY" })
+        ])
       ]),
 
-      el("button", {
-        class: "w-full py-4 bg-midnight text-white rounded-sharp mono-label text-xs tracking-wider",
-        on: { click: () => router.navigate("/my-tickets") },
-        text: "WAITING FOR PAYMENT..."
-      })
-    ]));
+      // ── Right: Order Summary Sidebar ──
+      el("aside", { class: "summary-column" }, [
+        el("div", { class: "order-summary-card" }, [
+          el("span", { class: "summary-label", text: "ORDER DETAILS" }),
+          
+          el("div", { class: "summary-items" }, [
+            el("div", { class: "summary-item", attrs: { style: "margin-bottom: 16px; border-bottom: 1px solid var(--color-border); padding-bottom: 16px;" } }, [
+              el("div", {}, [
+                el("div", { attrs: { style: "font-weight: 500; font-size: 15px; color: var(--color-midnight);" }, text: "Ticket Reservation" }),
+                el("div", { class: "label-mono", attrs: { style: "font-size: 10px; margin-top: 4px;" }, text: `REF: BKG-${bookingId}` })
+              ]),
+              el("div", { attrs: { style: "font-weight: 500; color: var(--color-midnight);" }, text: formatBaht(data.amount) })
+            ])
+          ]),
+
+          el("div", { class: "summary-row total", attrs: { style: "margin-top: 0;" } }, [
+            el("span", { text: "Total Amount" }),
+            el("span", { class: "summary-total-price", text: formatBaht(data.amount) })
+          ]),
+
+          // Badge ความปลอดภัย
+          el("div", { attrs: { style: "margin-top: 40px; padding: 16px; background: rgba(1, 1, 32, 0.04); border-radius: var(--radius-control); display: flex; gap: 12px; align-items: flex-start;" } }, [
+            el("div", { attrs: { style: "width: 24px; height: 24px; background: var(--color-primary-blue); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--color-midnight); font-weight: bold; flex-shrink: 0;" } }, [
+              document.createTextNode("✓")
+            ]),
+            el("p", { class: "label-mono", attrs: { style: "font-size: 10px; line-height: 1.5; color: var(--color-midnight); text-transform: none;" }, text: "Your transaction is protected by 256-bit SSL encryption. We do not store your full payment details on our servers." })
+          ])
+        ])
+      ])
+    ]);
+
+    mount(container, ui);
   };
 
   void init();

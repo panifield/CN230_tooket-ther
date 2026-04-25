@@ -1047,7 +1047,7 @@
 .coastal-card {
   position: relative;
   z-index: 1;
-  background: #fff9df ; /* ใช้ Cream Base ให้การ์ดดูมีมิติและอบอุ่น */
+  background: #ffffff ; /* ใช้ Cream Base ให้การ์ดดูมีมิติและอบอุ่น */
   border: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: rgba(1, 1, 32, 0.06) 0px 4px 12px;
   border-radius: 8px;

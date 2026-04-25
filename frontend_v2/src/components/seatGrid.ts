@@ -1,90 +1,263 @@
-import type { Seat } from "../api/types";
-import { el } from "../utils/dom";
+import { bookingApi } from "../api/booking";
+import { router } from "../router";
+import { el, mount, clear } from "../utils/dom";
+import { formatBaht } from "../utils/format";
+import { events } from "../state/events";
 
-export interface SeatGridOptions {
-  seats: readonly Seat[];
-  selected: ReadonlySet<number>;
-  onToggle: (seatId: number) => void;
-}
+export function renderSeatsView(params: { concertId: number, zoneId: number }): HTMLElement {
+  const state = {
+    seats: [] as any[],
+    selectedSeats: new Set<number>(),
+    zoneInfo: null as any,
+    isLoading: true
+  };
 
-export function renderSeatGrid(options: SeatGridOptions): HTMLElement {
-  const { seats, selected, onToggle } = options;
+  const gridHost = el("div", { attrs: { style: "width: 100%; position: relative;" } });
+  const summaryHost = el("div", { class: "order-summary-card" });
 
-  // จัดกลุ่มที่นั่งตามแถว (Row)
-  const byRow = new Map<string, Seat[]>();
-  for (const seat of seats) {
-    const list = byRow.get(seat.seat_row) ?? [];
-    list.push(seat);
-    byRow.set(seat.seat_row, list);
-  }
-  const sortedRows = [...byRow.keys()].sort();
-
-  const rows = sortedRows.map((rowKey) => {
-    // 💡 ตัดให้เหลือแค่ 5 ที่นั่งต่อแถว (ด้วยคำสั่ง .slice(0, 5))
-    const rowSeats = (byRow.get(rowKey) ?? [])
-      .slice()
-      .sort((a, b) => a.seat_number - b.seat_number)
-      .slice(0, 5); 
-
-    return el("div", { class: "coastal-seat-row" }, [
-      el("span", { class: "coastal-row-label", text: rowKey }),
+  const container = el("div", { class: "coastal-page" }, [
+    el("div", { class: "booking-layout" }, [
       
-      // Render ที่นั่งทั้ง 5 ตัว
-      ...rowSeats.map((seat) => {
-        const isSelected = selected.has(seat.seat_id);
-        const isAvailable = seat.status === "available";
+      // ── Left: Seat Map ──
+      el("section", { attrs: { style: "min-width: 0;" } }, [ // min-width: 0 ป้องกัน Grid ทะลุ Layout
+        el("div", { class: "selection-header", attrs: { style: "align-items: flex-end; margin-bottom: 40px;" } }, [
+          el("div", {}, [
+            el("button", { 
+              class: "btn btn--ghost btn--sm", 
+              attrs: { style: "margin-bottom: 16px;" },
+              on: { click: () => router.navigate(`/zones?concertId=${params.concertId}`) },
+              text: "← BACK TO ZONES" 
+            }),
+            el("span", { class: "label-mono", attrs: { id: "zone-name-display" }, text: "STEP 03 / SEAT SELECTION" }),
+            el("h1", { class: "concert-title", attrs: { style: "margin-top: 8px;" }, text: "Choose your spot" }),
+          ]),
+          el("div", { attrs: { style: "text-align: right;" } }, [
+             el("div", { class: "label-mono", attrs: { style: "margin-bottom: 4px;" }, text: "PRICE PER SEAT" }),
+             el("div", { id: "zone-price-display", attrs: { style: "font-size: 28px; font-weight: 500; color: var(--color-midnight);" }, text: "..." })
+          ])
+        ]),
 
-        // ประมวลผลคลาส CSS
-        let seatClasses = "coastal-seat";
-        if (isSelected) seatClasses += " is-selected";
-        if (!isAvailable) seatClasses += " is-sold";
+        el("div", { class: "coastal-seat-container", attrs: { style: "width: 100%; padding: 32px 0; overflow: hidden;" } }, [
+          // เวที (Stage)
+          el("div", { attrs: { style: "width: calc(100% - 64px); max-width: 800px; height: 16px; background: rgba(1,1,32,0.05); border-radius: 8px; margin: 0 auto 64px auto; position: relative; overflow: hidden; display: flex; justify-content: center; align-items: center;" } }, [
+              el("div", { attrs: { style: "position: absolute; inset: 0; background: linear-gradient(90deg, transparent, var(--color-sky-tint), transparent); opacity: 0.5; filter: blur(4px);" } }),
+              el("span", { class: "label-mono", attrs: { style: "font-size: 9px; position: relative; z-index: 1;" }, text: "STAGE / SCREEN" })
+          ]), 
+          gridHost,
+          renderLegend()
+        ])
+      ]),
 
-        return el(
-          "button",
-          {
-            class: seatClasses,
-            attrs: {
-              type: "button",
-              "data-status": seat.status,
-              "aria-label": `Seat ${seat.seat_row}${seat.seat_number} — ${seat.status}`,
-              "aria-pressed": isSelected ? "true" : "false",
-              ...(!isAvailable ? { disabled: "true" } : {}),
-            },
-            on: {
-              click: () => {
-                if (isAvailable) onToggle(seat.seat_id);
-              },
-            },
-          },
-          [String(seat.seat_number)]
-        );
-      }),
-      
-      el("span", { class: "coastal-row-label", text: rowKey }) // ปิดท้ายแถวด้วยตัวอักษรอีกรอบให้สมดุล
-    ]);
-  });
-
-  // Legend
-  const legend = el("div", { class: "coastal-seat-legend" }, [
-    el("span", { class: "legend-item" }, [
-      el("span", { class: "legend-chip is-available" }),
-      "Available",
-    ]),
-    el("span", { class: "legend-item" }, [
-      el("span", { class: "legend-chip is-selected" }),
-      "Selected",
-    ]),
-    el("span", { class: "legend-item" }, [
-      el("span", { class: "legend-chip is-sold" }),
-      "Sold",
-    ]),
+      // ── Right: Summary Sidebar ──
+      el("aside", { class: "summary-column" }, [summaryHost])
+    ])
   ]);
 
-  const gridContainer = el("div", { class: "coastal-grid-map" }, [...rows]);
+  const updateUI = () => {
+    renderGrid();
+    renderSummary();
+    
+    const priceDisplay = container.querySelector("#zone-price-display");
+    const nameDisplay = container.querySelector("#zone-name-display");
+    if (state.zoneInfo) {
+      if (priceDisplay) priceDisplay.textContent = formatBaht(state.zoneInfo.price);
+      if (nameDisplay) nameDisplay.textContent = `ZONE: ${state.zoneInfo.zone_name}`;
+    }
+  };
 
-  // ห่อหุ้มทุกอย่างด้วยการ์ดสวยๆ
-  return el("div", { class: "coastal-seat-container" }, [
-    gridContainer,
-    legend
+  const renderGrid = () => {
+    clear(gridHost);
+
+    if (state.isLoading) {
+      mount(gridHost, el("div", { class: "empty-cart" }, [
+        el("p", { class: "label-mono", text: "SYNCING SEAT MAP..." })
+      ]));
+      return;
+    }
+
+    if (!state.zoneInfo || state.seats.length === 0) {
+      mount(gridHost, el("div", { class: "empty-cart" }, [
+        el("p", { class: "label-mono", text: "NO SEATS FOUND IN THIS ZONE." })
+      ]));
+      return;
+    }
+
+    // จัดกลุ่มตามแถว
+    const rowLabels = Array.from(new Set(state.seats.map(s => s.seat_row || s.row || "A"))).sort();
+
+    // สร้างกล่องกั้น Scroll แนวนอน (เพื่อไม่ให้เบราว์เซอร์บีบที่นั่ง)
+    const scrollWrapper = el("div", { attrs: { style: "width: 100%; overflow-x: auto; padding-bottom: 24px;" } });
+    const mapContainer = el("div", { attrs: { style: "display: flex; flex-direction: column; gap: 12px; min-width: max-content; margin: 0 auto; padding: 0 32px;" } });
+
+    rowLabels.forEach(rowLabel => {
+      const rowSeats = state.seats.filter(s => (s.seat_row || s.row || "A") === rowLabel);
+      
+      // 🛠️ FIX 1: ดึงเฉพาะ "ตัวเลข" ออกมาแปลงเป็น Number เพื่อให้เรียง 1, 2, 3 ได้ถูกต้อง (ไม่เอา 1, 10, 11)
+      rowSeats.sort((a, b) => {
+        const numA = parseInt(String(a.seat_label || a.seat_number || a.column || "").match(/\d+/)?.[0] || "0", 10);
+        const numB = parseInt(String(b.seat_label || b.seat_number || b.column || "").match(/\d+/)?.[0] || "0", 10);
+        return numA - numB;
+      });
+
+      const rowEl = el("div", { attrs: { style: "display: flex; align-items: center; gap: 12px; flex-wrap: nowrap;" } }, [
+        el("span", { class: "label-mono", attrs: { style: "width: 32px; text-align: right; color: var(--color-midnight); opacity: 0.4; font-weight: bold; flex-shrink: 0;" }, text: String(rowLabel) })
+      ]);
+
+      rowSeats.forEach(seat => {
+        const isSold = seat.status ? seat.status !== 'available' : !seat.is_available;
+        const isSelected = state.selectedSeats.has(seat.seat_id);
+        
+        // 🛠️ FIX 2: ลบตัวอักษรภาษาอังกฤษที่ติดมา (เช่น A13) ให้เหลือแค่ตัวเลข (13) เพื่อไม่ให้ล้นกล่อง
+        const rawSeatNum = String(seat.seat_label || seat.seat_number || seat.column || "");
+        const displayNum = rawSeatNum.replace(/^[A-Za-z_-]+/, '').trim() || rawSeatNum;
+
+        // 🛠️ FIX 3: บังคับ min-width, min-height และ flex-shrink: 0 เพื่อห้ามเบราว์เซอร์บีบกล่องเด็ดขาด
+        let style = "width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--color-white); border: 1px solid var(--color-border); color: var(--color-midnight); border-radius: 4px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; cursor: pointer; padding: 0; box-sizing: border-box; transition: all 0.2s ease;"; 
+        
+        if (isSold) {
+          style = "width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--color-midnight); border: 1px solid var(--color-midnight); color: var(--color-white); border-radius: 4px; font-family: var(--font-mono); font-size: 13px; font-weight: 500; cursor: not-allowed; opacity: 0.6; padding: 0; box-sizing: border-box; position: relative;";
+        } else if (isSelected) {
+          style = "width: 44px; height: 44px; min-width: 44px; min-height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; background: var(--color-primary-blue); border: 1px solid var(--color-primary-blue); color: var(--color-midnight); box-shadow: 0 4px 12px rgba(170, 214, 250, 0.4); transform: scale(1.1); font-weight: bold; border-radius: 4px; font-family: var(--font-mono); font-size: 13px; cursor: pointer; padding: 0; box-sizing: border-box; z-index: 10; transition: all 0.2s ease;";
+        }
+
+        const seatBtn = el("button", {
+          attrs: { style, ...(isSold ? { disabled: "true", title: "Occupied" } : { title: `Row ${rowLabel} Seat ${displayNum}` }) },
+          text: isSold ? "" : displayNum,
+          on: {
+            click: () => {
+              if (isSold) return;
+              if (state.selectedSeats.has(seat.seat_id)) state.selectedSeats.delete(seat.seat_id);
+              else state.selectedSeats.add(seat.seat_id);
+              updateUI();
+            },
+            // เพิ่ม Hover Effect แบบ Inline
+            mouseenter: (e) => {
+               if (!isSold && !isSelected) {
+                  (e.target as HTMLElement).style.borderColor = "var(--color-primary-blue)";
+                  (e.target as HTMLElement).style.boxShadow = "0 0 0 3px var(--color-sky-tint)";
+                  (e.target as HTMLElement).style.transform = "translateY(-2px)";
+               }
+            },
+            mouseleave: (e) => {
+               if (!isSold && !isSelected) {
+                  (e.target as HTMLElement).style.borderColor = "var(--color-border)";
+                  (e.target as HTMLElement).style.boxShadow = "none";
+                  (e.target as HTMLElement).style.transform = "none";
+               }
+            }
+          }
+        });
+
+        // จุดตรงกลางสำหรับที่นั่งที่ขายไปแล้ว
+        if (isSold) {
+          seatBtn.append(el("div", { attrs: { style: "position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 4px; height: 4px; background: rgba(255,255,255,0.3); border-radius: 50%;" } }));
+        }
+
+        rowEl.append(seatBtn);
+      });
+
+      rowEl.append(el("span", { class: "label-mono", attrs: { style: "width: 32px; text-align: left; color: var(--color-midnight); opacity: 0.4; font-weight: bold; flex-shrink: 0;" }, text: String(rowLabel) }));
+      mapContainer.append(rowEl);
+    });
+
+    scrollWrapper.append(mapContainer);
+    gridHost.append(scrollWrapper);
+  };
+
+  const renderSummary = () => {
+    clear(summaryHost);
+    const count = state.selectedSeats.size;
+    const price = state.zoneInfo?.price || 0;
+    const total = count * price;
+
+    const selectedSeatObjects = state.seats.filter(s => state.selectedSeats.has(s.seat_id));
+
+    mount(summaryHost, 
+      el("span", { class: "summary-label", text: "SELECTION SUMMARY" }),
+      
+      el("div", { class: "summary-items" }, [
+        count > 0 
+          ? el("div", { attrs: { style: "display: flex; flex-direction: column; gap: 16px;" } }, 
+              selectedSeatObjects.map(s => {
+                // ตัดตัวอักษรออกในหน้า Summary ด้วย
+                const rawSeatNum = String(s.seat_label || s.seat_number || s.column || "");
+                const displayNum = rawSeatNum.replace(/^[A-Za-z_-]+/, '').trim() || rawSeatNum;
+                
+                return el("div", { attrs: { style: "display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--color-border); padding-bottom: 12px;" } }, [
+                  el("div", {}, [
+                    el("div", { attrs: { style: "font-weight: 500; font-size: 15px; color: var(--color-midnight);" }, text: `Seat ${s.seat_row || s.row}${displayNum}` }),
+                    el("div", { class: "label-mono", attrs: { style: "font-size: 10px; margin-top: 4px;" }, text: state.zoneInfo?.zone_name || "Zone" })
+                  ]),
+                  el("div", { attrs: { style: "font-weight: 500; color: var(--color-midnight);" }, text: formatBaht(price) })
+                ]);
+              })
+            )
+          : el("div", { class: "empty-cart", attrs: { style: "padding: 40px 0; border: 2px dashed var(--color-border); border-radius: 8px; margin-bottom: 16px;" } }, [
+              el("p", { class: "label-mono", text: "No seats selected" })
+            ])
+      ]),
+
+      el("div", { class: "summary-divider" }),
+      el("div", { class: "summary-row total" }, [
+        el("span", { text: "Total" }),
+        el("span", { class: "summary-total-price", text: formatBaht(total) })
+      ]),
+      el("button", {
+        class: "btn btn--primary btn--block",
+        attrs: { style: "margin-top: 24px; padding: 16px;", ...(count === 0 ? { disabled: "true" } : {}) },
+        text: "CONFIRM SEATS →",
+        on: { click: handleBooking }
+      })
+    );
+  };
+
+  const handleBooking = async () => {
+    try {
+      const r = await bookingApi.book({
+        concert_id: params.concertId,
+        seat_ids: Array.from(state.selectedSeats)
+      });
+      events.emit("log", { level: "info", message: "Seats secured. Redirecting to checkout..." });
+      router.navigate(`/payment?bookingId=${r.booking_id}`);
+    } catch (err) {
+      events.emit("log", { level: "error", message: String(err) });
+    }
+  };
+
+  const loadData = async () => {
+    state.isLoading = true;
+    updateUI();
+    try {
+      const [zones, seats] = await Promise.all([
+        bookingApi.listZones(params.concertId),
+        bookingApi.listSeats(params.concertId, params.zoneId)
+      ]);
+      state.zoneInfo = zones.find(z => z.zone_id === params.zoneId);
+      state.seats = seats || [];
+      state.isLoading = false;
+      updateUI();
+    } catch (err) {
+      state.isLoading = false;
+      events.emit("log", { level: "error", message: "Failed to connect to seat map server." });
+      updateUI();
+    }
+  };
+
+  loadData();
+  return container;
+}
+
+function renderLegend() {
+  return el("div", { class: "coastal-seat-legend", attrs: { style: "margin-top: 40px; display: flex; justify-content: center; gap: 32px;" } }, [
+    legendItem("background: var(--color-white); border: 1px solid var(--color-border);", "Available"),
+    legendItem("background: var(--color-primary-blue); border: 1px solid var(--color-primary-blue);", "Selected"),
+    legendItem("background: var(--color-midnight); border: 1px solid var(--color-midnight);", "Occupied")
+  ]);
+}
+
+function legendItem(style: string, label: string) {
+  return el("div", { class: "legend-item", attrs: { style: "display: flex; align-items: center; gap: 8px;" } }, [
+    el("div", { class: "legend-chip", attrs: { style: style + " width: 16px; height: 16px; border-radius: 4px;" } }),
+    el("span", { class: "label-mono", attrs: { style: "color: var(--color-midnight);" }, text: label })
   ]);
 }

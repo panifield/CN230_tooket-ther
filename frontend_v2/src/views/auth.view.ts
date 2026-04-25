@@ -3,49 +3,44 @@ import type { Role } from "../api/types";
 import { authStore } from "../state/auth";
 import { events } from "../state/events";
 import { router } from "../router";
-import { el } from "../utils/dom";
+import { el, mount, clear } from "../utils/dom";
 import { isEmail, isPassword, nonEmpty } from "../utils/validation";
 
 export function renderAuthView(): HTMLElement {
-  return el("section", { class: "section" }, [
-    el("div", { class: "container" }, [
-      el("div", { class: "hero", attrs: { style: "padding-top:0;" } }, [
-        el("div", { class: "hero__gradient", attrs: { "aria-hidden": "true" } }),
-        el("div", { class: "hero__inner" }, [
-          el("p", { class: "label-mono", text: "Tooket-ther / Sign in" }),
-          el("h1", {
-            text: "The Intelligence Infrastructure for Live Events.",
-          }),
-          el("p", {
-            attrs: { style: "font-size:var(--fs-body-lg); letter-spacing:var(--ls-body-lg); max-width:540px;" },
-            text:
-              "Sign in to manage queues, secure seats, and orchestrate concert operations end-to-end.",
-          }),
-        ]),
-      ]),
-      el("div", { class: "auth-grid", attrs: { style: "margin-top:48px;" } }, [
-        renderLoginCard(),
-        renderRegisterCard(),
-      ]),
-    ]),
-  ]);
+  const container = el("div", { 
+    class: "coastal-page", 
+    attrs: { style: "display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: 40px 20px;" } 
+  });
+  
+  let isLoginMode = true;
+
+  const updateView = () => {
+    clear(container);
+    if (isLoginMode) {
+      mount(container, renderLoginCard(() => { isLoginMode = false; updateView(); }));
+    } else {
+      mount(container, renderRegisterCard(() => { isLoginMode = true; updateView(); }));
+    }
+  };
+
+  updateView();
+  return container;
 }
 
-function renderLoginCard(): HTMLElement {
-  const error = el("p", { class: "field__error" });
-  const emailInput = el("input", {
-    class: "input",
-    attrs: { type: "email", id: "login-email", autocomplete: "email", required: "true" },
-  }) as HTMLInputElement;
-  const passwordInput = el("input", {
-    class: "input",
-    attrs: {
-      type: "password",
-      id: "login-password",
-      autocomplete: "current-password",
-      required: "true",
+function renderLoginCard(onGoToRegister: () => void): HTMLElement {
+  const error = el("p", { class: "field__error", attrs: { style: "text-align: center; margin-bottom: 16px;" } });
+  
+  const emailInput = makeInput("login-email", "email", "name@example.com", "email");
+  const passwordInput = makeInput("login-password", "password", "••••••••", "current-password");
+
+  const submitBtn = el(
+    "button",
+    {
+      class: "coastal-btn-primary",
+      attrs: { type: "submit", style: "width: 100%; margin-top: 8px;" },
     },
-  }) as HTMLInputElement;
+    ["SIGN IN"]
+  ) as HTMLButtonElement;
 
   const submit = async (): Promise<void> => {
     error.textContent = "";
@@ -53,7 +48,8 @@ function renderLoginCard(): HTMLElement {
       error.textContent = "Enter a valid email and a password (6+ chars).";
       return;
     }
-    submitBtn.setAttribute("disabled", "true");
+    submitBtn.disabled = true;
+    submitBtn.textContent = "SIGNING IN...";
     try {
       const auth = await authApi.login(emailInput.value, passwordInput.value);
       authStore.setSession(auth);
@@ -62,28 +58,18 @@ function renderLoginCard(): HTMLElement {
       events.emit("auth:login", { user_id: auth.user_id });
       routeForRole(me.role);
     } catch (err) {
-      error.textContent =
-        err instanceof Error ? err.message : "Sign in failed.";
-      submitBtn.removeAttribute("disabled");
+      error.textContent = err instanceof Error ? err.message : "Sign in failed.";
+      submitBtn.disabled = false;
+      submitBtn.textContent = "SIGN IN";
     }
   };
-
-  const submitBtn = el(
-    "button",
-    {
-      class: "btn btn--primary btn--block",
-      attrs: { type: "submit" },
-    },
-    ["Sign in"]
-  );
 
   const oauth = async (provider: "line" | "google"): Promise<void> => {
     try {
       const { authorize_url } = await authApi.oauthAuthorizeUrl(provider);
       window.location.href = authorize_url;
     } catch (err) {
-      error.textContent =
-        err instanceof Error ? err.message : "Could not start OAuth.";
+      error.textContent = err instanceof Error ? err.message : "Could not start OAuth.";
     }
   };
 
@@ -99,85 +85,71 @@ function renderLoginCard(): HTMLElement {
       },
     },
     [
-      el("div", { class: "field" }, [
-        el("label", {
-          class: "field__label",
-          attrs: { for: "login-email" },
-          text: "Email",
-        }),
-        emailInput,
-      ]),
-      el("div", { class: "field" }, [
-        el("label", {
-          class: "field__label",
-          attrs: { for: "login-password" },
-          text: "Password",
-        }),
-        passwordInput,
-      ]),
+      labelled("login-email", "EMAIL ADDRESS", emailInput),
+      labelled("login-password", "PASSWORD", passwordInput),
       error,
       submitBtn,
-      el("div", { class: "divider", text: "or continue with" }),
-      el("div", { class: "form-actions" }, [
-        el(
-          "button",
-          {
-            class: "btn btn--secondary",
-            attrs: { type: "button" },
-            on: { click: () => void oauth("line") },
-          },
-          ["LINE"]
-        ),
-        el(
-          "button",
-          {
-            class: "btn btn--secondary",
-            attrs: { type: "button" },
-            on: { click: () => void oauth("google") },
-          },
-          ["Google"]
-        ),
-        el(
-          "a",
-          {
-            class: "btn btn--ghost",
-            attrs: { href: "#/forgot" },
-          },
-          ["Forgot password"]
-        ),
+
+      // ── Social Login & Links ──
+      el("div", { class: "divider", attrs: { style: "margin: 32px 0 24px 0;" }, text: "OR CONTINUE WITH" }),
+      
+      // ปุ่ม LINE และ Google อยู่ตรงกลาง
+      el("div", { attrs: { style: "display: flex; gap: 16px; justify-content: center; width: 100%; margin-bottom: 32px;" } }, [
+        el("button", { 
+          class: "btn btn--secondary", 
+          attrs: { type: "button", style: "flex: 1; justify-content: center;" }, 
+          on: { click: () => void oauth("line") } 
+        }, ["LINE"]),
+        el("button", { 
+          class: "btn btn--secondary", 
+          attrs: { type: "button", style: "flex: 1; justify-content: center;" }, 
+          on: { click: () => void oauth("google") } 
+        }, ["Google"]),
       ]),
+
+      // Forgot Password & Register (อยู่คู่กันตรงกลาง)
+      el("div", { attrs: { style: "display: flex; gap: 12px; justify-content: center; align-items: center; width: 100%; flex-wrap: wrap;" } }, [
+        el("a", { class: "btn btn--ghost btn--sm", attrs: { href: "#/forgot" } }, ["Forgot password?"]),
+        el("span", { class: "label-mono", attrs: { style: "opacity: 0.3;" }, text: "•" }),
+        el("button", { 
+          class: "btn btn--ghost btn--sm", 
+          attrs: { type: "button", style: "color: var(--color-primary-blue);" }, 
+          on: { click: onGoToRegister } 
+        }, ["Don't have an account?"])
+      ])
     ]
   );
 
-  return el("div", { class: "card" }, [
-    el("div", { class: "card__header" }, [
-      el("h2", { class: "card__title", text: "Sign in" }),
-      el("span", { class: "label-mono", text: "Step 01" }),
+  return el("div", { attrs: { style: "width: 100%; max-width: 440px; margin: 0 auto;" } }, [
+    el("div", { attrs: { style: "text-align: center; margin-bottom: 32px;" } }, [
+      el("div", { attrs: { style: "width: 64px; height: 64px; background: var(--gradient-coastal); border-radius: var(--radius-control); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; box-shadow: var(--shadow-card);" } }),
+      el("h1", { class: "concert-title", text: "Access Portal" }),
+      el("p", { class: "label-mono", text: "Sign in to your TOOKET-THER account" })
     ]),
-    form,
+    el("div", { class: "card", attrs: { style: "padding: 40px 32px;" } }, [form])
   ]);
 }
 
-function renderRegisterCard(): HTMLElement {
+function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
   const banner = el("div", {
     class: "banner banner--err",
-    attrs: { role: "alert", style: "display:none;" },
+    attrs: { role: "alert", style: "display:none; margin-bottom: 24px;" },
   });
-  const success = el("p", { class: "label-mono label-mono--accent" });
+  const success = el("p", { class: "label-mono", attrs: { style: "color: var(--color-primary-blue); text-align: center; margin-bottom: 16px;" } });
 
   const fields = {
-    name: makeInput("reg-name", "text", "name"),
-    id_card: makeInput("reg-id_card", "text"),
-    email: makeInput("reg-email", "email", "email"),
-    phone: makeInput("reg-phone", "tel", "tel"),
-    address: makeInput("reg-address", "text", "street-address"),
-    password: makeInput("reg-password", "password", "new-password"),
+    name: makeInput("reg-name", "text", "John Doe", "name"),
+    id_card: makeInput("reg-id_card", "text", "AA1234567"),
+    email: makeInput("reg-email", "email", "name@example.com", "email"),
+    phone: makeInput("reg-phone", "tel", "+1 234 567 890", "tel"),
+    address: makeInput("reg-address", "text", "City, Country", "street-address"),
+    password: makeInput("reg-password", "password", "••••••••", "new-password"),
   };
 
   const roleSelect = el(
     "select",
     {
-      class: "select",
+      class: "coastal-input",
       attrs: { id: "reg-role" },
     },
     [
@@ -190,6 +162,15 @@ function renderRegisterCard(): HTMLElement {
     banner.textContent = msg;
     banner.style.display = msg ? "block" : "none";
   };
+
+  const submitBtn = el(
+    "button",
+    {
+      class: "coastal-btn-primary",
+      attrs: { type: "submit", style: "width: 100%; margin-top: 16px;" },
+    },
+    ["REGISTER"]
+  ) as HTMLButtonElement;
 
   const submit = async (): Promise<void> => {
     showError("");
@@ -204,20 +185,15 @@ function renderRegisterCard(): HTMLElement {
       role: roleSelect.value as Role,
     };
 
-    // Backend requires id_card, name, email, phone, address, password.
-    // Keep validation aligned with that — never silently block the button.
     if (!nonEmpty(payload.name)) return showError("Full name is required.");
-    if (!nonEmpty(payload.id_card))
-      return showError("ID card / passport is required.");
-    if (!isEmail(payload.email))
-      return showError("Enter a valid email address.");
+    if (!nonEmpty(payload.id_card)) return showError("ID card / passport is required.");
+    if (!isEmail(payload.email)) return showError("Enter a valid email address.");
     if (!nonEmpty(payload.phone)) return showError("Phone number is required.");
     if (!nonEmpty(payload.address)) return showError("Address is required.");
-    if (!isPassword(payload.password))
-      return showError("Password must be at least 6 characters.");
+    if (!isPassword(payload.password)) return showError("Password must be at least 6 characters.");
 
     submitBtn.disabled = true;
-    submitBtn.textContent = "Creating account…";
+    submitBtn.textContent = "CREATING ACCOUNT...";
     try {
       const result = await authApi.register(payload);
       success.textContent = `${result.message} (id #${result.user_id}). You can sign in now.`;
@@ -226,28 +202,9 @@ function renderRegisterCard(): HTMLElement {
       showError(err instanceof Error ? err.message : "Registration failed.");
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = "Create account";
+      submitBtn.textContent = "REGISTER";
     }
   };
-
-  const submitBtn = el(
-    "button",
-    {
-      class: "btn btn--primary btn--block",
-      attrs: { type: "submit" },
-    },
-    ["Create account"]
-  ) as HTMLButtonElement;
-
-  const labelled = (id: string, label: string, ctrl: HTMLElement): HTMLElement =>
-    el("div", { class: "field" }, [
-      el("label", {
-        class: "field__label",
-        attrs: { for: id },
-        text: label,
-      }),
-      ctrl,
-    ]);
 
   const form = el(
     "form",
@@ -261,41 +218,66 @@ function renderRegisterCard(): HTMLElement {
       },
     },
     [
-      el("div", { class: "form-grid" }, [
-        labelled("reg-name", "Full name", fields.name),
-        labelled("reg-id_card", "ID card / passport", fields.id_card),
-        labelled("reg-email", "Email", fields.email),
-        labelled("reg-phone", "Phone", fields.phone),
-        el("div", { class: "form-grid--full" }, [
-          labelled("reg-address", "Address", fields.address),
-        ]),
-        labelled("reg-password", "Password", fields.password),
-        labelled("reg-role", "Role", roleSelect),
-      ]),
       banner,
+      el("div", { class: "coastal-grid", attrs: { style: "margin-bottom: 24px;" } }, [
+        labelled("reg-name", "FULL NAME", fields.name),
+        labelled("reg-id_card", "ID / PASSPORT NUMBER", fields.id_card),
+        labelled("reg-email", "EMAIL ADDRESS", fields.email),
+        labelled("reg-phone", "PHONE NUMBER", fields.phone),
+        el("div", { class: "coastal-grid-full" }, [
+          labelled("reg-address", "DOMICILE", fields.address),
+        ]),
+        labelled("reg-password", "PASSWORD", fields.password),
+        labelled("reg-role", "ACCOUNT ROLE", roleSelect),
+      ]),
       success,
       submitBtn,
+
+      // Back to Login Link
+      el("div", { attrs: { style: "text-align: center; margin-top: 32px;" } }, [
+        el("span", { class: "label-mono", attrs: { style: "opacity: 0.5;" }, text: "Already have an account? " }),
+        el("button", { 
+          class: "btn btn--ghost btn--sm", 
+          attrs: { type: "button", style: "color: var(--color-primary-blue);" }, 
+          on: { click: onGoToLogin } 
+        }, ["Sign in here"])
+      ])
     ]
   );
 
-  return el("div", { class: "card" }, [
-    el("div", { class: "card__header" }, [
-      el("h2", { class: "card__title", text: "Create account" }),
-      el("span", { class: "label-mono", text: "Step 02" }),
+  return el("div", { attrs: { style: "width: 100%; max-width: 640px; margin: 0 auto;" } }, [
+    el("div", { attrs: { style: "text-align: center; margin-bottom: 32px;" } }, [
+      el("div", { attrs: { style: "width: 64px; height: 64px; background: var(--gradient-coastal); border-radius: var(--radius-control); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; box-shadow: var(--shadow-card);" } }),
+      el("h1", { class: "concert-title", text: "Create Account" }),
+      el("p", { class: "label-mono", text: "Join the TOOKET-THER priority network" })
     ]),
-    form,
+    el("div", { class: "card", attrs: { style: "padding: 48px 40px;" } }, [form])
   ]);
 }
 
-function makeInput(id: string, type: string, autocomplete = ""): HTMLInputElement {
+// ── Helper Functions ──
+
+function makeInput(id: string, type: string, placeholder: string = "", autocomplete = ""): HTMLInputElement {
   return el("input", {
-    class: "input",
+    class: "coastal-input",
     attrs: {
       id,
       type,
+      placeholder,
       ...(autocomplete ? { autocomplete } : {}),
     },
   }) as HTMLInputElement;
+}
+
+function labelled(id: string, label: string, ctrl: HTMLElement): HTMLElement {
+  return el("div", { class: "coastal-input-group" }, [
+    el("label", {
+      class: "label-mono",
+      attrs: { for: id },
+      text: label,
+    }),
+    ctrl,
+  ]);
 }
 
 function routeForRole(role: Role): void {

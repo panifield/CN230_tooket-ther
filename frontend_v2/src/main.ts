@@ -50,21 +50,29 @@ function render(view: HTMLElement): void {
       ]),
 
       // Footer (Coastal Edition - คืนค่า Font แบบเดิม)
-      el("footer", { 
-        attrs: { style: "background: var(--color-midnight); color: var(--color-white); padding: 48px 0; border-top: 1px solid rgba(255,255,255,0.1);" } 
-      }, [
-        el("div", { 
-          attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 var(--space-5); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 24px;" } 
-        }, [
-          el("div", {}, [
-            el("p", { class: "label-mono", attrs: { style: "color: var(--color-primary-blue); margin-bottom: 8px;" }, text: "TOOKET-THER / COASTAL EDITION" }),
-            el("p", { attrs: { style: "font-size: 12px; opacity: 0.4;" }, text: "Built for CN230. © 2026. Infrastructure for Live Intelligence." }),
-          ]),
-          el("div", { class: "label-mono", attrs: { style: "opacity: 0.2;" } }, [
-            el("span", { text: "LAT: 13.7563 / LON: 100.5018" })
-          ])
-        ]),
-      ]),
+      // ในไฟล์ main.ts ตรงส่วน Footer
+el("footer", { 
+  attrs: { style: "background: var(--color-midnight); color: var(--color-white); padding: 64px 0; border-top: 1px solid rgba(255,255,255,0.1);" } 
+}, [
+  el("div", { 
+    attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center;" } 
+  }, [
+    el("div", {}, [
+      el("p", { 
+        class: "label-mono", 
+        attrs: { style: "color: var(--color-primary-blue); margin-bottom: 8px;" }, 
+        text: "TOOKET-THER / COASTAL EDITION" 
+      }),
+      el("p", { 
+        attrs: { style: "font-size: 12px; opacity: 0.4; font-family: var(--font-display);" }, 
+        text: "Built for CN230. © 2026. Infrastructure for Live Intelligence." 
+      }),
+    ]),
+    el("div", { class: "label-mono", attrs: { style: "opacity: 0.2;" } }, [
+      el("span", { text: "LAT: 13.7563 / LON: 100.5018" })
+    ])
+  ]),
+])
     ])
   );
 }

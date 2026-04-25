@@ -13,7 +13,7 @@ export function renderHeader(): HTMLElement {
       navLinks.push(navLink("Events", "/dashboard"));
       navLinks.push(navLink("My Tickets", "/my-tickets"));
     } else if (user.role === "organizer") {
-      navLinks.push(navLink("Control Room", "/organizer"));
+      navLinks.push(navLink("Dashboard", "/organizer"));
       navLinks.push(navLink("Create Concert", "/create-concert"));
     }
     navLinks.push(navLink("Profile", "/profile"));
