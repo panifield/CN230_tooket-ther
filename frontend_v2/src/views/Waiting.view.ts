@@ -14,12 +14,12 @@ export function renderWaitingView(params: { concertId: number }): HTMLElement {
   const statusHost = el("div", { attrs: { style: "margin-top: 24px;" } });
 
   const container = el("div", { class: "coastal-page", attrs: { style: "display: flex; align-items: center; justify-content: center; min-height: 70vh;" } }, [
-    el("div", { class: "card card--cream", attrs: { style: "text-align: center; max-width: 480px; width: 100%; padding: 64px 32px;" } }, [
+    el("div", { class: "card card--white", attrs: { style: "text-align: center; max-width: 480px; width: 100%; padding: 64px 32px;" } }, [
       
       // Loading Spinner
       el("div", { attrs: { style: "width: 48px; height: 48px; border: 3px solid var(--color-border); border-top-color: var(--color-midnight); border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 24px auto;" } }),
       
-      el("span", { class: "label-mono", attrs: { style: "color: var(--color-primary-blue); margin-bottom: 8px; display: block;" }, text: "TICKETING QUEUE" }),
+      el("span", { class: "label-mono", attrs: { style: "color: var(--color-midnight); margin-bottom: 8px; display: block;" }, text: "TICKETING QUEUE" }),
       el("h1", { class: "coastal-title", attrs: { style: "margin: 0 0 16px 0; font-size: 32px;" }, text: "Waiting for confirmation..." }),
       el("p", { attrs: { style: "color: var(--color-text-muted); font-size: 15px; line-height: 1.5;" }, text: "Your position in line is being processed. Please do not close or refresh this window." }),
       
