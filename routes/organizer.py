@@ -308,6 +308,444 @@ def create_concert(
     }
 
 
+@organizer_router.delete("/concerts/{concert_id}")
+def delete_concert(concert_id: int, current_user: CurrentUser):
+    """
+    Soft-delete คอนเสิร์ต: UPDATE concert SET status = 'cancelled'.
+    เก็บประวัติ booking, payment, refund, finance, queue_session ไว้ครบเพื่อ
+    audit trail (ห้าม hard delete). organizer ของคอนเสิร์ตเองเท่านั้นที่ทำได้.
+    """
+    _check_organizer_role(current_user)
+    organizer_profile_id = current_user.get("organizer_profile_id")
+    if not organizer_profile_id:
+        raise HTTPException(status_code=403, detail="ไม่พบ organizer profile")
+
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT organizer_id, status FROM concert WHERE id = %s FOR UPDATE",
+                    (concert_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="ไม่พบคอนเสิร์ต")
+
+                owner_id, current_status = row
+                if owner_id != organizer_profile_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้",
+                    )
+                if current_status == "cancelled":
+                    raise HTTPException(
+                        status_code=409,
+                        detail="คอนเสิร์ตนี้ถูกยกเลิกไปแล้ว",
+                    )
+
+                cur.execute(
+                    "UPDATE concert SET status = 'cancelled' WHERE id = %s",
+                    (concert_id,),
+                )
+
+            conn.commit()
+            logger.info(
+                "Concert cancelled: concert_id=%s organizer=%s prev_status=%s",
+                concert_id, organizer_profile_id, current_status,
+            )
+
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            logger.exception("delete_concert error: %s", exc)
+            raise HTTPException(status_code=500, detail=f"ยกเลิกคอนเสิร์ตไม่สำเร็จ: {exc}")
+
+    return {
+        "message": "ยกเลิกคอนเสิร์ตสำเร็จ",
+        "concert_id": concert_id,
+        "status": "cancelled",
+    }
+
+
+@organizer_router.get("/concerts/{concert_id}")
+def get_concert_for_edit(concert_id: int, current_user: CurrentUser):
+    """
+    Detailed concert payload สำหรับฟอร์มแก้ไข (รวม sale_open_at/sale_close_at + zones)
+    organizer ของคอนเสิร์ตนี้เท่านั้นที่อ่านได้
+    """
+    _check_organizer_role(current_user)
+    organizer_profile_id = current_user.get("organizer_profile_id")
+    if not organizer_profile_id:
+        raise HTTPException(status_code=403, detail="ไม่พบ organizer profile")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, organizer_id, title, artist, venue, address,
+                       concert_datetime, sale_open_at, sale_close_at, status, image_url
+                FROM concert WHERE id = %s
+                """,
+                (concert_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="ไม่พบคอนเสิร์ต")
+
+            (c_id, owner_id, title, artist, venue, address,
+             concert_dt, sale_open, sale_close, status_v, image_url) = row
+
+            if owner_id != organizer_profile_id:
+                raise HTTPException(
+                    status_code=403,
+                    detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้",
+                )
+
+            cur.execute(
+                """
+                SELECT z.id, z.zone_name, z.total_seats, z.price,
+                       (SELECT seat_row FROM seat
+                        WHERE zone_id = z.id ORDER BY id LIMIT 1) AS row_prefix
+                FROM zone z
+                WHERE z.concert_id = %s
+                ORDER BY z.id
+                """,
+                (concert_id,),
+            )
+            zones = [
+                {
+                    "zone_id": zr[0],
+                    "zone_name": zr[1],
+                    "total_seats": zr[2],
+                    "price": float(zr[3]),
+                    "row_prefix": zr[4] or "A",
+                }
+                for zr in cur.fetchall()
+            ]
+
+    def _iso(dt):
+        return dt.isoformat() if dt else None
+
+    return {
+        "concert_id": c_id,
+        "title": title,
+        "artist": artist,
+        "venue": venue,
+        "address": address,
+        "concert_datetime": _iso(concert_dt),
+        "sale_open_at": _iso(sale_open),
+        "sale_close_at": _iso(sale_close),
+        "status": status_v,
+        "image_url": image_url,
+        "zones": zones,
+    }
+
+
+@organizer_router.patch("/concerts/{concert_id}")
+def update_concert(
+    concert_id: int,
+    current_user: CurrentUser,
+    title: str = Form(...),
+    artist: str = Form(...),
+    venue: str = Form(...),
+    address: str = Form(...),
+    concert_datetime: str = Form(...),
+    sale_open_at: str = Form(...),
+    sale_close_at: Optional[str] = Form(None),
+    zones_json: str = Form("[]"),
+    image: Optional[UploadFile] = File(None),
+):
+    """
+    อัปเดตคอนเสิร์ต + zones ตาม business rules:
+    - status ถูกตรึงไว้ (ใช้ DELETE endpoint สำหรับ cancel)
+    - zone ที่ไม่อยู่ใน payload → ลบได้เฉพาะเมื่อไม่มี ticket อ้างอิง seat ของ zone นั้น
+    - ลด total_seats ห้ามทำถ้า zone มี ticket อยู่; เพิ่ม total_seats ต่อเลข seat เดิม
+    - ราคา/ชื่อ zone เปลี่ยนได้เสมอ
+    - image: ไม่ส่งมา = คงรูปเดิม; ส่งมา = บันทึกใหม่และอัปเดต URL (ปล่อยรูปเก่าค้างไว้)
+    """
+    _check_organizer_role(current_user)
+    organizer_profile_id = current_user.get("organizer_profile_id")
+    if not organizer_profile_id:
+        raise HTTPException(status_code=403, detail="ไม่พบ organizer profile")
+
+    try:
+        payload_zones = json.loads(zones_json)
+        if not isinstance(payload_zones, list):
+            raise ValueError("zones_json ต้องเป็น array")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"รูปแบบ zones ไม่ถูกต้อง: {e}")
+
+    seen_names: set = set()
+    parsed_zones = []
+    for raw in payload_zones:
+        if not isinstance(raw, dict):
+            raise HTTPException(status_code=422, detail="zone item ต้องเป็น object")
+        zone_name = (raw.get("zone_name") or "").strip()
+        if not zone_name:
+            raise HTTPException(status_code=422, detail="zone_name ห้ามว่าง")
+        if zone_name in seen_names:
+            raise HTTPException(
+                status_code=422,
+                detail=f"ชื่อ zone '{zone_name}' ซ้ำกัน",
+            )
+        seen_names.add(zone_name)
+
+        try:
+            total_seats = int(raw.get("total_seats", 0))
+            price = Decimal(str(raw.get("price", 0)))
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Zone '{zone_name}': total_seats/price ไม่ถูกต้อง",
+            )
+        if total_seats <= 0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Zone '{zone_name}': total_seats ต้องมากกว่า 0",
+            )
+        if price < 0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Zone '{zone_name}': price ต้องไม่ติดลบ",
+            )
+
+        zone_id = raw.get("zone_id")
+        if zone_id is not None:
+            try:
+                zone_id = int(zone_id)
+            except (TypeError, ValueError):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Zone '{zone_name}': zone_id ไม่ใช่จำนวนเต็ม",
+                )
+
+        row_prefix = (raw.get("row_prefix") or "A").strip() or "A"
+
+        parsed_zones.append({
+            "zone_id": zone_id,
+            "zone_name": zone_name,
+            "total_seats": total_seats,
+            "price": price,
+            "row_prefix": row_prefix,
+        })
+
+    image_url_new: Optional[str] = None
+    if image is not None and image.filename:
+        ext = os.path.splitext(image.filename)[1].lower()
+        if ext not in [".jpg", ".jpeg", ".png", ".webp"]:
+            raise HTTPException(
+                status_code=400,
+                detail="อนุญาตเฉพาะไฟล์รูปภาพ (.jpg, .png, .webp)",
+            )
+        os.makedirs("database/image", exist_ok=True)
+        filename = f"{uuid.uuid4()}{ext}"
+        filepath = os.path.join("database/image", filename)
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(image.file, buffer)
+        image_url_new = f"database/image/{filename}"
+
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                from models import fix_all_sequences
+                fix_all_sequences(cur)
+
+                cur.execute(
+                    """
+                    SELECT organizer_id FROM concert WHERE id = %s FOR UPDATE
+                    """,
+                    (concert_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="ไม่พบคอนเสิร์ต")
+                if row[0] != organizer_profile_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้",
+                    )
+
+                cur.execute(
+                    """
+                    SELECT id, zone_name, total_seats
+                    FROM zone WHERE concert_id = %s FOR UPDATE
+                    """,
+                    (concert_id,),
+                )
+                existing_zones = {r[0]: {"zone_name": r[1], "total_seats": r[2]} for r in cur.fetchall()}
+
+                payload_ids = {z["zone_id"] for z in parsed_zones if z["zone_id"] is not None}
+
+                unknown_ids = payload_ids - set(existing_zones.keys())
+                if unknown_ids:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"zone_id {sorted(unknown_ids)} ไม่ใช่ของคอนเสิร์ตนี้",
+                    )
+
+                ids_to_delete = set(existing_zones.keys()) - payload_ids
+                for zid in ids_to_delete:
+                    cur.execute(
+                        """
+                        SELECT 1 FROM ticket t
+                        JOIN seat s ON s.id = t.seat_id
+                        WHERE s.zone_id = %s LIMIT 1
+                        """,
+                        (zid,),
+                    )
+                    if cur.fetchone():
+                        raise HTTPException(
+                            status_code=409,
+                            detail=(
+                                f"ลบ zone '{existing_zones[zid]['zone_name']}' ไม่ได้ "
+                                "เพราะมีตั๋วอ้างอิงอยู่ — ใช้ฟีเจอร์ Close Zone แทน"
+                            ),
+                        )
+                    cur.execute("DELETE FROM seat WHERE zone_id = %s", (zid,))
+                    cur.execute("DELETE FROM zone WHERE id = %s", (zid,))
+
+                for z in parsed_zones:
+                    if z["zone_id"] is not None:
+                        zid = z["zone_id"]
+                        existing = existing_zones[zid]
+                        new_total = z["total_seats"]
+                        old_total = existing["total_seats"]
+
+                        cur.execute(
+                            """
+                            UPDATE zone
+                            SET zone_name = %s, price = %s, total_seats = %s
+                            WHERE id = %s
+                            """,
+                            (z["zone_name"], z["price"], new_total, zid),
+                        )
+
+                        if new_total > old_total:
+                            cur.execute(
+                                "SELECT seat_row FROM seat WHERE zone_id = %s ORDER BY id LIMIT 1",
+                                (zid,),
+                            )
+                            row_seat = cur.fetchone()
+                            prefix = (row_seat[0] if row_seat and row_seat[0] else z["row_prefix"]) or "A"
+
+                            cur.execute(
+                                "SELECT COUNT(*) FROM seat WHERE zone_id = %s",
+                                (zid,),
+                            )
+                            current_count = cur.fetchone()[0] or 0
+
+                            additions = [
+                                (zid, f"{prefix}{current_count + i + 1}", prefix, "available")
+                                for i in range(new_total - old_total)
+                            ]
+                            cur.executemany(
+                                "INSERT INTO seat (zone_id, seat_number, seat_row, status) "
+                                "VALUES (%s, %s, %s, %s)",
+                                additions,
+                            )
+                        elif new_total < old_total:
+                            cur.execute(
+                                """
+                                SELECT 1 FROM ticket t
+                                JOIN seat s ON s.id = t.seat_id
+                                WHERE s.zone_id = %s LIMIT 1
+                                """,
+                                (zid,),
+                            )
+                            if cur.fetchone():
+                                raise HTTPException(
+                                    status_code=409,
+                                    detail=(
+                                        f"ลด total_seats ของ zone '{z['zone_name']}' ไม่ได้ "
+                                        "เพราะมีตั๋วอ้างอิงอยู่"
+                                    ),
+                                )
+                            to_remove = old_total - new_total
+                            cur.execute(
+                                """
+                                DELETE FROM seat
+                                WHERE id IN (
+                                    SELECT id FROM seat WHERE zone_id = %s
+                                    ORDER BY id DESC LIMIT %s
+                                )
+                                """,
+                                (zid, to_remove),
+                            )
+                    else:
+                        cur.execute(
+                            """
+                            INSERT INTO zone (concert_id, zone_name, total_seats, price, is_active)
+                            VALUES (%s, %s, %s, %s, TRUE)
+                            RETURNING id
+                            """,
+                            (concert_id, z["zone_name"], z["total_seats"], z["price"]),
+                        )
+                        new_zone_id = cur.fetchone()[0]
+                        prefix = z["row_prefix"]
+                        seat_rows = [
+                            (new_zone_id, f"{prefix}{i+1}", prefix, "available")
+                            for i in range(z["total_seats"])
+                        ]
+                        if seat_rows:
+                            cur.executemany(
+                                "INSERT INTO seat (zone_id, seat_number, seat_row, status) "
+                                "VALUES (%s, %s, %s, %s)",
+                                seat_rows,
+                            )
+
+                if image_url_new is not None:
+                    cur.execute(
+                        """
+                        UPDATE concert
+                        SET title = %s, artist = %s, venue = %s, address = %s,
+                            concert_datetime = %s, sale_open_at = %s, sale_close_at = %s,
+                            image_url = %s
+                        WHERE id = %s
+                        """,
+                        (
+                            title, artist, venue, address,
+                            concert_datetime, sale_open_at, sale_close_at,
+                            image_url_new, concert_id,
+                        ),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        UPDATE concert
+                        SET title = %s, artist = %s, venue = %s, address = %s,
+                            concert_datetime = %s, sale_open_at = %s, sale_close_at = %s
+                        WHERE id = %s
+                        """,
+                        (
+                            title, artist, venue, address,
+                            concert_datetime, sale_open_at, sale_close_at,
+                            concert_id,
+                        ),
+                    )
+
+            conn.commit()
+            logger.info(
+                "Concert updated: concert_id=%s organizer=%s zones=%d image_replaced=%s",
+                concert_id, organizer_profile_id, len(parsed_zones),
+                bool(image_url_new),
+            )
+
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            logger.exception("update_concert error: %s", exc)
+            raise HTTPException(status_code=500, detail=f"อัปเดตคอนเสิร์ตไม่สำเร็จ: {exc}")
+
+    return {
+        "message": "อัปเดตคอนเสิร์ตสำเร็จ",
+        "concert_id": concert_id,
+    }
+
+
 @organizer_router.post("/concerts/{concert_id}/queues/auto_sort")
 def auto_sort_queues(concert_id: int, current_user: CurrentUser):
     """

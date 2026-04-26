@@ -21,7 +21,10 @@ import {
 
 interface ZoneDraft extends CreateZonePayload {}
 
-export function renderOrganizerView(initialState: "events" | "create" | "dashboard" = "events"): HTMLElement {
+export function renderOrganizerView(
+  initialState: "events" | "create" | "dashboard" = "events",
+  initialConcertId: number | null = null,
+): HTMLElement {
   if (!authStore.isAuthenticated() || authStore.getRole() !== "organizer") {
     router.navigate("/login");
     return el("div");
@@ -29,7 +32,7 @@ export function renderOrganizerView(initialState: "events" | "create" | "dashboa
 
   const state = {
     concerts: [] as Concert[],
-    selectedConcertId: null as number | null,
+    selectedConcertId: initialConcertId,
     queues: [] as OrganizerQueueRow[],
     dashboard: null as OrganizerDashboard | null,
     concertZones: [] as Zone[],
@@ -639,16 +642,46 @@ export function renderOrganizerView(initialState: "events" | "create" | "dashboa
     if (state.navState === "create") {
       content = renderCreateConcert();
     } else if (state.navState === "dashboard") {
+      const dashboardConcertId = state.selectedConcertId;
+      const onEditSeats = (): void => {
+        if (dashboardConcertId === null) return;
+        router.navigate(`/edit-concert?id=${dashboardConcertId}`);
+      };
+      const onDeleteConcert = async (): Promise<void> => {
+        if (dashboardConcertId === null) return;
+        if (!window.confirm(
+          "Are you sure you want to completely delete this concert? This action cannot be undone."
+        )) return;
+        try {
+          await organizerApi.deleteConcert(dashboardConcertId);
+          state.selectedConcertId = null;
+          state.navState = "events";
+          await refreshConcerts();
+        } catch (err) {
+          alert(err instanceof Error ? err.message : "Failed to delete concert.");
+        }
+      };
+
       content = el("div", { class: "space-y-section-gap" }, [
         el("div", { class: "flex items-center justify-between mb-6" }, [
           el("div", {}, [
             el("h2", { class: "font-display-xl text-slate-900", text: "Dashboard" }),
             el("p", { class: "font-body-md text-slate-500", text: "Financials and Analytics for selected event." })
           ]),
-          el("button", {
-            class: "flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-label-sm hover:bg-slate-200 transition-colors",
-            on: { click: () => { state.navState = "events"; renderMainContent(); } }
-          }, [ renderIcon("arrow_back", "text-lg"), "BACK TO ALL EVENTS" ])
+          el("div", { class: "flex items-center gap-2" }, [
+            el("button", {
+              class: "flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-label-sm hover:bg-slate-200 transition-colors",
+              on: { click: () => { state.navState = "events"; renderMainContent(); } }
+            }, [ renderIcon("arrow_back", "text-lg"), "BACK TO ALL EVENTS" ]),
+            el("button", {
+              class: "flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl font-label-sm hover:bg-slate-50 transition-colors",
+              on: { click: onEditSeats }
+            }, [ renderIcon("edit", "text-lg"), "EDIT SEATS" ]),
+            el("button", {
+              class: "flex items-center gap-2 px-4 py-2 border border-red-300 text-red-600 rounded-xl font-label-sm hover:bg-red-50 transition-colors",
+              on: { click: () => { void onDeleteConcert(); } }
+            }, [ renderIcon("delete", "text-lg"), "DELETE CONCERT" ])
+          ])
         ]),
         renderDashboardData(),
         renderQueueList(),
@@ -673,6 +706,12 @@ export function renderOrganizerView(initialState: "events" | "create" | "dashboa
   // Initial Data Load
   renderMainContent();
   void refreshConcerts();
+  if (state.navState === "dashboard" && state.selectedConcertId !== null) {
+    void (async () => {
+      await Promise.all([loadQueues(), loadDashboard(), loadZones(), loadPendingRefunds()]);
+      renderMainContent();
+    })();
+  }
 
   return el("div", { class: "bg-background text-on-background min-h-screen py-10 px-6" }, [
     mainContentHost

@@ -1,6 +1,7 @@
 import { request } from "./client";
 import type {
   ApproveRefundResponse,
+  ConcertEditDetail,
   CreateConcertPayload,
   OrganizerDashboard,
   OrganizerQueueRow,
@@ -63,5 +64,25 @@ export const organizerApi = {
       `/organizer/bookings/${bookingId}/approve-refund`,
       { method: "POST" }
     );
+  },
+
+  deleteConcert(
+    concertId: number
+  ): Promise<{ message: string; concert_id: number; status: "cancelled" }> {
+    return request(`/organizer/concerts/${concertId}`, { method: "DELETE" });
+  },
+
+  getConcertForEdit(concertId: number): Promise<ConcertEditDetail> {
+    return request<ConcertEditDetail>(`/organizer/concerts/${concertId}`);
+  },
+
+  updateConcert(
+    concertId: number,
+    payload: FormData
+  ): Promise<{ message: string; concert_id: number }> {
+    return request(`/organizer/concerts/${concertId}`, {
+      method: "PATCH",
+      body: payload,
+    });
   },
 };
