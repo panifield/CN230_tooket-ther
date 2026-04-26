@@ -1,4 +1,4 @@
-import { refundApi } from "../api/payment";
+import { refundApi } from "../api/refund";
 import { el } from "../utils/dom";
 import { openModal } from "./modal";
 

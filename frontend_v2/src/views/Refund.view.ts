@@ -105,9 +105,9 @@ export function renderRefundView(props: { bookingId: number, isVoucher?: boolean
             };
 
             if (isVoucher) {
-              await refundApi.requestVoucherRefund(bookingId, basePayload);
+              await refundApi.voucher(bookingId, basePayload);
             } else {
-              await refundApi.requestRefund({ booking_id: bookingId, ...basePayload });
+              await refundApi.request({ booking_id: bookingId, ...basePayload });
             }
             
             state.success = true;

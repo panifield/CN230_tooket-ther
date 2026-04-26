@@ -1,9 +1,6 @@
 import { el, mount, clear } from "../utils/dom";
 import { formatDateTime } from "../utils/format";
 import { bookingApi } from "../api/booking";
-import { refundApi } from "../api/payment";
-import { ApiError } from "../api/client";
-import { events } from "../state/events";
 import { router } from "../router-instance";
 
 const ZONE_CLOSED = "zone_closed_action_required";

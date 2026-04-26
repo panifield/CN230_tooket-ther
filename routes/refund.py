@@ -84,6 +84,20 @@ def request_refund(body: RefundRequestBody, current_user: CurrentUser):
                         detail=f"booking สถานะ '{b_status}' ไม่สามารถขอคืนเงินได้",
                     )
 
+                # ตั๋วที่ถูก check-in ไปแล้ว = ใช้งานเข้างานแล้ว ห้ามคืนเงิน
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM ticket_checkin
+                    WHERE ticket_id IN (SELECT id FROM ticket WHERE booking_id = %s)
+                    """,
+                    (b_id,),
+                )
+                if (cur.fetchone()[0] or 0) > 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="ไม่สามารถคืนเงินได้เนื่องจากตั๋วถูกใช้งานไปแล้ว (Ticket already checked in)",
+                    )
+
                 # ดึง payment ที่ชำระสำเร็จของ booking
                 cur.execute(
                     """

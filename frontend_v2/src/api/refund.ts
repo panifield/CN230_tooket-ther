@@ -1,6 +1,8 @@
-import { request } from "./client";// อ้างอิงตัวจัดการ API หลักของโปรเจกต์
+import { request as apiRequest } from "./client";
 
-// ── 1. กำหนดโครงสร้างข้อมูล (Interfaces) ตามฝั่ง Python ──
+// ── Types ──────────────────────────────────────────────────────────────────
+// Single source of truth for refund payloads/responses. ห้าม duplicate
+// ที่ไฟล์อื่น (เช่น api/types.ts หรือ api/payment.ts)
 
 export interface RefundRequestPayload {
   booking_id: number;
@@ -25,28 +27,33 @@ export interface RefundResponse {
   status: string;
 }
 
-// ── 2. สร้างออบเจกต์ refundApi สำหรับให้ View เรียกใช้งาน ──
+// ── refundApi ──────────────────────────────────────────────────────────────
+// Vite proxy (vite.config.ts) rewrite "/refund" → "/api/v1/refunds" ให้แล้ว
+// view ฝั่ง frontend จึง import จากไฟล์นี้ที่เดียว
 
 export const refundApi = {
   /**
    * ยื่นฟอร์มขอคืนเงินแบบปกติ (ต้องทำภายใน 7 วันหลังชำระเงิน)
-   * Endpoint: POST /api/v1/refunds/request
+   * Backend: POST /api/v1/refunds/request
    */
-  requestRefund: async (payload: RefundRequestPayload): Promise<RefundResponse> => {
-    return request<RefundResponse>("/api/v1/refunds/request", {
+  request(payload: RefundRequestPayload): Promise<RefundResponse> {
+    return apiRequest<RefundResponse>("/refund/request", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: payload,
     });
   },
 
   /**
-   * ยื่นฟอร์มขอคืนเงินแบบใช้ Voucher (กรณีที่นั่งโดนยกเลิกจากการปิดโซน)
-   * Endpoint: POST /api/v1/refunds/voucher/{booking_id}
+   * ยื่นฟอร์มขอคืนเงินแบบใช้ voucher (กรณีที่นั่งโดนยกเลิกจากการปิดโซน)
+   * Backend: POST /api/v1/refunds/voucher/{booking_id}
    */
-  requestVoucherRefund: async (bookingId: number, payload: VoucherRefundPayload): Promise<RefundResponse> => {
-    return request<RefundResponse>(`/api/v1/refunds/voucher/${bookingId}`, {
+  voucher(
+    bookingId: number,
+    payload: VoucherRefundPayload
+  ): Promise<RefundResponse> {
+    return apiRequest<RefundResponse>(`/refund/voucher/${bookingId}`, {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: payload,
     });
-  }
+  },
 };

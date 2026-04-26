@@ -157,8 +157,8 @@ router.register({
     }
 
     // ดึงค่า isVoucher จาก URL Parameters (?isVoucher=true)
-    const searchParams = new URLSearchParams(window.location.search);
-    const isVoucher = searchParams.get("isVoucher") === "true";
+    // hash router: query params อยู่ใน window.location.hash ไม่ใช่ .search
+    const isVoucher = router.paramString("isVoucher") === "true";
 
     // อย่าลืมครอบด้วย render() เพื่อให้มันวาดลงบนจอ
     render(renderRefundView({ bookingId, isVoucher }));

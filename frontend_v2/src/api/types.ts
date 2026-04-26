@@ -255,11 +255,3 @@ export interface VerifyTicketResponse {
   zone_name: string;
   seat_number: string;
 }
-
-export interface RefundRequestPayload {
-  booking_id: number;
-  bank_name: string;
-  account_number: string;
-  account_name: string;
-  reason?: string;
-}
