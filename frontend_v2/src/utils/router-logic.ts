@@ -29,6 +29,12 @@ export class MyRouter {
     return val ? parseInt(val, 10) : null;
   }
 
+  // ดึงค่า string จาก URL (เช่น /refund?isVoucher=true)
+  paramString(name: string): string | null {
+    const params = new URLSearchParams(window.location.hash.split("?")[1]);
+    return params.get(name);
+  }
+
   // เริ่มทำงาน
   start(): void {
     const handleRoute = () => {

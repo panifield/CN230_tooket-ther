@@ -242,8 +242,8 @@ router.register({
       router.navigate("/my-tickets"); 
       return; 
     }
-    const searchParams = new URLSearchParams(window.location.search);
-    const isVoucher = searchParams.get("isVoucher") === "true";
+    // hash router: query params อยู่ใน window.location.hash ไม่ใช่ .search
+    const isVoucher = router.paramString("isVoucher") === "true";
     render(renderRefundView({ bookingId, isVoucher }));
   }
 });

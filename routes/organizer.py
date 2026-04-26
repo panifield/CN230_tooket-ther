@@ -590,6 +590,22 @@ def approve_refund(booking_id: int, current_user: CurrentUser):
                         detail=f"booking สถานะ '{b_status}' ไม่อยู่ในคิวขออนุมัติคืนเงิน",
                     )
 
+                # ตั๋วที่ถูก check-in ไปแล้ว = ใช้งานเข้างานแล้ว ห้ามอนุมัติคืนเงิน
+                # (ปกติเคสนี้ควรถูกบล็อกตั้งแต่ /api/v1/refunds/request แต่กันเหนียวอีกชั้น
+                # เพราะถ้าปล่อยให้ DELETE ticket ดำเนินต่อ FK ของ ticket_checkin จะพัง 500)
+                cur.execute(
+                    """
+                    SELECT COUNT(*) FROM ticket_checkin
+                    WHERE ticket_id IN (SELECT id FROM ticket WHERE booking_id = %s)
+                    """,
+                    (b_id,),
+                )
+                if (cur.fetchone()[0] or 0) > 0:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="ไม่สามารถคืนเงินได้เนื่องจากตั๋วถูกใช้งานไปแล้ว (Ticket already checked in)",
+                    )
+
                 # หา seat_id ของ ticket ก่อนลบ
                 cur.execute(
                     "SELECT seat_id FROM ticket WHERE booking_id = %s",
