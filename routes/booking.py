@@ -693,8 +693,9 @@ def rebook_zone_closure(
     - new_seat_ids ต้องอยู่ในโซน active, concert เดียวกัน, status='available'
     - new_total ต้องมากกว่า original_total (รับเฉพาะ upgrade ที่แพงกว่า)
     - transaction: lock seats → DELETE ticket เก่า → free seat เก่า → seat ใหม่ → 'locked'
-      → INSERT ticket ใหม่ → booking.total_amount = ส่วนต่าง, status='pending', expired_at=15min
+      → INSERT ticket ใหม่ → booking.total_amount = new_total, status='pending', expired_at=15min
     - คืน difference_amount เพื่อให้ user เข้า payment flow ต่อจ่ายส่วนต่าง
+      (payment.amount จะคำนวณจาก booking.total_amount - sum(payment paid))
     """
     if current_user["role"] != "customer":
         raise HTTPException(status_code=403, detail="เฉพาะลูกค้าเท่านั้น")
@@ -837,9 +838,12 @@ def rebook_zone_closure(
                     )
                     new_ticket_ids.append(cur.fetchone()[0])
 
-                # booking เข้าสู่ payment flow รอบใหม่: total_amount = ส่วนต่าง,
-                # status='pending', expired_at=NOW()+15min. payment เดิม (paid)
-                # ยังเก็บไว้ในตาราง payment เพื่อ accounting.
+                # booking เข้าสู่ payment flow รอบใหม่: total_amount = new_total
+                # (ยอดรวมใหม่ทั้งก้อน — เพื่อให้ vw_concert_sales / dashboard
+                # รายงานรายได้ครบทั้งก้อนหลัง upgrade), status='pending',
+                # expired_at=NOW()+15min. ส่วนต่างที่ลูกค้าต้องจ่ายเพิ่มจะคำนวณ
+                # ใน /payment/generate-qr จาก total_amount - sum(payment paid).
+                # payment เดิม (paid) ยังเก็บไว้ในตาราง payment เพื่อ accounting.
                 new_expired_at = datetime.now(timezone.utc) + timedelta(minutes=15)
                 cur.execute(
                     """
@@ -850,7 +854,7 @@ def rebook_zone_closure(
                         expired_at = %s
                     WHERE id = %s AND status = 'zone_closed_action_required'
                     """,
-                    (difference_amount, len(new_seat_ids), new_expired_at, b_id),
+                    (new_total, len(new_seat_ids), new_expired_at, b_id),
                 )
                 if cur.rowcount != 1:
                     raise HTTPException(

@@ -691,8 +691,11 @@ class DashboardResponse(BaseModel):
 def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
     """
     Phase 6 — สรุปรายรับ/รายจ่ายรายวันของคอนเสิร์ต (Asia/Bangkok timezone)
-    - income: payment.status='paid' รวมตาม paid_at (แปลงเป็นเวลาไทยก่อน)
-    - expense: refund ที่ยังไม่ถูก reject รวมตามเวลาคำขอ/อนุมัติ/เสร็จสิ้น
+    อ่านตรงจาก finance ledger เป็น single source of truth:
+      - amount > 0 → income (payment webhook, manual confirm)
+      - amount < 0 → expense (organizer approved refund)
+    finance.created_at ถูกเซ็ตอัตโนมัติตอน INSERT ในทรานแซกชันเดียวกับ
+    payment/refund (ดู routes/payment.py, routes/organizer.py: approve_refund)
     """
     _check_organizer_role(current_user)
     organizer_profile_id = current_user.get("organizer_profile_id")
@@ -714,46 +717,19 @@ def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
                     detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้",
                 )
 
-            # ใช้ payment + refund แทน finance table เพราะ finance ไม่มี timestamp
-            # สำหรับ group by วันได้ — แต่ยอดตรงกันเพราะ finance rows ถูก insert
-            # ใน transaction เดียวกับ payment/refund (ดู routes/payment.py, routes/refund.py)
             cur.execute(
                 """
-                WITH income AS (
-                    SELECT
-                        (p.paid_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok')::date AS day,
-                        SUM(p.amount) AS amount
-                    FROM payment p
-                    JOIN booking b ON b.id = p.booking_id
-                    WHERE b.concert_id = %s
-                      AND p.status = 'paid'
-                      AND p.paid_at IS NOT NULL
-                    GROUP BY day
-                ),
-                expense AS (
-                    -- นับเฉพาะ refund ที่ organizer อนุมัติแล้ว (approved/completed)
-                    -- pending_transfer/requested/processing = ยังไม่ใช่รายจ่ายจริง,
-                    -- การ "ขอคืน" ของลูกค้าไม่ควรกระทบ dashboard ของ organizer
-                    SELECT
-                        (COALESCE(r.completed_at, r.approved_at, r.requested_at)
-                            AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok')::date AS day,
-                        SUM(r.amount) AS amount
-                    FROM refund r
-                    JOIN payment p ON p.id = r.payment_id
-                    JOIN booking b ON b.id = p.booking_id
-                    WHERE b.concert_id = %s
-                      AND r.status IN ('approved', 'completed')
-                    GROUP BY day
-                )
                 SELECT
-                    COALESCE(i.day, e.day) AS day,
-                    COALESCE(i.amount, 0) AS income,
-                    COALESCE(e.amount, 0) AS expense
-                FROM income i
-                FULL OUTER JOIN expense e ON e.day = i.day
+                    (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok')::date
+                        AS day,
+                    SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
+                    SUM(CASE WHEN amount < 0 THEN -amount ELSE 0 END) AS expense
+                FROM finance
+                WHERE concert_id = %s
+                GROUP BY day
                 ORDER BY day ASC
                 """,
-                (concert_id, concert_id),
+                (concert_id,),
             )
             rows = cur.fetchall()
 

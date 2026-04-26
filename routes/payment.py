@@ -161,8 +161,27 @@ def generate_qr(body: GenerateQrBody, current_user: CurrentUser):
                         payment_id, transaction_ref, b_id,
                     )
                 else:
+                    # คิดส่วนต่างที่ต้องเก็บจริง: total_amount - ยอดที่จ่ายไปแล้ว.
+                    # กรณีจองใหม่ปกติ paid_so_far = 0 → amount = total_amount.
+                    # กรณี upgrade หลัง zone closure (booking.total_amount =
+                    # new_total) paid_so_far = original_total → amount = delta.
+                    cur.execute(
+                        """
+                        SELECT COALESCE(SUM(amount), 0)
+                        FROM payment
+                        WHERE booking_id = %s AND status = 'paid'
+                        """,
+                        (b_id,),
+                    )
+                    paid_so_far = cur.fetchone()[0] or Decimal("0")
+                    amount = Decimal(b_amount) - Decimal(paid_so_far)
+                    if amount <= 0:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="booking นี้ไม่มียอดค้างชำระ",
+                        )
+
                     transaction_ref = f"TX-{b_id}-{int(time.time())}-{secrets.token_hex(4)}"
-                    amount = b_amount
                     cur.execute(
                         """
                         INSERT INTO payment
