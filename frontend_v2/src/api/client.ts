@@ -5,7 +5,7 @@ import { events } from "../state/events";
 // proxies those prefixes to http://localhost:8000 (see vite.config.ts).
 // Set VITE_API_BASE in production to point at the live API host (no trailing slash).
 const API_BASE: string =
-  (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+  (import.meta.env.VITE_API_URL as string | undefined) ?? "";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -25,7 +25,20 @@ interface RequestOptions {
 }
 
 function buildUrl(path: string, query?: RequestOptions["query"]): string {
-  const url = new URL(API_BASE + path, window.location.origin);
+  // If API_BASE is set (e.g. in production), use it as the base.
+  // Otherwise, use relative paths for Vite proxy to work in development.
+  if (API_BASE) {
+    const url = new URL(path.startsWith("/") ? path.slice(1) : path, API_BASE.endsWith("/") ? API_BASE : API_BASE + "/");
+    if (query) {
+      for (const [k, v] of Object.entries(query)) {
+        if (v !== undefined) url.searchParams.set(k, String(v));
+      }
+    }
+    return url.toString();
+  }
+
+  // Fallback for development proxy
+  const url = new URL(path, window.location.origin);
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v !== undefined) url.searchParams.set(k, String(v));
