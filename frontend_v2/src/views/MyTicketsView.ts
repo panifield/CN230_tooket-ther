@@ -7,12 +7,19 @@ import { events } from "../state/events";
 import { router } from "../router-instance";
 
 const ZONE_CLOSED = "zone_closed_action_required";
+const REFUND_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+function parseAsUtc(s: string | null | undefined): number {
+  if (!s) return NaN;
+  const hasOffset = /[zZ]|[+-]\d{2}:?\d{2}$/.test(s);
+  return new Date(hasOffset ? s : `${s}Z`).getTime();
+}
 
 export function renderMyTicketsView(): HTMLElement {
   // ── 🛠️ ปรับพื้นหลังของหน้าเพจให้เป็นสีขาว ──
   const container = el("div", { 
     class: "bg-tickets-page", 
-    attrs: { style: "background: #FFFFFF; min-height: 100vh;" } 
+    attrs: { style: "background: #FFFFFF;\] min-height: 100vh;" } 
   }, [
     el("div", {
       attrs: { style: "max-width: 1000px; margin: 0 auto; padding: 64px 24px;" }
@@ -72,7 +79,7 @@ export function renderMyTicketsView(): HTMLElement {
         el("article", { class: "ticket-card-v2", attrs: { style: "background: #FFFFFF; border: 1px solid var(--color-border);" } }, [
           
           // ── ฝั่งข้อมูล (ซ้าย) ──
-          el("div", { class: "ticket-card-v2__info", attrs: { style: "position: relative; background: #def6ff;" } }, [
+          el("div", { class: "ticket-card-v2__info", attrs: { style: "position: relative; background: #FFFFFF;" } }, [
             
             // ── วงกลมรอยฉีกสีขาว ──
             el("div", { 
@@ -108,14 +115,13 @@ export function renderMyTicketsView(): HTMLElement {
           // ── ฝั่ง QR Code หรือ Action ──
           t.booking.status === ZONE_CLOSED
             ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id, loadTickets)
-            : el("div", { 
-                class: "ticket-card-v2__qr-area", 
-                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" } 
+            : el("div", {
+                class: "ticket-card-v2__qr-area",
+                attrs: { style: "background: #AAD6FA; border-left: 1px dashed var(--color-border);" }
               }, [
                 el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
                   el("img", {
                     attrs: {
-                      // ใช้ hash จริงจาก backend
                       src: `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${t.qr_hash}`,
                       alt: "Verification QR",
                       style: "width: 100%; height: 100%;"
@@ -124,18 +130,22 @@ export function renderMyTicketsView(): HTMLElement {
                 ]),
 
                 el("div", { attrs: { style: "display: flex; gap: 12px; margin-bottom: 16px; width: 100%;" } }, [
-                  el("button", { 
-                    class: "btn-outline-sm", 
-                    attrs: { style: "flex: 1;" }, 
+                  el("button", {
+                    class: "btn-outline-sm",
+                    attrs: { style: "flex: 1;" },
                     text: "DOWNLOAD",
                     on: { click: () => downloadTicket(t) }
                   }),
                   el("button", { class: "btn-outline-sm", attrs: { style: "flex: 1;" }, text: "SHARE" })
                 ]),
 
+                ...(isRefundEligible(t.booking)
+                  ? [renderRequestRefundButton(t.booking.booking_id, t.booking.total_tickets, loadTickets)]
+                  : []),
+
                 el("span", {
                   class: "label-mono",
-                  attrs: { style: "color: var(--color-primary-blue); font-size: 10px; cursor: pointer;" },
+                  attrs: { style: "color: #6f5e4e; font-size: 10px; cursor: pointer;" },
                   text: "PREVIEW SCANNER ›"
                 })
               ])
@@ -191,35 +201,9 @@ export function renderMyTicketsView(): HTMLElement {
       text: "UPGRADE SEAT",
     }) as HTMLButtonElement;
 
-    refundBtn.addEventListener("click", async () => {
-      if (!window.confirm("Request a full refund for this booking? This cannot be undone.")) return;
-      const bank_name = window.prompt("Bank name:")?.trim();
-      if (!bank_name) return;
-      const account_number = window.prompt("Account number:")?.trim();
-      if (!account_number) return;
-      const account_name = window.prompt("Account holder name:")?.trim();
-      if (!account_name) return;
-      const reason = window.prompt("Reason (optional):")?.trim();
-
-      refundBtn.disabled = true;
-      upgradeBtn.disabled = true;
-      refundBtn.textContent = "SUBMITTING...";
-      try {
-        const payload = reason
-          ? { bank_name, account_number, account_name, reason }
-          : { bank_name, account_number, account_name };
-        const res = await refundApi.voucher(bookingId, payload);
-        events.emit("log", { level: "info", message: res.message ?? "Refund request submitted" });
-        reload();
-      } catch (err) {
-        const detail =
-          err instanceof ApiError ? err.detail :
-          err instanceof Error ? err.message : "Refund failed";
-        events.emit("log", { level: "error", message: `Refund failed: ${detail}` });
-        refundBtn.disabled = false;
-        upgradeBtn.disabled = false;
-        refundBtn.textContent = "REQUEST REFUND";
-      }
+    // ── 🛠️ เปลี่ยนให้ Navigate ไปหน้า Refund แทนการใช้ window.prompt ──
+    refundBtn.addEventListener("click", () => {
+      router.navigate(`/refund?bookingId=${bookingId}&isVoucher=true`);
     });
 
     upgradeBtn.addEventListener("click", () => {
@@ -239,6 +223,34 @@ export function renderMyTicketsView(): HTMLElement {
       refundBtn,
       upgradeBtn,
     ]);
+  }
+
+  function isRefundEligible(booking: { status: string; created_at: string | null }): boolean {
+    if (booking.status !== "paid") return false;
+    const paidAt = parseAsUtc(booking.created_at);
+    if (isNaN(paidAt)) return false;
+    return Date.now() - paidAt <= REFUND_WINDOW_MS;
+  }
+
+  function renderRequestRefundButton(
+    bookingId: number,
+    totalTickets: number,
+    reload: () => void
+  ): HTMLElement {
+    const isMulti = totalTickets > 1;
+    const label = isMulti ? "REFUND ENTIRE BOOKING" : "REQUEST REFUND";
+    const btn = el("button", {
+      class: "btn btn--ghost btn--block",
+      attrs: { style: "padding: 10px; margin-bottom: 12px; color: var(--color-danger); border-color: var(--color-danger);" },
+      text: label,
+    }) as HTMLButtonElement;
+
+    // ── 🛠️ เปลี่ยนให้ Navigate ไปหน้า Refund แทนการใช้ window.prompt ──
+    btn.addEventListener("click", () => {
+      router.navigate(`/refund?bookingId=${bookingId}&isVoucher=false`);
+    });
+
+    return btn;
   }
 
   loadTickets();

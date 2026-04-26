@@ -129,7 +129,7 @@ export function renderPaymentView(props: { bookingId: number }): HTMLElement {
         ]),
 
         // กล่องแสดง QR Code
-        el("div", { class: "card card--cream", attrs: { style: "text-align: center; padding: 48px 24px; border: 2px solid var(--color-primary-blue);" } }, [
+        el("div", { class: "card card--white", attrs: { style: "text-align: center; padding: 48px 24px; border: 2px solid var(--color-primary-blue);" } }, [
           el("span", { class: "label-mono", attrs: { style: "color: var(--color-primary-blue); margin-bottom: 32px; display: block;" }, text: "PAYMENT METHOD: PROMPTPAY QR CODE" }),
           
           el("div", { class: "qr-box", attrs: { style: "margin: 0 auto 32px auto; width: 280px; height: 280px; padding: 16px; background: var(--color-white); border-radius: 8px; box-shadow: var(--shadow-card);" } }, [

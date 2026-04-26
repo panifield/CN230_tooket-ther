@@ -6,10 +6,13 @@ import { router } from "../router";
 import { el, mount, clear } from "../utils/dom";
 import { isEmail, isPassword, nonEmpty } from "../utils/validation";
 
+// ── Shared UI Configs ──
+const cardStyle = "background: #FFFFFF; border: 1px solid rgba(0, 0, 0, 0.08); box-shadow: 0px 4px 12px rgba(1, 1, 32, 0.06); border-radius: 8px; padding: 48px 40px;";
+
 export function renderAuthView(): HTMLElement {
   const container = el("div", { 
-    class: "coastal-page", 
-    attrs: { style: "display: flex; align-items: center; justify-content: center; min-height: 80vh; padding: 40px 20px;" } 
+    class: "bg-tickets-page", 
+    attrs: { style: "display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 64px 24px; background: #FFFFFF; font-family: 'The Future', sans-serif;" } 
   });
   
   let isLoginMode = true;
@@ -28,24 +31,22 @@ export function renderAuthView(): HTMLElement {
 }
 
 function renderLoginCard(onGoToRegister: () => void): HTMLElement {
-  const error = el("p", { class: "field__error", attrs: { style: "text-align: center; margin-bottom: 16px;" } });
+  const error = el("p", { attrs: { style: "text-align: center; margin-bottom: 24px; padding: 12px; background: #FFF4C7; color: #010120; border-radius: 4px; font-size: 14px; display: none;" } });
   
   const emailInput = makeInput("login-email", "email", "name@example.com", "email");
   const passwordInput = makeInput("login-password", "password", "••••••••", "current-password");
 
-  const submitBtn = el(
-    "button",
-    {
-      class: "coastal-btn-primary",
-      attrs: { type: "submit", style: "width: 100%; margin-top: 8px;" },
-    },
-    ["SIGN IN"]
-  ) as HTMLButtonElement;
+  // 🛠️ ใช้คลาส btn--primary ของระบบ เพื่อดึงฟอนต์และสไตล์ที่ถูกต้องมาใช้
+  const submitBtn = el("button", { 
+    class: "btn btn--primary btn--block", 
+    attrs: { type: "submit", style: "padding: 16px; font-size: 16px; margin-top: 8px;" } 
+  }, ["SIGN IN"]) as HTMLButtonElement;
 
   const submit = async (): Promise<void> => {
-    error.textContent = "";
+    error.style.display = "none";
     if (!isEmail(emailInput.value) || !isPassword(passwordInput.value)) {
       error.textContent = "Enter a valid email and a password (4+ chars).";
+      error.style.display = "block";
       return;
     }
     submitBtn.disabled = true;
@@ -59,6 +60,7 @@ function renderLoginCard(onGoToRegister: () => void): HTMLElement {
       routeForRole(me.role);
     } catch (err) {
       error.textContent = err instanceof Error ? err.message : "Sign in failed.";
+      error.style.display = "block";
       submitBtn.disabled = false;
       submitBtn.textContent = "SIGN IN";
     }
@@ -70,72 +72,45 @@ function renderLoginCard(onGoToRegister: () => void): HTMLElement {
       window.location.href = authorize_url;
     } catch (err) {
       error.textContent = err instanceof Error ? err.message : "Could not start OAuth.";
+      error.style.display = "block";
     }
   };
 
-  const form = el(
-    "form",
-    {
-      attrs: { novalidate: "true" },
-      on: {
-        submit: (e) => {
-          e.preventDefault();
-          void submit();
-        },
-      },
-    },
-    [
+  const form = el("form", { attrs: { novalidate: "true", style: "width: 100%;" }, on: { submit: (e) => { e.preventDefault(); void submit(); } } }, [
       labelled("login-email", "EMAIL ADDRESS", emailInput),
       labelled("login-password", "PASSWORD", passwordInput),
       error,
       submitBtn,
 
       // ── Social Login & Links ──
-      el("div", { class: "divider", attrs: { style: "margin: 32px 0 24px 0;" }, text: "OR CONTINUE WITH" }),
+      el("div", { attrs: { style: "margin: 32px 0 24px 0; text-align: center; font-family: 'PP Neue Montreal Mono', monospace; font-size: 10px; color: #010120; opacity: 0.4; letter-spacing: 0.055px;" } }, ["OR CONTINUE WITH"]),
       
-      // ปุ่ม LINE และ Google อยู่ตรงกลาง
       el("div", { attrs: { style: "display: flex; gap: 16px; justify-content: center; width: 100%; margin-bottom: 32px;" } }, [
-        el("button", { 
-          class: "btn btn--secondary", 
-          attrs: { type: "button", style: "flex: 1; justify-content: center;" }, 
-          on: { click: () => void oauth("line") } 
-        }, ["LINE"]),
-        el("button", { 
-          class: "btn btn--secondary", 
-          attrs: { type: "button", style: "flex: 1; justify-content: center;" }, 
-          on: { click: () => void oauth("google") } 
-        }, ["Google"]),
+        el("button", { class: "btn btn--ghost", attrs: { type: "button", style: "flex: 1; padding: 14px; background: #aad6fa6d;" }, on: { click: () => void oauth("line") } }, ["LINE"]),
+        el("button", { class: "btn btn--ghost", attrs: { type: "button", style: "flex: 1; padding: 14px; background: #aad6fa6d;#AAD6FA;" }, on: { click: () => void oauth("google") } }, ["Google"]),
       ]),
 
-      // Forgot Password & Register (อยู่คู่กันตรงกลาง)
+      // Forgot Password & Register
       el("div", { attrs: { style: "display: flex; gap: 12px; justify-content: center; align-items: center; width: 100%; flex-wrap: wrap;" } }, [
-        el("a", { class: "btn btn--ghost btn--sm", attrs: { href: "#/forgot" } }, ["Forgot password?"]),
+        el("a", { class: "label-mono", attrs: { href: "#/forgot", style: "color: #010120; opacity: 0.6; text-decoration: none;" } }, ["Forgot password?"]),
         el("span", { class: "label-mono", attrs: { style: "opacity: 0.3;" }, text: "•" }),
-        el("button", { 
-          class: "btn btn--ghost btn--sm", 
-          attrs: { type: "button", style: "color: var(--color-primary-blue);" }, 
-          on: { click: onGoToRegister } 
-        }, ["Don't have an account?"])
+        el("button", { attrs: { type: "button", style: "background: none; border: none; font-family: 'PP Neue Montreal Mono', monospace; font-size: 11px; color: #AAD6FA; cursor: pointer; text-transform: uppercase;" }, on: { click: onGoToRegister } }, ["Create Account"])
       ])
     ]
   );
 
   return el("div", { attrs: { style: "width: 100%; max-width: 440px; margin: 0 auto;" } }, [
-    el("div", { attrs: { style: "text-align: center; margin-bottom: 32px;" } }, [
-      el("div", { attrs: { style: "width: 64px; height: 64px; background: var(--gradient-coastal); border-radius: var(--radius-control); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; box-shadow: var(--shadow-card);" } }),
-      el("h1", { class: "concert-title", text: "Access Portal" }),
-      el("p", { class: "label-mono", text: "Sign in to your TOOKET-THER account" })
+    el("div", { attrs: { style: "text-align: center; margin-bottom: 40px;" } }, [
+      el("p", { class: "label-mono", attrs: { style: "color: #967E67; margin-bottom: 12px;" } }, ["AUTHENTICATION / LOGIN"]),
+      el("h1", { class: "concert-title", attrs: { style: "margin: 0; font-size: 40px; letter-spacing: -0.8px; color: #010120;" } }, ["Access Portal"])
     ]),
-    el("div", { class: "card", attrs: { style: "padding: 40px 32px;" } }, [form])
+    el("div", { attrs: { style: cardStyle } }, [form])
   ]);
 }
 
 function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
-  const banner = el("div", {
-    class: "banner banner--err",
-    attrs: { role: "alert", style: "display:none; margin-bottom: 24px;" },
-  });
-  const success = el("p", { class: "label-mono", attrs: { style: "color: var(--color-primary-blue); text-align: center; margin-bottom: 16px;" } });
+  const errorBanner = el("div", { attrs: { style: "margin-bottom: 24px; padding: 12px; background: #FFF4C7; color: #010120; border-radius: 4px; font-size: 14px; display: none;" } });
+  const successMsg = el("p", { class: "label-mono", attrs: { style: "color: #AAD6FA; text-align: center; margin-bottom: 16px;" } });
 
   const fields = {
     name: makeInput("reg-name", "text", "John Doe", "name"),
@@ -146,13 +121,7 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
     password: makeInput("reg-password", "password", "••••••••", "new-password"),
   };
 
-  const roleSelect = el(
-    "select",
-    {
-      class: "coastal-input",
-      attrs: { id: "reg-role" },
-    },
-    [
+  const roleSelect = el("select", { attrs: { id: "reg-role", style: "width: 100%; padding: 16px 20px; background: #FFFFFF; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 4px; font-size: 16px; color: #010120; outline: none;" } }, [
       el("option", { attrs: { value: "customer" }, text: "Customer" }),
       el("option", { attrs: { value: "organizer" }, text: "Organizer" }),
       el("option", { attrs: { value: "staff" }, text: "Gate Staff" }),
@@ -160,22 +129,19 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
   ) as HTMLSelectElement;
 
   const showError = (msg: string): void => {
-    banner.textContent = msg;
-    banner.style.display = msg ? "block" : "none";
+    errorBanner.textContent = msg;
+    errorBanner.style.display = msg ? "block" : "none";
   };
 
-  const submitBtn = el(
-    "button",
-    {
-      class: "coastal-btn-primary",
-      attrs: { type: "submit", style: "width: 100%; margin-top: 16px;" },
-    },
-    ["REGISTER"]
-  ) as HTMLButtonElement;
+  // 🛠️ ใช้คลาสมาตรฐานของระบบ
+  const submitBtn = el("button", { 
+    class: "btn btn--primary btn--block", 
+    attrs: { type: "submit", style: "padding: 16px; font-size: 16px;" } 
+  }, ["REGISTER"]) as HTMLButtonElement;
 
   const submit = async (): Promise<void> => {
     showError("");
-    success.textContent = "";
+    successMsg.textContent = "";
     const payload = {
       id_card: fields.id_card.value.trim(),
       name: fields.name.value.trim(),
@@ -197,7 +163,7 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
     submitBtn.textContent = "CREATING ACCOUNT...";
     try {
       const result = await authApi.register(payload);
-      success.textContent = `${result.message} (id #${result.user_id}). You can sign in now.`;
+      successMsg.textContent = `${result.message} (id #${result.user_id}). You can sign in now.`;
       for (const input of Object.values(fields)) input.value = "";
     } catch (err) {
       showError(err instanceof Error ? err.message : "Registration failed.");
@@ -207,52 +173,34 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
     }
   };
 
-  const form = el(
-    "form",
-    {
-      attrs: { novalidate: "true" },
-      on: {
-        submit: (e) => {
-          e.preventDefault();
-          void submit();
-        },
-      },
-    },
-    [
-      banner,
-      el("div", { class: "coastal-grid", attrs: { style: "margin-bottom: 24px;" } }, [
+  const form = el("form", { attrs: { novalidate: "true", style: "width: 100%;" }, on: { submit: (e) => { e.preventDefault(); void submit(); } } }, [
+      errorBanner,
+      // 🛠️ ขยายระยะห่างของ Grid ให้โปร่งขึ้น (gap: 32px)
+      el("div", { attrs: { style: "display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px;" } }, [
         labelled("reg-name", "FULL NAME", fields.name),
         labelled("reg-id_card", "ID / PASSPORT NUMBER", fields.id_card),
         labelled("reg-email", "EMAIL ADDRESS", fields.email),
         labelled("reg-phone", "PHONE NUMBER", fields.phone),
-        el("div", { class: "coastal-grid-full" }, [
-          labelled("reg-address", "DOMICILE", fields.address),
-        ]),
+        el("div", { attrs: { style: "grid-column: span 2;" } }, [ labelled("reg-address", "DOMICILE", fields.address) ]),
         labelled("reg-password", "PASSWORD", fields.password),
         labelled("reg-role", "ACCOUNT ROLE", roleSelect),
       ]),
-      success,
+      successMsg,
       submitBtn,
 
-      // Back to Login Link
       el("div", { attrs: { style: "text-align: center; margin-top: 32px;" } }, [
         el("span", { class: "label-mono", attrs: { style: "opacity: 0.5;" }, text: "Already have an account? " }),
-        el("button", { 
-          class: "btn btn--ghost btn--sm", 
-          attrs: { type: "button", style: "color: var(--color-primary-blue);" }, 
-          on: { click: onGoToLogin } 
-        }, ["Sign in here"])
+        el("button", { attrs: { type: "button", style: "background: none; border: none; font-family: 'PP Neue Montreal Mono', monospace; font-size: 11px; color: #AAD6FA; cursor: pointer; text-transform: uppercase;" }, on: { click: onGoToLogin } }, ["Sign in here"])
       ])
     ]
   );
 
-  return el("div", { attrs: { style: "width: 100%; max-width: 640px; margin: 0 auto;" } }, [
-    el("div", { attrs: { style: "text-align: center; margin-bottom: 32px;" } }, [
-      el("div", { attrs: { style: "width: 64px; height: 64px; background: var(--gradient-coastal); border-radius: var(--radius-control); display: flex; align-items: center; justify-content: center; margin: 0 auto 24px auto; box-shadow: var(--shadow-card);" } }),
-      el("h1", { class: "concert-title", text: "Create Account" }),
-      el("p", { class: "label-mono", text: "Join the TOOKET-THER priority network" })
+  return el("div", { attrs: { style: "width: 100%; max-width: 680px; margin: 0 auto;" } }, [
+    el("div", { attrs: { style: "text-align: center; margin-bottom: 40px;" } }, [
+      el("p", { class: "label-mono", attrs: { style: "color: #967E67; margin-bottom: 12px;" } }, ["AUTHENTICATION / REGISTER"]),
+      el("h1", { class: "concert-title", attrs: { style: "margin: 0; font-size: 40px; letter-spacing: -0.8px; color: #010120;" } }, ["Create Account"])
     ]),
-    el("div", { class: "card", attrs: { style: "padding: 48px 40px;" } }, [form])
+    el("div", { attrs: { style: cardStyle } }, [form])
   ]);
 }
 
@@ -260,21 +208,28 @@ function renderRegisterCard(onGoToLogin: () => void): HTMLElement {
 
 function makeInput(id: string, type: string, placeholder: string = "", autocomplete = ""): HTMLInputElement {
   return el("input", {
-    class: "coastal-input",
     attrs: {
       id,
       type,
       placeholder,
+      // 🛠️ เพิ่ม Padding ให้ช่องกรอกข้อมูลดูใหญ่และอ่านง่ายขึ้น
+      style: "width: 100%; padding: 16px 20px; background: #FFFFFF; border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 4px; font-size: 16px; color: #010120; box-sizing: border-box; outline: none; transition: border-color 0.2s;",
       ...(autocomplete ? { autocomplete } : {}),
     },
+    on: {
+      focus: (e: Event) => (e.target as HTMLElement).style.borderColor = "#AAD6FA",
+      blur: (e: Event) => (e.target as HTMLElement).style.borderColor = "rgba(0, 0, 0, 0.08)",
+    }
   }) as HTMLInputElement;
 }
 
 function labelled(id: string, label: string, ctrl: HTMLElement): HTMLElement {
-  return el("div", { class: "coastal-input-group" }, [
+  // 🛠️ ขยายระยะห่าง (margin-bottom) ระหว่างแต่ละฟิลด์ให้โปร่งขึ้นเป็น 32px
+  return el("div", { attrs: { style: "margin-bottom: 32px;" } }, [
     el("label", {
       class: "label-mono",
-      attrs: { for: id },
+      // 🛠️ เพิ่มระยะห่างระหว่าง Label และ Input เล็กน้อย
+      attrs: { for: id, style: "display: block; opacity: 0.6; margin-bottom: 12px; color: #010120;" },
       text: label,
     }),
     ctrl,

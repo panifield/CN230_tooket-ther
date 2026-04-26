@@ -4,7 +4,6 @@ import "./styles/components.css";
 
 import { authApi } from "./api/auth";
 import { renderHeader } from "./components/header";
-
 import { renderLogPanel } from "./components/logPanel";
 import { router } from "./router-instance";
 import { authStore } from "./state/auth";
@@ -25,18 +24,21 @@ import { renderPaymentView } from "./views/Payment.view";
 import { renderControlRoomView } from "./views/ControlRoom.view";
 import { renderCreateConcertView } from "./views/CreateConcert.view";
 import { renderStaffView } from "./views/Staff.view";
+import { renderRefundView } from "./views/Refund.view";
 
 const root = qs<HTMLDivElement>("#app");
 
 function render(view: HTMLElement): void {
   if (!root) return;
   clear(root);
-  
   root.append(
     el("div", { 
       class: "app-shell", 
-      attrs: { style: "display: flex; flex-direction: column; min-height: 100vh; background: #FFFFFF;" } 
+      attrs: { 
+        style: "background: radial-gradient(circle at 100% 0%, rgba(197, 246, 250, 0.4) 0%, rgba(255, 255, 255, 1) 40%); background-attachment: fixed; min-height: 100vh; display: flex; flex-direction: column;" 
+      }
     }, [
+      // Navbar (Glassmorphism)
       renderHeader(),
       
       // Main Content Area
@@ -45,37 +47,57 @@ function render(view: HTMLElement): void {
         attrs: { role: "main", style: "flex-grow: 1;" } 
       }, [view]),
       
-      // Log Panel Section (เอาพื้นหลังสี Cream ออกแล้ว)
+      // Log Panel Section
       el("section", { 
-        attrs: { style: "padding: var(--space-6) 0; border-top: 1px solid var(--color-border);" } 
+        attrs: { style: "padding: 24px 0; border-top: 1px solid rgba(0,0,0,0.05);" } 
       }, [
-        el("div", { attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 var(--space-5);" } }, [renderLogPanel()]),
+        el("div", { attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px;" } }, [renderLogPanel()]),
       ]),
 
-      // Footer (Coastal Edition - คืนค่า Font แบบเดิม)
-      // ในไฟล์ main.ts ตรงส่วน Footer
-el("footer", { 
-  attrs: { style: "background: var(--color-midnight); color: var(--color-white); padding: 64px 0; border-top: 1px solid rgba(255,255,255,0.1);" } 
-}, [
-  el("div", { 
-    attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center;" } 
-  }, [
-    el("div", {}, [
-      el("p", { 
-        class: "label-mono", 
-        attrs: { style: "color: var(--color-primary-blue); margin-bottom: 8px;" }, 
-        text: "TOOKET-THER / COASTAL EDITION" 
-      }),
-      el("p", { 
-        attrs: { style: "font-size: 12px; opacity: 0.4; font-family: var(--font-display);" }, 
-        text: "Built for CN230. © 2026. Infrastructure for Live Intelligence." 
-      }),
-    ]),
-    el("div", { class: "label-mono", attrs: { style: "opacity: 0.2;" } }, [
-      el("span", { text: "LAT: 13.7563 / LON: 100.5018" })
-    ])
-  ]),
-])
+      // ── 🛠️ Footer (Decorative & Structured matching Layout.tsx) ──
+      el("footer", { 
+        attrs: { style: "background: #010120; color: #FFFFFF; padding: 80px 0 32px 0; margin-top: auto; font-family: 'The Future', sans-serif;" } 
+      }, [
+        el("div", { 
+          attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px;" } 
+        }, [
+          // Upper Section: Grid Layout
+          el("div", { attrs: { style: "display: flex; flex-wrap: wrap; gap: 48px; justify-content: space-between;" } }, [
+            
+            // Col 1: Brand & Description
+            el("div", { attrs: { style: "flex: 1 1 400px; display: flex; flex-direction: column; gap: 24px;" } }, [
+              el("div", { attrs: { style: "display: flex; align-items: center; gap: 12px;" } }, [
+                el("div", { attrs: { style: "width: 32px; height: 32px; background: var(--gradient-coastal); border-radius: 4px;" } }),
+                el("span", { attrs: { style: "font-size: 20px; font-weight: 500; letter-spacing: -0.8px;" } }, ["TOOKET-THER"])
+              ]),
+              el("p", { 
+                attrs: { style: "color: rgba(255,255,255,0.6); max-width: 380px; line-height: 1.6; font-size: 14px;" }, 
+                text: "Built for CN230. Infrastructure for Live Intelligence." 
+              })
+            ]),
+            
+            // Col 2: Platform Links
+            el("div", { attrs: { style: "flex: 1 1 200px;" } }, [
+              el("h4", { class: "label-mono", attrs: { style: "color: rgba(255,255,255,0.4); margin-bottom: 24px; font-size: 11px; letter-spacing: 0.055px;" } }, ["PLATFORM"]),
+              el("ul", { attrs: { style: "list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px;" } }, [
+                el("li", {}, [ el("a", { attrs: { href: "#/", style: "color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; transition: color 0.2s;" }, on: { mouseenter: (e) => (e.target as HTMLElement).style.color = "#AAD6FA", mouseleave: (e) => (e.target as HTMLElement).style.color = "rgba(255,255,255,0.8)" } }, ["Events"]) ]),
+                el("li", {}, [ el("a", { attrs: { href: "#/my-tickets", style: "color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; transition: color 0.2s;" }, on: { mouseenter: (e) => (e.target as HTMLElement).style.color = "#AAD6FA", mouseleave: (e) => (e.target as HTMLElement).style.color = "rgba(255,255,255,0.8)" } }, ["My Tickets"]) ])
+              ])
+            ])
+
+          ]),
+
+          // Lower Section: Meta Info & Copyright
+          el("div", { 
+            attrs: { style: "margin-top: 80px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;" } 
+          }, [
+            el("span", { class: "label-mono", attrs: { style: "color: rgba(255,255,255,0.2); font-size: 10px; letter-spacing: 0.055px;" } }, ["© 2026 TOOKET-THER / COASTAL EDITION"]),
+            el("div", { class: "label-mono", attrs: { style: "color: rgba(255,255,255,0.2); font-size: 10px; letter-spacing: 0.055px; display: flex; gap: 24px;" } }, [
+              el("span", { text: "LAT: 13.7563 / LON: 100.5018" })
+            ])
+          ])
+        ]),
+      ])
     ])
   );
 }
@@ -210,6 +232,22 @@ router.register({
   } 
 });
 
+// หน้า Refund ลงทะเบียนไว้
+router.register({
+  path: "/refund",
+  handler: () => {
+    if (!requireAuth("customer")) return;
+    const bookingId = router.paramInt("bookingId");
+    if (!bookingId) { 
+      router.navigate("/my-tickets"); 
+      return; 
+    }
+    const searchParams = new URLSearchParams(window.location.search);
+    const isVoucher = searchParams.get("isVoucher") === "true";
+    render(renderRefundView({ bookingId, isVoucher }));
+  }
+});
+
 router.setFallback(() => render(renderLandingView()));
 
 // ─────────────────────────────────────────────────────────────
@@ -218,22 +256,18 @@ router.setFallback(() => render(renderLandingView()));
 async function handleOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
-  const state = params.get("state"); // ในที่นี้คือ 'google' หรือ 'line'
+  const state = params.get("state"); 
 
   if (code && state) {
-    // ล้าง URL params เพื่อความสะอาด
     window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
     
     try {
-      // เรียก Backend เพื่อแลก code เป็น JWT
       const auth = await authApi.oauthCallback(state, code, state);
       authStore.setSession(auth);
       
-      // ดึงข้อมูลตัวตน
       const me = await authApi.me();
       authStore.setUser(me);
       
-      // แจ้ง Event เพื่อเปลี่ยนหน้าไปยัง Dashboard
       events.emit("auth:login", { user_id: auth.user_id });
       console.log("OAuth Login Success:", me.name);
     } catch (err) {
@@ -246,6 +280,5 @@ async function handleOAuthCallback() {
 handleOAuthCallback().then(() => {
   router.start();
 });
-
 
 export { router };

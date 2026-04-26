@@ -488,6 +488,180 @@ def close_zone(zone_id: int, background_tasks: BackgroundTasks, current_user: Cu
 
 
 # ---------------------------------------------------------------------------
+# Refund approval — Organizer อนุมัติคำขอคืนเงินที่อยู่ใน refund_pending
+# ---------------------------------------------------------------------------
+
+
+@organizer_router.get("/concerts/{concert_id}/refund-pending")
+def list_pending_refunds(concert_id: int, current_user: CurrentUser):
+    """
+    ดึงรายชื่อ booking ที่อยู่สถานะ 'refund_pending' ของคอนเสิร์ตที่ organizer เป็นเจ้าของ
+    เพื่อแสดงให้ organizer กดอนุมัติได้
+    """
+    _check_organizer_role(current_user)
+    organizer_profile_id = current_user.get("organizer_profile_id")
+    if not organizer_profile_id:
+        raise HTTPException(status_code=400, detail="ไม่พบ organizer profile ของคุณ")
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT organizer_id FROM concert WHERE id = %s",
+                (concert_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="ไม่พบ concert")
+            if row[0] != organizer_profile_id:
+                raise HTTPException(status_code=403, detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้")
+
+            cur.execute(
+                """
+                SELECT b.id, b.total_amount, b.total_tickets, b.created_at,
+                       u.name, u.email,
+                       r.id, r.bank_name, r.account_number, r.account_name, r.reason, r.requested_at
+                FROM booking b
+                JOIN customer_profile cp ON cp.id = b.customer_id
+                JOIN users u ON u.id = cp.user_id
+                LEFT JOIN payment p ON p.booking_id = b.id AND p.status = 'paid'
+                LEFT JOIN refund r ON r.payment_id = p.id
+                WHERE b.concert_id = %s AND b.status = 'refund_pending'
+                ORDER BY b.created_at DESC
+                """,
+                (concert_id,),
+            )
+            rows = cur.fetchall()
+
+    return [
+        {
+            "booking_id": r[0],
+            "total_amount": float(r[1]) if r[1] is not None else 0,
+            "total_tickets": r[2],
+            "created_at": r[3].isoformat() if r[3] else None,
+            "customer_name": r[4],
+            "customer_email": r[5],
+            "refund_id": r[6],
+            "bank_name": r[7],
+            "account_number": r[8],
+            "account_name": r[9],
+            "reason": r[10],
+            "requested_at": r[11].isoformat() if r[11] else None,
+        }
+        for r in rows
+    ]
+
+
+@organizer_router.post("/bookings/{booking_id}/approve-refund")
+def approve_refund(booking_id: int, current_user: CurrentUser):
+    """
+    Organizer อนุมัติคำขอคืนเงิน: booking → 'refunded', ลบ ticket (เคลียร์ UNIQUE(seat_id)),
+    seat → 'available', refund row → 'completed', บันทึก finance หักลบ.
+    Validate: organizer เป็นเจ้าของ concert + booking สถานะ 'refund_pending' เท่านั้น.
+    """
+    _check_organizer_role(current_user)
+    organizer_profile_id = current_user.get("organizer_profile_id")
+    if not organizer_profile_id:
+        raise HTTPException(status_code=400, detail="ไม่พบ organizer profile ของคุณ")
+
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT b.id, b.concert_id, b.status, b.total_amount, c.organizer_id
+                    FROM booking b
+                    JOIN concert c ON c.id = b.concert_id
+                    WHERE b.id = %s
+                    FOR UPDATE OF b
+                    """,
+                    (booking_id,),
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(status_code=404, detail="ไม่พบ booking")
+
+                b_id, concert_id, b_status, total_amount, owner_id = row
+
+                if owner_id != organizer_profile_id:
+                    raise HTTPException(status_code=403, detail="ไม่ใช่ organizer ของคอนเสิร์ตนี้")
+                if b_status != "refund_pending":
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"booking สถานะ '{b_status}' ไม่อยู่ในคิวขออนุมัติคืนเงิน",
+                    )
+
+                # หา seat_id ของ ticket ก่อนลบ
+                cur.execute(
+                    "SELECT seat_id FROM ticket WHERE booking_id = %s",
+                    (b_id,),
+                )
+                seat_ids = [r[0] for r in cur.fetchall()]
+
+                # ลบ ticket เพื่อเคลียร์ UNIQUE(seat_id) ตาม schema เดิม
+                cur.execute("DELETE FROM ticket WHERE booking_id = %s", (b_id,))
+
+                # ปลดที่นั่งกลับเป็น available
+                if seat_ids:
+                    cur.execute(
+                        "UPDATE seat SET status = 'available' WHERE id = ANY(%s)",
+                        (seat_ids,),
+                    )
+
+                # booking → refunded (terminal)
+                cur.execute(
+                    "UPDATE booking SET status = 'refunded' WHERE id = %s AND status = 'refund_pending'",
+                    (b_id,),
+                )
+                if cur.rowcount != 1:
+                    raise HTTPException(
+                        status_code=409, detail="booking ถูกเปลี่ยนสถานะไปแล้ว"
+                    )
+
+                # refund row → completed (ถ้ามี)
+                cur.execute(
+                    """
+                    UPDATE refund SET status = 'completed', completed_at = NOW()
+                    WHERE payment_id IN (
+                        SELECT id FROM payment WHERE booking_id = %s AND status = 'paid'
+                    )
+                    AND status <> 'completed'
+                    """,
+                    (b_id,),
+                )
+
+                # finance: บันทึกยอดหักออก (ลบ) จากรายได้ของ organizer
+                cur.execute(
+                    """
+                    INSERT INTO finance (concert_id, booking_id, type, amount, description)
+                    VALUES (%s, %s, 'refund', %s, 'organizer approved refund')
+                    """,
+                    (concert_id, b_id, -Decimal(total_amount)),
+                )
+
+            conn.commit()
+            logger.info(
+                "Refund approved: booking=%s concert=%s seats_released=%d amount=%s",
+                b_id, concert_id, len(seat_ids), total_amount,
+            )
+
+        except HTTPException:
+            conn.rollback()
+            raise
+        except Exception as exc:
+            conn.rollback()
+            logger.exception("approve_refund error: %s", exc)
+            raise HTTPException(status_code=500, detail=f"อนุมัติคืนเงินไม่สำเร็จ: {exc}")
+
+    return {
+        "message": "อนุมัติคืนเงินสำเร็จ",
+        "booking_id": b_id,
+        "status": "refunded",
+        "seats_released": len(seat_ids),
+        "amount": f"{Decimal(total_amount):.2f}",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Phase 6 — Organizer Dashboard (สรุปรายรับรายจ่ายรายวันของคอนเสิร์ต)
 # ---------------------------------------------------------------------------
 
@@ -557,6 +731,9 @@ def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
                     GROUP BY day
                 ),
                 expense AS (
+                    -- นับเฉพาะ refund ที่ organizer อนุมัติแล้ว (approved/completed)
+                    -- pending_transfer/requested/processing = ยังไม่ใช่รายจ่ายจริง,
+                    -- การ "ขอคืน" ของลูกค้าไม่ควรกระทบ dashboard ของ organizer
                     SELECT
                         (COALESCE(r.completed_at, r.approved_at, r.requested_at)
                             AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Bangkok')::date AS day,
@@ -565,7 +742,7 @@ def get_concert_dashboard(concert_id: int, current_user: CurrentUser):
                     JOIN payment p ON p.id = r.payment_id
                     JOIN booking b ON b.id = p.booking_id
                     WHERE b.concert_id = %s
-                      AND r.status <> 'rejected'
+                      AND r.status IN ('approved', 'completed')
                     GROUP BY day
                 )
                 SELECT
