@@ -111,7 +111,7 @@ export function renderMyTicketsView(): HTMLElement {
 
           // ── ฝั่ง QR Code หรือ Action ──
           t.booking.status === ZONE_CLOSED
-            ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id, loadTickets)
+            ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id)
             : el("div", {
                 class: "ticket-card-v2__qr-area",
                 attrs: { style: "background: #AAD6FA; border-left: 1px dashed var(--color-border);" }
@@ -137,7 +137,7 @@ export function renderMyTicketsView(): HTMLElement {
                 ]),
 
                 ...(isRefundEligible(t.booking)
-                  ? [renderRequestRefundButton(t.booking.booking_id, t.booking.total_tickets, loadTickets)]
+                  ? [renderRequestRefundButton(t.booking.booking_id, t.booking.total_tickets)]
                   : []),
 
                 el("span", {
@@ -183,8 +183,7 @@ export function renderMyTicketsView(): HTMLElement {
 
   function renderZoneClosedActions(
     bookingId: number,
-    concertId: number,
-    reload: () => void
+    concertId: number
   ): HTMLElement {
     const refundBtn = el("button", {
       class: "btn btn--primary btn--block",
@@ -231,8 +230,7 @@ export function renderMyTicketsView(): HTMLElement {
 
   function renderRequestRefundButton(
     bookingId: number,
-    totalTickets: number,
-    reload: () => void
+    totalTickets: number
   ): HTMLElement {
     const isMulti = totalTickets > 1;
     const label = isMulti ? "REFUND ENTIRE BOOKING" : "REQUEST REFUND";
