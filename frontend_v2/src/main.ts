@@ -5,7 +5,7 @@ import "./styles/components.css";
 
 import { authApi } from "./api/auth";
 import { renderHeader } from "./components/header";
-import { renderLogPanel } from "./components/logPanel";
+
 import { router } from "./router-instance";
 import { authStore } from "./state/auth";
 import { events } from "./state/events";
@@ -32,64 +32,57 @@ function render(view: HTMLElement): void {
   if (!root) return;
   clear(root);
   root.append(
-    el("div", { 
-      class: "app-shell", 
-      attrs: { 
-        style: "background: radial-gradient(circle at 100% 0%, rgba(197, 246, 250, 0.4) 0%, rgba(255, 255, 255, 1) 40%); background-attachment: fixed; min-height: 100vh; display: flex; flex-direction: column;" 
+    el("div", {
+      class: "app-shell",
+      attrs: {
+        style: "background: radial-gradient(circle at 100% 0%, rgba(197, 246, 250, 0.4) 0%, rgba(255, 255, 255, 1) 40%); background-attachment: fixed; min-height: 100vh; display: flex; flex-direction: column;"
       }
     }, [
       // Navbar (Glassmorphism)
       renderHeader(),
-      
+
       // Main Content Area
-      el("main", { 
-        class: "app-main", 
-        attrs: { role: "main", style: "flex-grow: 1;" } 
+      el("main", {
+        class: "app-main",
+        attrs: { role: "main", style: "flex-grow: 1;" }
       }, [view]),
-      
-      // Log Panel Section
-      el("section", { 
-        attrs: { style: "padding: 24px 0; border-top: 1px solid rgba(0,0,0,0.05);" } 
-      }, [
-        el("div", { attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px;" } }, [renderLogPanel()]),
-      ]),
 
       // ── 🛠️ Footer (Decorative & Structured matching Layout.tsx) ──
-      el("footer", { 
-        attrs: { style: "background: #010120; color: #FFFFFF; padding: 80px 0 32px 0; margin-top: auto; font-family: 'The Future', sans-serif;" } 
+      el("footer", {
+        attrs: { style: "background: #010120; color: #FFFFFF; padding: 80px 0 32px 0; margin-top: auto; font-family: 'The Future', sans-serif;" }
       }, [
-        el("div", { 
-          attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px;" } 
+        el("div", {
+          attrs: { style: "max-width: 1200px; margin: 0 auto; padding: 0 24px;" }
         }, [
           // Upper Section: Grid Layout
           el("div", { attrs: { style: "display: flex; flex-wrap: wrap; gap: 48px; justify-content: space-between;" } }, [
-            
+
             // Col 1: Brand & Description
             el("div", { attrs: { style: "flex: 1 1 400px; display: flex; flex-direction: column; gap: 24px;" } }, [
               el("div", { attrs: { style: "display: flex; align-items: center; gap: 12px;" } }, [
                 el("div", { attrs: { style: "width: 32px; height: 32px; background: var(--gradient-coastal); border-radius: 4px;" } }),
                 el("span", { attrs: { style: "font-size: 20px; font-weight: 500; letter-spacing: -0.8px;" } }, ["TOOKET-THER"])
               ]),
-              el("p", { 
-                attrs: { style: "color: rgba(255,255,255,0.6); max-width: 380px; line-height: 1.6; font-size: 14px;" }, 
-                text: "Built for CN230. Infrastructure for Live Intelligence." 
+              el("p", {
+                attrs: { style: "color: rgba(255,255,255,0.6); max-width: 380px; line-height: 1.6; font-size: 14px;" },
+                text: "Built for CN230. Infrastructure for Live Intelligence."
               })
             ]),
-            
+
             // Col 2: Platform Links
             el("div", { attrs: { style: "flex: 1 1 200px;" } }, [
               el("h4", { class: "label-mono", attrs: { style: "color: rgba(255,255,255,0.4); margin-bottom: 24px; font-size: 11px; letter-spacing: 0.055px;" } }, ["PLATFORM"]),
               el("ul", { attrs: { style: "list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 16px;" } }, [
-                el("li", {}, [ el("a", { attrs: { href: "#/", style: "color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; transition: color 0.2s;" }, on: { mouseenter: (e) => (e.target as HTMLElement).style.color = "#AAD6FA", mouseleave: (e) => (e.target as HTMLElement).style.color = "rgba(255,255,255,0.8)" } }, ["Events"]) ]),
-                el("li", {}, [ el("a", { attrs: { href: "#/my-tickets", style: "color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; transition: color 0.2s;" }, on: { mouseenter: (e) => (e.target as HTMLElement).style.color = "#AAD6FA", mouseleave: (e) => (e.target as HTMLElement).style.color = "rgba(255,255,255,0.8)" } }, ["My Tickets"]) ])
+                el("li", {}, [el("a", { attrs: { href: "#/", style: "color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; transition: color 0.2s;" }, on: { mouseenter: (e) => (e.target as HTMLElement).style.color = "#AAD6FA", mouseleave: (e) => (e.target as HTMLElement).style.color = "rgba(255,255,255,0.8)" } }, ["Events"])]),
+                el("li", {}, [el("a", { attrs: { href: "#/my-tickets", style: "color: rgba(255,255,255,0.8); text-decoration: none; font-size: 14px; transition: color 0.2s;" }, on: { mouseenter: (e) => (e.target as HTMLElement).style.color = "#AAD6FA", mouseleave: (e) => (e.target as HTMLElement).style.color = "rgba(255,255,255,0.8)" } }, ["My Tickets"])])
               ])
             ])
 
           ]),
 
           // Lower Section: Meta Info & Copyright
-          el("div", { 
-            attrs: { style: "margin-top: 80px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;" } 
+          el("div", {
+            attrs: { style: "margin-top: 80px; padding-top: 32px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;" }
           }, [
             el("span", { class: "label-mono", attrs: { style: "color: rgba(255,255,255,0.2); font-size: 10px; letter-spacing: 0.055px;" } }, ["© 2026 TOOKET-THER / COASTAL EDITION"]),
             el("div", { class: "label-mono", attrs: { style: "color: rgba(255,255,255,0.2); font-size: 10px; letter-spacing: 0.055px; display: flex; gap: 24px;" } }, [
@@ -132,23 +125,23 @@ router.register({ path: "/", handler: () => render(renderLandingView()) });
 router.register({ path: "/login", handler: () => render(renderAuthView()) });
 router.register({ path: "/forgot", handler: () => render(renderForgotView()) });
 
-router.register({ 
-  path: "/dashboard", 
-  handler: () => { 
-    if (requireAuth("customer")) render(renderCustomerDashboard()); 
-  } 
+router.register({
+  path: "/dashboard",
+  handler: () => {
+    if (requireAuth("customer")) render(renderCustomerDashboard());
+  }
 });
 
-router.register({ 
-  path: "/my-tickets", 
-  handler: () => { 
-    if (requireAuth("customer")) render(renderMyTicketsView()); 
-  } 
+router.register({
+  path: "/my-tickets",
+  handler: () => {
+    if (requireAuth("customer")) render(renderMyTicketsView());
+  }
 });
 
-router.register({ 
-  path: "/waiting", 
-  handler: () => { 
+router.register({
+  path: "/waiting",
+  handler: () => {
     if (!requireAuth("customer")) return;
     const concertId = router.paramInt("concertId");
     if (!concertId) { router.navigate("/dashboard"); return; }
@@ -183,9 +176,9 @@ router.register({
   }
 });
 
-router.register({ 
-  path: "/payment", 
-  handler: () => { 
+router.register({
+  path: "/payment",
+  handler: () => {
     if (!requireAuth("customer")) return;
     const bookingId = router.paramInt("bookingId");
     if (!bookingId) { router.navigate("/my-tickets"); return; }
@@ -204,32 +197,32 @@ router.register({
   },
 });
 
-router.register({ 
-  path: "/profile", 
-  handler: () => { 
-    if (requireAuth()) render(renderProfileView()); 
-  } 
+router.register({
+  path: "/profile",
+  handler: () => {
+    if (requireAuth()) render(renderProfileView());
+  }
 });
 
-router.register({ 
-  path: "/organizer", 
-  handler: () => { 
-    if (requireAuth("organizer")) render(renderOrganizerView("events")); 
-  } 
+router.register({
+  path: "/organizer",
+  handler: () => {
+    if (requireAuth("organizer")) render(renderOrganizerView("events"));
+  }
 });
 
-router.register({ 
-  path: "/create-concert", 
-  handler: () => { 
-    if (requireAuth("organizer")) render(renderOrganizerView("create")); 
-  } 
+router.register({
+  path: "/create-concert",
+  handler: () => {
+    if (requireAuth("organizer")) render(renderOrganizerView("create"));
+  }
 });
 
-router.register({ 
-  path: "/staff", 
-  handler: () => { 
-    if (requireAuth("staff")) render(renderStaffView()); 
-  } 
+router.register({
+  path: "/staff",
+  handler: () => {
+    if (requireAuth("staff")) render(renderStaffView());
+  }
 });
 
 // หน้า Refund ลงทะเบียนไว้
@@ -238,9 +231,9 @@ router.register({
   handler: () => {
     if (!requireAuth("customer")) return;
     const bookingId = router.paramInt("bookingId");
-    if (!bookingId) { 
-      router.navigate("/my-tickets"); 
-      return; 
+    if (!bookingId) {
+      router.navigate("/my-tickets");
+      return;
     }
     // hash router: query params อยู่ใน window.location.hash ไม่ใช่ .search
     const isVoucher = router.paramString("isVoucher") === "true";
@@ -256,18 +249,18 @@ router.setFallback(() => render(renderLandingView()));
 async function handleOAuthCallback() {
   const params = new URLSearchParams(window.location.search);
   const code = params.get("code");
-  const state = params.get("state"); 
+  const state = params.get("state");
 
   if (code && state) {
     window.history.replaceState({}, document.title, window.location.pathname + window.location.hash);
-    
+
     try {
       const auth = await authApi.oauthCallback(state, code, state);
       authStore.setSession(auth);
-      
+
       const me = await authApi.me();
       authStore.setUser(me);
-      
+
       events.emit("auth:login", { user_id: auth.user_id });
       console.log("OAuth Login Success:", me.name);
     } catch (err) {
