@@ -1,0 +1,88 @@
+import { request } from "./client";
+import type {
+  ApproveRefundResponse,
+  ConcertEditDetail,
+  CreateConcertPayload,
+  OrganizerDashboard,
+  OrganizerQueueRow,
+  PendingRefund,
+} from "./types";
+
+export const organizerApi = {
+  listQueues(concertId: number): Promise<OrganizerQueueRow[]> {
+    return request<OrganizerQueueRow[]>(
+      `/organizer/concerts/${concertId}/queues`
+    );
+  },
+
+  admit(queueId: number): Promise<{ message: string }> {
+    return request(`/organizer/queues/${queueId}/admit`, { method: "POST" });
+  },
+
+  updatePriority(
+    queueId: number,
+    priorityScore: number
+  ): Promise<{ message: string }> {
+    return request(`/organizer/queues/${queueId}/priority`, {
+      method: "PATCH",
+      body: { priority_score: priorityScore },
+    });
+  },
+
+  createConcert(
+    payload: CreateConcertPayload | FormData
+  ): Promise<{ message: string; concert_id: number }> {
+    return request("/organizer/concerts", { method: "POST", body: payload });
+  },
+
+  autoSortQueues(concertId: number): Promise<{ message: string }> {
+    return request(`/organizer/concerts/${concertId}/queues/auto_sort`, {
+      method: "POST",
+    });
+  },
+
+  closeZone(
+    zoneId: number
+  ): Promise<{ message: string; affected_bookings: number }> {
+    return request(`/organizer/zones/${zoneId}/close`, { method: "POST" });
+  },
+
+  dashboard(concertId: number): Promise<OrganizerDashboard> {
+    return request<OrganizerDashboard>(
+      `/organizer/concerts/${concertId}/dashboard`
+    );
+  },
+
+  listPendingRefunds(concertId: number): Promise<PendingRefund[]> {
+    return request<PendingRefund[]>(
+      `/organizer/concerts/${concertId}/refund-pending`
+    );
+  },
+
+  approveRefund(bookingId: number): Promise<ApproveRefundResponse> {
+    return request<ApproveRefundResponse>(
+      `/organizer/bookings/${bookingId}/approve-refund`,
+      { method: "POST" }
+    );
+  },
+
+  deleteConcert(
+    concertId: number
+  ): Promise<{ message: string; concert_id: number; status: "cancelled" }> {
+    return request(`/organizer/concerts/${concertId}`, { method: "DELETE" });
+  },
+
+  getConcertForEdit(concertId: number): Promise<ConcertEditDetail> {
+    return request<ConcertEditDetail>(`/organizer/concerts/${concertId}`);
+  },
+
+  updateConcert(
+    concertId: number,
+    payload: FormData
+  ): Promise<{ message: string; concert_id: number }> {
+    return request(`/organizer/concerts/${concertId}`, {
+      method: "PATCH",
+      body: payload,
+    });
+  },
+};
