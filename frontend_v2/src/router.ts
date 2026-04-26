@@ -3,7 +3,7 @@ import "./styles/base.css";
 import "./styles/components.css";
 
 import { renderHeader } from "./components/header";
-import { renderLogPanel } from "./components/logPanel";
+
 import { authStore } from "./state/auth";
 import { events } from "./state/events";
 import { clear, el, qs } from "./utils/dom";
@@ -33,10 +33,6 @@ function render(view: HTMLElement): void {
     el("div", { class: "app-shell min-h-screen flex flex-col bg-white" }, [
       renderHeader(),
       el("main", { class: "flex-grow", attrs: { role: "main" } }, [view]),
-
-      el("section", { class: "bg-cream-base/10 py-8 border-t border-black/5" }, [
-        el("div", { class: "max-w-7xl mx-auto px-6" }, [renderLogPanel()]),
-      ]),
 
       el("footer", {
         class: "bg-[#010120] text-white py-12",
@@ -151,9 +147,9 @@ router.register({
 
     // ดึง bookingId ผ่านฟังก์ชันของ router ที่เธอมีอยู่แล้ว
     const bookingId = router.paramInt("bookingId");
-    if (!bookingId) { 
-      router.navigate("/my-tickets"); 
-      return; 
+    if (!bookingId) {
+      router.navigate("/my-tickets");
+      return;
     }
 
     // ดึงค่า isVoucher จาก URL Parameters (?isVoucher=true)
