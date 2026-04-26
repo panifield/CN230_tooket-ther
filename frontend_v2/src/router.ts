@@ -22,6 +22,7 @@ import { renderSeatsView } from "./views/Seats.view";
 import { renderPaymentView } from "./views/Payment.view";
 import { renderControlRoomView } from "./views/ControlRoom.view";
 import { renderCreateConcertView } from "./views/CreateConcert.view";
+import { renderRefundView } from "./views/Refund.view";
 
 const root = qs<HTMLDivElement>("#app");
 
@@ -136,6 +137,31 @@ router.register({
     if (!bookingId) { router.navigate("/my-tickets"); return; }
     // ตรงนี้จะหายแดง เพราะเรา Import มาแล้วข้างบน
     render(renderPaymentView({ bookingId }));
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// Route: /refund
+// ─────────────────────────────────────────────────────────────
+router.register({
+  path: "/refund",
+  handler: () => {
+    // บังคับให้ต้องเป็นลูกค้าก่อนถึงจะขอคืนเงินได้
+    if (!requireAuth("customer")) return;
+
+    // ดึง bookingId ผ่านฟังก์ชันของ router ที่เธอมีอยู่แล้ว
+    const bookingId = router.paramInt("bookingId");
+    if (!bookingId) { 
+      router.navigate("/my-tickets"); 
+      return; 
+    }
+
+    // ดึงค่า isVoucher จาก URL Parameters (?isVoucher=true)
+    const searchParams = new URLSearchParams(window.location.search);
+    const isVoucher = searchParams.get("isVoucher") === "true";
+
+    // อย่าลืมครอบด้วย render() เพื่อให้มันวาดลงบนจอ
+    render(renderRefundView({ bookingId, isVoucher }));
   }
 });
 

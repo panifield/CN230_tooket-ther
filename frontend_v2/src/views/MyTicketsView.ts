@@ -19,7 +19,7 @@ export function renderMyTicketsView(): HTMLElement {
   // ── 🛠️ ปรับพื้นหลังของหน้าเพจให้เป็นสีขาว ──
   const container = el("div", { 
     class: "bg-tickets-page", 
-    attrs: { style: "background: #FFFFFF; min-height: 100vh;" } 
+    attrs: { style: "background: #FFFFFF;\] min-height: 100vh;" } 
   }, [
     el("div", {
       attrs: { style: "max-width: 1000px; margin: 0 auto; padding: 64px 24px;" }
@@ -79,7 +79,7 @@ export function renderMyTicketsView(): HTMLElement {
         el("article", { class: "ticket-card-v2", attrs: { style: "background: #FFFFFF; border: 1px solid var(--color-border);" } }, [
           
           // ── ฝั่งข้อมูล (ซ้าย) ──
-          el("div", { class: "ticket-card-v2__info", attrs: { style: "position: relative; background: #def6ff;" } }, [
+          el("div", { class: "ticket-card-v2__info", attrs: { style: "position: relative; background: #FFFFFF;" } }, [
             
             // ── วงกลมรอยฉีกสีขาว ──
             el("div", { 
@@ -117,7 +117,7 @@ export function renderMyTicketsView(): HTMLElement {
             ? renderZoneClosedActions(t.booking.booking_id, t.booking.concert_id, loadTickets)
             : el("div", {
                 class: "ticket-card-v2__qr-area",
-                attrs: { style: "background: #FFFFFF; border-left: 1px dashed var(--color-border);" }
+                attrs: { style: "background: #AAD6FA; border-left: 1px dashed var(--color-border);" }
               }, [
                 el("div", { class: "qr-box", attrs: { style: "background: #FFFFFF; box-shadow: none; border: 1px solid var(--color-border);" } }, [
                   el("img", {
@@ -145,7 +145,7 @@ export function renderMyTicketsView(): HTMLElement {
 
                 el("span", {
                   class: "label-mono",
-                  attrs: { style: "color: var(--color-primary-blue); font-size: 10px; cursor: pointer;" },
+                  attrs: { style: "color: #6f5e4e; font-size: 10px; cursor: pointer;" },
                   text: "PREVIEW SCANNER ›"
                 })
               ])
@@ -201,35 +201,9 @@ export function renderMyTicketsView(): HTMLElement {
       text: "UPGRADE SEAT",
     }) as HTMLButtonElement;
 
-    refundBtn.addEventListener("click", async () => {
-      if (!window.confirm("Request a full refund for this booking? This cannot be undone.")) return;
-      const bank_name = window.prompt("Bank name:")?.trim();
-      if (!bank_name) return;
-      const account_number = window.prompt("Account number:")?.trim();
-      if (!account_number) return;
-      const account_name = window.prompt("Account holder name:")?.trim();
-      if (!account_name) return;
-      const reason = window.prompt("Reason (optional):")?.trim();
-
-      refundBtn.disabled = true;
-      upgradeBtn.disabled = true;
-      refundBtn.textContent = "SUBMITTING...";
-      try {
-        const payload = reason
-          ? { bank_name, account_number, account_name, reason }
-          : { bank_name, account_number, account_name };
-        const res = await refundApi.voucher(bookingId, payload);
-        events.emit("log", { level: "info", message: res.message ?? "Refund request submitted" });
-        reload();
-      } catch (err) {
-        const detail =
-          err instanceof ApiError ? err.detail :
-          err instanceof Error ? err.message : "Refund failed";
-        events.emit("log", { level: "error", message: `Refund failed: ${detail}` });
-        refundBtn.disabled = false;
-        upgradeBtn.disabled = false;
-        refundBtn.textContent = "REQUEST REFUND";
-      }
+    // ── 🛠️ เปลี่ยนให้ Navigate ไปหน้า Refund แทนการใช้ window.prompt ──
+    refundBtn.addEventListener("click", () => {
+      router.navigate(`/refund?bookingId=${bookingId}&isVoucher=true`);
     });
 
     upgradeBtn.addEventListener("click", () => {
@@ -271,37 +245,9 @@ export function renderMyTicketsView(): HTMLElement {
       text: label,
     }) as HTMLButtonElement;
 
-    btn.addEventListener("click", async () => {
-      const confirmMsg = isMulti
-        ? `This action will refund the ENTIRE booking (${totalTickets} tickets). You cannot refund individual tickets. Are you sure you want to proceed?`
-        : "Are you sure you want to request a refund?";
-      if (!window.confirm(confirmMsg)) return;
-      const bank_name = window.prompt("Bank name:")?.trim();
-      if (!bank_name) return;
-      const account_number = window.prompt("Account number:")?.trim();
-      if (!account_number) return;
-      const account_name = window.prompt("Account holder name:")?.trim();
-      if (!account_name) return;
-      const reason = window.prompt("Reason (optional):")?.trim();
-
-      btn.disabled = true;
-      btn.textContent = "SUBMITTING...";
-      try {
-        const payload = reason
-          ? { booking_id: bookingId, bank_name, account_number, account_name, reason }
-          : { booking_id: bookingId, bank_name, account_number, account_name };
-        const res = await refundApi.request(payload);
-        events.emit("log", { level: "info", message: res.message ?? "Refund requested" });
-        reload();
-      } catch (err) {
-        const detail =
-          err instanceof ApiError ? err.detail :
-          err instanceof Error ? err.message : "Refund failed";
-        alert(`Refund failed: ${detail}`);
-        events.emit("log", { level: "error", message: `Refund failed: ${detail}` });
-        btn.disabled = false;
-        btn.textContent = label;
-      }
+    // ── 🛠️ เปลี่ยนให้ Navigate ไปหน้า Refund แทนการใช้ window.prompt ──
+    btn.addEventListener("click", () => {
+      router.navigate(`/refund?bookingId=${bookingId}&isVoucher=false`);
     });
 
     return btn;
