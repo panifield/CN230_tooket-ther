@@ -6,8 +6,8 @@
 
 - Base URL (dev): `http://localhost:8000`
 - Auth: ใช้ **JWT Bearer Token** ในทุก endpoint ที่ต้องล็อกอิน ส่งผ่าน header: `Authorization: Bearer <token>`
-- JWT token ได้จากการ login (ดู `routes/auth.py`) ภายในจะบอก `role` เป็น `customer` / `organizer` / `staff`
-- ทุก response ที่ error จะอยู่ในรูปแบบ: `{ "detail": "ข้อความ error" }` (หรือเป็น object ถ้ามีรายละเอียดเพิ่ม)
+- JWT token ได้จากการ login ภายใน payload จะบอก `role` เป็น `customer` / `organizer` / `staff`
+- ทุก response ที่ error จะอยู่ในรูปแบบ: `{ "detail": "ข้อความ error" }`
 - วันที่-เวลาใน response เป็น ISO 8601 format (UTC timezone)
 - จำนวนเงินอาจอยู่ในรูป string `"1234.00"` (2 ตำแหน่ง) หรือ number — ดูแต่ละ endpoint
 
@@ -15,42 +15,232 @@
 
 ## สารบัญ
 
-1. [Auth APIs](#1-auth-apis) — `routes/auth.py`
-2. [Booking / Queue / Seat APIs](#2-booking--queue--seat-apis) — `routes/booking.py`
-3. [Organizer APIs](#3-organizer-apis) — `routes/organizer.py`
-4. [Payment APIs](#4-payment-apis) — `routes/payment.py`
-5. [Refund APIs](#5-refund-apis) — `routes/refund.py`
-
----
+1. [Auth APIs](#1-auth-apis) — `routes/auth.py` (prefix `/auth`)
+2. [Booking / Queue / Seat APIs](#2-booking--queue--seat-apis) — `routes/booking.py` (prefix `/booking`)
+3. [Organizer APIs](#3-organizer-apis) — `routes/organizer.py` (prefix `/organizer`)
+4. [Payment APIs](#4-payment-apis) — `routes/payment.py` (prefix `/api/v1/payments`)
+5. [Refund APIs](#5-refund-apis) — `routes/refund.py` (prefix `/api/v1/refunds`)
+6. [Staff APIs](#6-staff-apis) — `routes/staff.py` (prefix `/staff`)
 
 ---
 
 ## 1. Auth APIs
 
-### 1.1 `POST /auth/register`
+### 1.1 `GET /auth/health`
 
-**Description:** สมัครสมาชิกใหม่
+**Description:** Health check ของ auth service — ใช้ debug
+
+**Auth:** ไม่ต้อง
+
+**Response 200:**
+```json
+{ "service": "auth", "status": "ok" }
+```
+
+---
+
+### 1.2 `POST /auth/register`
+
+**Description:** สมัครสมาชิกใหม่ (email + password)
+
+**Auth:** ไม่ต้อง
+
+**Request body:**
+```json
+{
+  "id_card": "1100100123456",
+  "name": "Full Name",
+  "email": "user@example.com",
+  "phone": "0812345678",
+  "address": "Bangkok",
+  "password": "Password123",
+  "role": "customer"
+}
+```
+- `role`: `customer` (default) / `organizer` / `staff`
+- `id_card` ต้อง unique ในระบบ (constraint จาก `users.id_card`)
+
+**Response 201:**
+```json
+{ "message": "สมัครสมาชิกสำเร็จ", "user_id": 42 }
+```
+
+**Errors:**
+- `400` — email หรือ id_card ซ้ำในระบบ / role ไม่ถูกต้อง
+- `422` — payload ไม่ครบ / email format ผิด
+
+---
+
+### 1.3 `POST /auth/login`
+
+**Description:** Login ด้วย email + password → ได้ JWT token
+
+**Auth:** ไม่ต้อง
 
 **Request body:**
 ```json
 {
   "email": "user@example.com",
-  "password": "Password123",
-  "name": "Full Name",
-  "role": "customer",
-  "address": "Bangkok",
-  "id_card": "1100100123456",
-  "phone": "0812345678"
+  "password": "Password123"
 }
 ```
-- `role`: `customer`, `organizer`, `staff`
-- `id_card` และ `phone` เป็นค่าที่ต้องส่งตาม schema ฐานข้อมูล
+
+**Response 200:**
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "user_id": 42,
+  "role": "customer"
+}
+```
+
+Frontend ควรเก็บ `access_token` ใน localStorage และ attach `Authorization: Bearer <token>` ทุก request หลังจากนี้
+
+**Errors:**
+- `401` — email หรือ password ไม่ถูกต้อง
+- `422` — payload ไม่ถูก format
+
+---
+
+### 1.4 `GET /auth/oauth/{provider}/authorize-url`
+
+**Description:** สร้าง URL สำหรับ redirect ไปหน้า Login ของ Provider (Line / Google)
+
+**Auth:** ไม่ต้อง
+
+**Path params:** `provider` ∈ `line` / `google`
+
+**Query params:** `state` (string, default `"tooket-state"`) — ใช้ตรวจสอบ CSRF เมื่อ callback กลับมา
+
+**Response 200:**
+```json
+{
+  "provider": "google",
+  "authorize_url": "https://accounts.google.com/o/oauth2/v2/auth?response_type=code&..."
+}
+```
+
+Frontend ใช้ `window.location.href = authorize_url` เพื่อพาผู้ใช้ไปหน้า OAuth
+
+**Errors:**
+- `400` — provider ไม่รองรับ (รองรับเฉพาะ `line`, `google`)
+
+---
+
+### 1.5 `GET /auth/oauth/{provider}/callback`
+
+**Description:** รับ `code` จาก OAuth provider → แลก token → ดึง profile → ออก JWT
+ปกติ provider จะ redirect มา endpoint นี้พร้อม query params `code` + `state`
+
+**Auth:** ไม่ต้อง
+
+**Path params:** `provider` ∈ `line` / `google`
+
+**Query params:**
+- `code` (string, required) — authorization code จาก provider
+- `state` (string) — ค่าที่ส่งไปตอน authorize-url
+
+**Response 200:**
+```json
+{
+  "access_token": "eyJhbGciOi...",
+  "token_type": "bearer",
+  "user_id": 51,
+  "display_name": "Somchai J."
+}
+```
+
+ถ้า user ใหม่ระบบจะสร้าง `users` row + `social_account` + `customer_profile` ให้อัตโนมัติ
+
+**Errors:**
+- `400` — provider ไม่รองรับ
+- `502` — แลก token / ดึง profile ไม่สำเร็จ
+
+---
+
+### 1.6 `GET /auth/me`
+
+**Description:** ดูข้อมูล user ที่ login อยู่ (ใช้เช็ค token ยัง valid + ดึง role/profile_id)
+
+**Auth:** ทุก role
+
+**Response 200:**
+```json
+{
+  "user_id": 42,
+  "role": "customer",
+  "customer_profile_id": 17,
+  "organizer_profile_id": null,
+  "staff_profile_id": null,
+  "name": "Somchai J.",
+  "email": "somchai@example.com"
+}
+```
+
+Field ที่อยู่ใน response มาจาก JWT decode + DB lookup ผ่าน `routes/deps.py:CurrentUser`
+Frontend ใช้ `customer_profile_id` / `organizer_profile_id` / `staff_profile_id` เพื่อ branch UI
+
+**Errors:**
+- `401` — token หมดอายุหรือไม่ถูกต้อง
+
+---
+
+### 1.7 `PATCH /auth/profiles`
+
+**Description:** แก้ไขข้อมูลส่วนตัวของ user ปัจจุบัน
+
+**Auth:** ทุก role
+
+**Request body:** (ทุก field optional — ส่งเฉพาะที่อยากแก้)
+```json
+{
+  "name": "ชื่อใหม่",
+  "phone": "0899999999",
+  "address": "ที่อยู่ใหม่",
+  "id_card": "1100100123456"
+}
+```
+
+**Response 200:**
+```json
+{ "message": "แก้ไขข้อมูลสำเร็จ" }
+```
+ถ้าไม่มี field ใดส่งมา → `{ "message": "ไม่มีข้อมูลที่ต้องการแก้ไข" }`
+
+**Errors:**
+- `401` — ไม่ได้ login
+
+---
+
+### 1.8 `POST /auth/forgot-password`
+
+**Description:** เปลี่ยนรหัสผ่านโดยใช้ email + id_card ยืนยันตัวตน (mode dev — production ต้อง email link)
+
+**Auth:** ไม่ต้อง
+
+**Request body:**
+```json
+{
+  "email": "user@example.com",
+  "id_card": "1100100123456",
+  "new_password": "NewPassword123"
+}
+```
+
+**Response 200:**
+```json
+{ "message": "เปลี่ยนรหัสผ่านสำเร็จแล้ว" }
+```
+
+**Errors:**
+- `404` — email + id_card ไม่ตรงกับ user ใด ๆ ในระบบ
 
 ---
 
 ## 2. Booking / Queue / Seat APIs
 
-### 1.1 `GET /booking/health`
+### 2.1 `GET /booking/health`
 
 **Description:** Health check ของ booking service — ไม่ต้องล็อกอิน ใช้ debug อย่างเดียว
 
@@ -63,7 +253,7 @@
 
 ---
 
-### 1.2 `GET /booking/concerts`
+### 2.2 `GET /booking/concerts`
 
 **Description:** ดึงรายการคอนเสิร์ตทั้งหมดมาแสดงในหน้าแรก / หน้า Browse
 เรียกตอนเปิดหน้า Home หรือ Concert List
@@ -96,7 +286,7 @@ Frontend ควรแสดงปุ่ม "เข้าคิว" เฉพา�
 
 ---
 
-### 1.3 `POST /booking/concerts/{concert_id}/queue/join`
+### 2.3 `POST /booking/concerts/{concert_id}/queue/join`
 
 **Description:** เข้าคิวของคอนเสิร์ต เรียกตอนกดปุ่ม "เข้าคิว" ในหน้ารายละเอียดคอนเสิร์ต
 
@@ -128,7 +318,7 @@ Frontend ควรแสดงปุ่ม "เข้าคิว" เฉพา�
 
 ---
 
-### 1.4 `GET /booking/concerts/{concert_id}/queue/status`
+### 2.4 `GET /booking/concerts/{concert_id}/queue/status`
 
 **Description:** ดูสถานะคิวของตัวเอง + ลำดับในคิว ใช้ polling ทุก 3-5 วินาที ในหน้า "รอคิว"
 
@@ -159,7 +349,7 @@ Frontend ควรแสดงปุ่ม "เข้าคิว" เฉพา�
 
 ---
 
-### 1.5 `GET /booking/concerts/{concert_id}/zones`
+### 2.5 `GET /booking/concerts/{concert_id}/zones`
 
 **Description:** ดูโซนทั้งหมดของคอนเสิร์ต + จำนวนที่นั่งว่าง ใช้ในหน้า "เลือกโซน" หลัง admit เข้าคิวแล้ว
 
@@ -183,7 +373,7 @@ Frontend ควรแสดงปุ่ม "เข้าคิว" เฉพา�
 
 ---
 
-### 1.6 `GET /booking/concerts/{concert_id}/zones/{zone_id}/seats`
+### 2.6 `GET /booking/concerts/{concert_id}/zones/{zone_id}/seats`
 
 **Description:** ดูที่นั่งทั้งหมดในโซน ใช้ render seat map ในหน้า "เลือกที่นั่ง"
 
@@ -203,7 +393,7 @@ Frontend ควรแสดงปุ่ม "เข้าคิว" เฉพา�
 
 ---
 
-### 1.7 `POST /booking/book`
+### 2.7 `POST /booking/book`
 
 **Description:** สร้าง booking จากที่นั่งที่เลือก เรียกตอนกด "ยืนยันที่นั่ง" ในหน้าเลือกที่นั่ง
 ต้อง admit queue ก่อนถึงจะเรียกได้
@@ -240,7 +430,7 @@ Frontend ควรเริ่ม countdown 15 นาทีจาก `expired_at
 
 ---
 
-### 1.8 `GET /booking/my`
+### 2.8 `GET /booking/my`
 
 **Description:** ดูประวัติการจองของลูกค้าเอง ใช้ในหน้า "ประวัติการจอง / My Tickets"
 
@@ -270,7 +460,37 @@ Frontend ควรเริ่ม countdown 15 นาทีจาก `expired_at
 
 ---
 
-### 1.9 `POST /booking/{booking_id}/confirm`
+### 2.9 `GET /booking/{booking_id}/tickets`
+
+**Description:** ดึงตั๋วรายใบใน booking (รวม `qr_hash`) ใช้ในหน้า "My Tickets" ตอน expand booking ที่จ่ายเงินแล้ว
+
+**Auth:** Customer JWT (ต้องเป็นเจ้าของ booking)
+
+**Path params:** `booking_id`
+
+**Response 200:** (array)
+```json
+[
+  {
+    "ticket_id": 901,
+    "qr_hash": "TKT-901-abc123def456",
+    "seat_number": "A1",
+    "zone_name": "VIP",
+    "is_used": false
+  }
+]
+```
+
+Frontend ใช้ `qr_hash` render เป็น QR code (เช่น `qrcode.js`) ส่งให้ staff scan
+`is_used: true` = ถูก check-in ไปแล้ว
+
+**Errors:**
+- `400` — ไม่พบ customer profile
+- `403` — ไม่ใช่ booking ของคุณ
+
+---
+
+### 2.10 `POST /booking/{booking_id}/confirm`
 
 **Description:** **Stub endpoint สำหรับทดสอบ** — ยืนยันการชำระแบบ manual (จะถูกแทนด้วย payment webhook ในโปรดักชัน)
 Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ flow payment แทน
@@ -289,7 +509,7 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-### 1.10 `POST /booking/{booking_id}/rebook`
+### 2.11 `POST /booking/{booking_id}/rebook`
 
 **Description:** ใช้ voucher จาก zone closure เลือกที่นั่งใหม่ฟรีในโซนอื่น
 เรียกเมื่อลูกค้ากดปุ่ม "เลือกที่นั่งใหม่ฟรี" จาก banner ของ booking สถานะ `zone_closed_action_required`
@@ -324,11 +544,11 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-## 2. Organizer APIs
+## 3. Organizer APIs
 
 > **หมายเหตุ:** ทุก endpoint ต้องใช้ JWT ที่ role = `organizer`
 
-### 2.1 `GET /organizer/concerts/{concert_id}/queues`
+### 3.1 `GET /organizer/concerts/{concert_id}/queues`
 
 **Description:** ดูรายชื่อลูกค้าในคิวทั้งหมดของคอนเสิร์ต ใช้ในหน้า Dashboard จัดการคิว
 
@@ -354,7 +574,7 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-### 2.2 `POST /organizer/queues/{queue_id}/admit`
+### 3.2 `POST /organizer/queues/{queue_id}/admit`
 
 **Description:** Admit ลูกค้าจากคิว (เปลี่ยน `waiting` → `admitted`) ให้เข้าไปเลือกที่นั่ง
 เรียกเมื่อ organizer กดปุ่ม "Admit" ในแถวของคิวนั้น
@@ -376,7 +596,7 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-### 2.3 `PATCH /organizer/queues/{queue_id}/priority`
+### 3.3 `PATCH /organizer/queues/{queue_id}/priority`
 
 **Description:** แก้ไข priority score ของคิวด้วยมือ ใช้เมื่อ organizer ต้องการ override คะแนนอัตโนมัติ
 
@@ -400,13 +620,75 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ### 3.4 `POST /organizer/concerts`
 
-**Description:** สร้างคอนเสิร์ตใหม่ พร้อมกำหนดโซนและที่นั่งได้ทันที
+**Description:** สร้างคอนเสิร์ตใหม่ พร้อมกำหนดโซน + ที่นั่ง + อัปโหลดรูป poster
 
 **Auth:** Organizer JWT
 
-**Request body:**
+**Content-Type:** `multipart/form-data` ⚠️ ไม่ใช่ JSON
+
+**Form fields:**
+| Field | Type | Required | คำอธิบาย |
+| --- | --- | --- | --- |
+| `title` | string | ✅ | ชื่อคอนเสิร์ต |
+| `artist` | string | ✅ | ชื่อศิลปิน |
+| `venue` | string | ✅ | สถานที่ |
+| `address` | string | ✅ | ที่อยู่ (ใช้ใน auto_sort เทียบกับลูกค้า) |
+| `concert_datetime` | string (ISO) | ✅ | วันเวลาแสดง |
+| `sale_open_at` | string (ISO) | ✅ | เวลาเปิดขาย |
+| `sale_close_at` | string (ISO) | ❌ | เวลาปิดขาย (optional) |
+| `status` | string | ❌ | `on_sale` (default) / `draft` |
+| `zones_json` | string (JSON) | ❌ | array ของโซน — default `"[]"` |
+| `image` | file | ❌ | รูป poster (.jpg/.png/.webp) |
+
+**โครงสร้าง `zones_json`:**
+```json
+[
+  { "zone_name": "VIP", "total_seats": 50, "price": 5000, "row_prefix": "V" },
+  { "zone_name": "Standard", "total_seats": 100, "price": 2000, "row_prefix": "A" }
+]
+```
+- `row_prefix`: prefix ของหมายเลขที่นั่ง (เช่น `"A"` → seat `A1`, `A2`, ...)
+- ระบบจะสร้าง `seat` ให้อัตโนมัติตาม `total_seats`
+
+**ตัวอย่าง fetch (frontend):**
+```js
+const fd = new FormData();
+fd.append("title", "Together Live 2026");
+fd.append("artist", "Together Band");
+// ... fields อื่น ๆ
+fd.append("zones_json", JSON.stringify(zones));
+if (file) fd.append("image", file);
+await fetch("/organizer/concerts", { method: "POST", body: fd, headers: { Authorization: `Bearer ${token}` } });
+```
+
+**Response 201:**
 ```json
 {
+  "message": "สร้างคอนเสิร์ตสำเร็จ",
+  "concert_id": 1,
+  "zones": [
+    { "zone_id": 10, "zone_name": "VIP", "seat_count": 50 }
+  ]
+}
+```
+
+**Errors:**
+- `400` — ไม่พบ organizer profile / ไฟล์รูปนามสกุลไม่รองรับ
+- `403` — ไม่ใช่ organizer
+- `422` — `zones_json` parse ไม่ได้ / total_seats ≤ 0
+
+---
+
+### 3.5 `GET /organizer/concerts/{concert_id}`
+
+**Description:** ดึง payload คอนเสิร์ตแบบเต็มสำหรับใช้ใน "ฟอร์มแก้ไขคอนเสิร์ต" (รวม sale window + zones รายโซน)
+
+**Auth:** Organizer JWT (ต้องเป็นเจ้าของคอนเสิร์ต)
+
+**Response 200:**
+```json
+{
+  "concert_id": 1,
   "title": "Together Live 2026",
   "artist": "Together Band",
   "venue": "อิมแพ็คอารีน่า",
@@ -415,40 +697,88 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
   "sale_open_at": "2026-05-01T10:00:00",
   "sale_close_at": "2026-06-14T23:59:00",
   "status": "on_sale",
+  "image_url": "database/image/abc123.jpg",
   "zones": [
     {
+      "zone_id": 10,
       "zone_name": "VIP",
       "total_seats": 50,
-      "price": 5000,
-      "row_prefix": "VIP-"
-    },
-    {
-      "zone_name": "Standard",
-      "total_seats": 100,
-      "price": 2000,
-      "row_prefix": "A"
+      "price": 5000.0,
+      "row_prefix": "V"
     }
   ]
 }
 ```
-- `zones`: (array) รายการโซนที่จะสร้างพร้อมที่นั่ง
-- `row_prefix`: (string) คำขึ้นต้นเลขที่นั่ง (เช่น `row_prefix: "A"` จะได้ที่นั่ง `A1`, `A2`...)
-- ระบบจะสร้าง `seat` ให้อัตโนมัติตามจำนวน `total_seats`
-- `sale_close_at` เป็น optional
-- `status` เริ่มต้น `on_sale` — ตั้ง `draft` ถ้ายังไม่อยากให้ลูกค้าเห็น
-
-**Response 201:**
-```json
-{ "message": "สร้างคอนเสิร์ตสำเร็จ", "concert_id": 1 }
-```
 
 **Errors:**
-- `400` — ไม่พบ organizer profile
-- `403` — ไม่ใช่ organizer
+- `403` — ไม่ใช่ organizer / ไม่ใช่เจ้าของคอนเสิร์ต
+- `404` — ไม่พบคอนเสิร์ต
 
 ---
 
-### 2.5 `POST /organizer/concerts/{concert_id}/queues/auto_sort`
+### 3.6 `PATCH /organizer/concerts/{concert_id}`
+
+**Description:** อัปเดตคอนเสิร์ต + zones ตาม business rules:
+- `status` ถูกตรึงไว้ — ใช้ `DELETE` endpoint สำหรับ cancel
+- zone ที่ไม่อยู่ใน `zones_json` ใหม่ → ลบได้เฉพาะถ้าไม่มี ticket อ้างอิง
+- ลด `total_seats` ห้ามทำถ้าโซนมี ticket อยู่แล้ว / เพิ่มได้เสมอ (ต่อท้ายเลข seat เดิม)
+- ราคา/ชื่อ zone เปลี่ยนได้เสมอ
+- `image`: ไม่ส่งมา = คงรูปเดิม / ส่งมา = บันทึกใหม่และอัปเดต URL
+
+**Auth:** Organizer JWT (ต้องเป็นเจ้าของคอนเสิร์ต)
+
+**Content-Type:** `multipart/form-data` ⚠️ เหมือน `POST /organizer/concerts`
+
+**Form fields:** เหมือน `POST /organizer/concerts` ยกเว้น **ไม่มี `status`** และ field `zones_json` รายโซนสามารถใส่ `zone_id` เพื่อ update zone เดิมได้:
+```json
+[
+  { "zone_id": 10, "zone_name": "VIP", "total_seats": 60, "price": 5500, "row_prefix": "V" },
+  { "zone_name": "New Zone", "total_seats": 30, "price": 3000, "row_prefix": "N" }
+]
+```
+- มี `zone_id` = update zone เดิม
+- ไม่มี `zone_id` = สร้าง zone ใหม่
+- zone_id เดิมที่หายไปจาก array = ลบ (ถ้าไม่มี ticket อ้าง)
+
+**Response 200:**
+```json
+{ "message": "อัปเดตคอนเสิร์ตสำเร็จ", "concert_id": 1 }
+```
+
+**Errors:**
+- `400` — `zones_json` parse ไม่ได้ / รูปนามสกุลไม่รองรับ
+- `403` — ไม่ใช่ organizer / ไม่ใช่เจ้าของคอนเสิร์ต
+- `404` — ไม่พบคอนเสิร์ต
+- `409` — ลบ/ลด total_seats ของ zone ที่มี ticket อ้างอยู่ — ใช้ Close Zone แทน
+- `422` — zone_id ไม่ใช่ของคอนเสิร์ตนี้ / ชื่อ zone ซ้ำกัน / total_seats ≤ 0
+
+---
+
+### 3.7 `DELETE /organizer/concerts/{concert_id}`
+
+**Description:** Soft-cancel คอนเสิร์ต — เปลี่ยน `concert.status = 'cancelled'`
+**ไม่ลบ** booking/payment/refund/queue_session เพื่อเก็บ audit trail
+
+**Auth:** Organizer JWT (ต้องเป็นเจ้าของคอนเสิร์ต)
+
+**Response 200:**
+```json
+{
+  "message": "ยกเลิกคอนเสิร์ตสำเร็จ",
+  "concert_id": 1,
+  "status": "cancelled"
+}
+```
+
+**Errors:**
+- `403` — ไม่ใช่ organizer / ไม่ใช่เจ้าของคอนเสิร์ต
+- `404` — ไม่พบคอนเสิร์ต
+- `409` — คอนเสิร์ตนี้ถูกยกเลิกไปแล้ว
+- `500` — internal error
+
+---
+
+### 3.8 `POST /organizer/concerts/{concert_id}/queues/auto_sort`
 
 **Description:** สั่งให้ระบบคำนวณ priority score ของคิวทั้งหมดใหม่ โดยเทียบ address ของคอนเสิร์ตกับ address ของลูกค้า (ตรง = 100, ไม่ตรง = 10)
 ใช้ตอน organizer กดปุ่ม "เรียงคิวอัตโนมัติ" ในหน้า Dashboard คิว
@@ -466,7 +796,7 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-### 2.6 `POST /organizer/zones/{zone_id}/close`
+### 3.9 `POST /organizer/zones/{zone_id}/close`
 
 **Description:** ปิดโซน (สำหรับกรณีคนซื้อน้อย / เปิดขายไม่สำเร็จ)
 ระบบจะ:
@@ -498,7 +828,71 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-### 2.7 `GET /organizer/concerts/{concert_id}/dashboard`
+### 3.10 `GET /organizer/concerts/{concert_id}/refund-pending`
+
+**Description:** ดึงรายชื่อ booking ที่อยู่สถานะ `refund_pending` ของคอนเสิร์ตที่ organizer เป็นเจ้าของ
+ใช้ในหน้า "อนุมัติคำขอคืนเงิน" — แสดงรายละเอียดบัญชีธนาคาร + เหตุผลของลูกค้า
+
+**Auth:** Organizer JWT (ต้องเป็นเจ้าของคอนเสิร์ต)
+
+**Response 200:** (array, เรียงตาม `created_at` DESC)
+```json
+[
+  {
+    "booking_id": 555,
+    "total_amount": 7000.0,
+    "total_tickets": 2,
+    "created_at": "2026-04-22T10:30:00",
+    "customer_name": "สมชาย ใจดี",
+    "customer_email": "somchai@example.com",
+    "refund_id": 80,
+    "bank_name": "ธนาคารกสิกรไทย",
+    "account_number": "1234567890",
+    "account_name": "สมชาย ใจดี",
+    "reason": "ติดธุระกะทันหัน",
+    "requested_at": "2026-04-22T11:00:00"
+  }
+]
+```
+
+**Errors:**
+- `400` — ไม่พบ organizer profile
+- `403` — ไม่ใช่ organizer ของคอนเสิร์ตนี้
+- `404` — ไม่พบ concert
+
+---
+
+### 3.11 `POST /organizer/bookings/{booking_id}/approve-refund`
+
+**Description:** อนุมัติคำขอคืนเงิน — booking → `refunded`, ลบ ticket, seat → `available`,
+refund row → `completed`, บันทึก `finance` หักลบ
+**ตั๋วที่ check-in ไปแล้วจะถูก reject** เพื่อกัน FK conflict กับ `ticket_checkin`
+
+**Auth:** Organizer JWT (ต้องเป็นเจ้าของคอนเสิร์ต)
+
+**Path params:** `booking_id`
+
+**Request body:** ไม่มี
+
+**Response 200:**
+```json
+{
+  "message": "อนุมัติคำขอคืนเงินสำเร็จ",
+  "booking_id": 555,
+  "amount": "7000.00",
+  "status": "refunded"
+}
+```
+
+**Errors:**
+- `400` — ไม่พบ organizer profile / ตั๋วถูก check-in ไปแล้ว (ห้ามคืนเงิน)
+- `403` — ไม่ใช่ organizer ของคอนเสิร์ตนี้
+- `404` — ไม่พบ booking
+- `409` — booking ไม่ได้อยู่สถานะ `refund_pending`
+
+---
+
+### 3.12 `GET /organizer/concerts/{concert_id}/dashboard`
 
 **Description:** ดึงสรุปรายรับ/รายจ่ายรายวันของคอนเสิร์ต (timezone: Asia/Bangkok) ใช้ใน dashboard การเงิน
 
@@ -533,9 +927,9 @@ Frontend ปกติ**ไม่ควรเรียก** ให้ใช้ fl
 
 ---
 
-## 3. Payment APIs
+## 4. Payment APIs
 
-### 3.1 `POST /api/v1/payments/generate-qr`
+### 4.1 `POST /api/v1/payments/generate-qr`
 
 **Description:** สร้าง QR PromptPay สำหรับจ่ายเงิน booking ที่อยู่สถานะ `pending`
 เรียกเมื่อกด "ชำระเงิน" ในหน้ารายละเอียด booking
@@ -573,7 +967,7 @@ Frontend:
 
 ---
 
-### 3.2 `GET /api/v1/payments/status/{transaction_ref}`
+### 4.2 `GET /api/v1/payments/status/{transaction_ref}`
 
 **Description:** เช็คสถานะ payment ใช้ polling จากหน้ารอจ่ายเงิน (หลัง generate QR) ทุก 3-5 วินาที
 
@@ -609,7 +1003,7 @@ Frontend:
 
 ---
 
-### 3.3 `POST /api/v1/payments/webhook`
+### 4.3 `POST /api/v1/payments/webhook`
 
 > **Internal only — Frontend ไม่ต้องเรียก endpoint นี้**
 >
@@ -618,9 +1012,9 @@ Frontend:
 
 ---
 
-## 4. Refund APIs
+## 5. Refund APIs
 
-### 4.1 `POST /api/v1/refunds/request`
+### 5.1 `POST /api/v1/refunds/request`
 
 **Description:** ยื่นฟอร์มขอคืนเงินสำหรับ booking ที่จ่ายเงินแล้ว **ภายใน 7 วันหลังชำระเงิน**
 เรียกเมื่อลูกค้ากดปุ่ม "ขอคืนเงิน" + กรอกฟอร์มบัญชีธนาคาร ในหน้ารายละเอียด booking
@@ -664,7 +1058,7 @@ Frontend ควรแสดง "รอรับเงินคืน" ในห�
 
 ---
 
-### 4.2 `POST /api/v1/refunds/voucher/{booking_id}`
+### 5.2 `POST /api/v1/refunds/voucher/{booking_id}`
 
 **Description:** ใช้ voucher จาก zone closure ขอคืนเงินเต็มจำนวน (ไม่มีจำกัด 7 วัน)
 เรียกเมื่อลูกค้ากดปุ่ม "ขอคืนเงิน" จาก banner ของ booking สถานะ `zone_closed_action_required`
@@ -702,6 +1096,45 @@ Frontend ควรแสดง "รอรับเงินคืน" ในห�
 - `404` — ไม่พบ booking
 - `409` — booking ไม่ใช่สถานะ `zone_closed_action_required` / ไม่พบ payment ที่จ่ายสำเร็จ / booking ถูกเปลี่ยนสถานะไปแล้ว (race condition) / เคยยื่น refund ไว้แล้ว
 - `500` — ยื่นไม่สำเร็จ
+
+---
+
+## 6. Staff APIs
+
+> **หมายเหตุ:** ทุก endpoint ต้องใช้ JWT ที่ role = `staff`
+
+### 6.1 `POST /staff/verify-ticket`
+
+**Description:** สแกน/ยืนยัน QR ตั๋วเพื่อให้ผู้เข้างานเข้าได้
+ระบบจะเช็คว่าตั๋วยัง valid (booking `paid` + `is_used = false`) ก่อน mark `is_used = true` และบันทึก `ticket_checkin`
+
+Frontend (Staff scanner) ใช้ `jsqr` จับ QR จากกล้อง แล้วส่ง `qr_hash` ที่ได้มา
+รองรับทั้ง `qr_hash` (string) และ `ticket_id` (numeric string) — ระบบจะลองทั้งสองทาง
+
+**Auth:** Staff JWT
+
+**Request body:**
+```json
+{ "qr_hash": "TKT-901-abc123def456" }
+```
+
+**Response 200:**
+```json
+{
+  "message": "Verify ตั๋วสำเร็จ อนุญาตให้เข้างานได้",
+  "ticket_id": 901,
+  "concert_title": "Together Live 2026",
+  "zone_name": "VIP",
+  "seat_number": "A1"
+}
+```
+
+**Errors:**
+- `400` — ไม่พบ staff profile / booking ไม่ใช่สถานะ `paid` (เช่นถูก refund หรือ cancel ไปแล้ว)
+- `403` — ไม่ใช่ role staff
+- `404` — ไม่พบตั๋วใบนี้ในระบบ
+- `409` — ตั๋วถูกใช้งานไปแล้ว (Duplicate Entry)
+- `500` — internal error
 
 ---
 
@@ -755,3 +1188,15 @@ Frontend ควรแสดง "รอรับเงินคืน" ในห�
 3. ลูกค้าเลือก 1 ใน 2:
    - **Refund:** `POST /api/v1/refunds/voucher/{booking_id}` → `refund_pending`
    - **Rebook:** เลือกที่นั่งใหม่ → `POST /booking/{booking_id}/rebook` → กลับเป็น `paid`
+
+### Flow 4: Organizer อนุมัติคำขอคืนเงิน
+1. `GET /organizer/concerts/{concert_id}/refund-pending` → ดูคิวขออนุมัติ
+2. กดปุ่มอนุมัติ → `POST /organizer/bookings/{booking_id}/approve-refund`
+3. booking → `refunded`, seat → `available`, refund row → `completed`
+
+### Flow 5: Staff QR Check-in
+1. ลูกค้าเปิดหน้า My Tickets → `GET /booking/{booking_id}/tickets` → render QR ด้วย `qr_hash`
+2. Staff เปิดหน้า scanner — ใช้ `jsqr` จับ QR จากกล้อง
+3. ส่ง `qr_hash` ไป `POST /staff/verify-ticket`
+4. ถ้า `200` → "อนุญาตเข้างาน" + แสดง zone/seat
+5. ถ้า `409` → "ตั๋วถูกใช้ไปแล้ว" (กัน Duplicate Entry)
