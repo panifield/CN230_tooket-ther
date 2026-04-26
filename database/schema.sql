@@ -241,7 +241,8 @@ CREATE TABLE finance (
     type             VARCHAR(20)     NOT NULL
                                      CHECK (type IN ('income','expense','refund','payout')),
     amount           NUMERIC(10,2)   NOT NULL,
-    description      TEXT
+    description      TEXT,
+    created_at       TIMESTAMP       NOT NULL DEFAULT NOW()
 );
 
 -- ============================================================
@@ -257,6 +258,7 @@ CREATE INDEX idx_concert_datetime ON concert(concert_datetime);
 
 --- Ticket ---
 CREATE INDEX idx_ticket_booking ON ticket(booking_id);
+CREATE INDEX idx_ticket_qr_hash ON ticket(qr_hash);
 
 --- queuery_session ---
 CREATE INDEX idx_queue_concert_status ON queue_session(concert_id, status);
@@ -285,6 +287,7 @@ CREATE INDEX idx_payment_status ON payment(status);
 --- Finance ---
 CREATE INDEX idx_finance_concert ON finance(concert_id);
 CREATE INDEX idx_finance_type ON finance(type);
+CREATE INDEX idx_finance_concert_created_at ON finance(concert_id, created_at);
 
 --- refund ---
 CREATE INDEX idx_refund_status ON refund(status);
