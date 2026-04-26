@@ -7,6 +7,7 @@ import type {
   OrganizerDashboard,
   OrganizerQueueRow,
   Zone,
+  PendingRefund,
 } from "../api/types";
 import { authStore } from "../state/auth";
 import { events } from "../state/events";
@@ -16,12 +17,11 @@ import {
   formatBaht,
   formatDateTime,
   statusLabel,
-  statusPillClass,
 } from "../utils/format";
 
 interface ZoneDraft extends CreateZonePayload {}
 
-export function renderOrganizerView(): HTMLElement {
+export function renderOrganizerView(initialState: "events" | "create" | "dashboard" = "events"): HTMLElement {
   if (!authStore.isAuthenticated() || authStore.getRole() !== "organizer") {
     router.navigate("/login");
     return el("div");
@@ -33,102 +33,17 @@ export function renderOrganizerView(): HTMLElement {
     queues: [] as OrganizerQueueRow[],
     dashboard: null as OrganizerDashboard | null,
     concertZones: [] as Zone[],
+    pendingRefunds: [] as PendingRefund[],
     zones: [] as ZoneDraft[],
+    navState: initialState
   };
 
-  const concertListHost = el("div");
-  const queueHost = el("div");
-  const dashboardHost = el("div");
-  const concertZonesHost = el("div");
-  const zoneDraftHost = el("div");
+  const mainContentHost = el("div", { class: "p-container-padding space-y-section-gap max-w-[1600px] mx-auto" });
+  const sidebarHost = el("div");
 
   const refreshConcerts = async (): Promise<void> => {
     state.concerts = await bookingApi.listConcerts();
-    renderConcerts();
-  };
-
-  const renderConcerts = (): void => {
-    if (state.concerts.length === 0) {
-      mount(concertListHost, el("div", { class: "empty-cart", text: "NO CONCERTS YET." }));
-      return;
-    }
-    mount(
-      concertListHost,
-      el("div", { class: "table-wrap" }, [
-        el("table", { class: "table" }, [
-          el("thead", {}, [
-            el("tr", {}, [
-              el("th", { text: "Concert Info" }),
-              el("th", { text: "Date & Venue" }),
-              el("th", { text: "Status" }),
-              el("th", { attrs: { style: "text-align: right;" }, text: "Actions" }),
-            ]),
-          ]),
-          el(
-            "tbody",
-            {},
-            state.concerts.map((c) =>
-              el("tr", { attrs: { style: state.selectedConcertId === c.concert_id ? "background: var(--color-sky-tint);" : "" } }, [
-                el("td", {}, [
-                  el("div", { attrs: { style: "font-weight: 500; font-size: 16px; color: var(--color-midnight);" }, text: c.title }),
-                  el("div", { class: "label-mono", attrs: { style: "margin-top: 4px;" }, text: c.artist }),
-                ]),
-                el("td", {}, [
-                  el("div", { text: formatDateTime(c.concert_datetime) }),
-                  el("div", { class: "label-mono", attrs: { style: "margin-top: 4px;" }, text: c.venue }),
-                ]),
-                el("td", {}, [
-                  el("span", {
-                    class: `pill ${String(c.status) === 'published' || String(c.status) === 'publish' ? 'pill--ok' : 'pill--muted'}`,
-                    text: statusLabel(c.status).toUpperCase(),
-                  }),
-                ]),
-                el("td", { attrs: { style: "text-align: right;" } }, [
-                  el("div", { class: "form-actions", attrs: { style: "justify-content: flex-end; margin-top: 0;" } }, [
-                    el(
-                      "button",
-                      {
-                        class: "btn btn--secondary btn--sm",
-                        attrs: { type: "button" },
-                        on: {
-                          click: () => {
-                            state.selectedConcertId = c.concert_id;
-                            renderConcerts();
-                            void Promise.all([loadQueues(), loadDashboard(), loadZones()]);
-                          },
-                        },
-                      },
-                      ["MANAGE"]
-                    ),
-                    el(
-                      "button",
-                      {
-                        class: "btn btn--ghost btn--sm",
-                        attrs: { type: "button" },
-                        on: {
-                          click: async () => {
-                            try {
-                              const r = await organizerApi.autoSortQueues(c.concert_id);
-                              events.emit("log", { level: "info", message: r.message });
-                            } catch (err) {
-                              events.emit("log", {
-                                level: "error",
-                                message: err instanceof Error ? err.message : String(err),
-                              });
-                            }
-                          },
-                        },
-                      },
-                      ["AUTO-SORT"]
-                    ),
-                  ]),
-                ]),
-              ])
-            )
-          ),
-        ]),
-      ])
-    );
+    renderMainContent();
   };
 
   const loadQueues = async (): Promise<void> => {
@@ -138,72 +53,6 @@ export function renderOrganizerView(): HTMLElement {
     } catch {
       state.queues = [];
     }
-    renderQueues();
-  };
-
-  const renderQueues = (): void => {
-    if (state.queues.length === 0) {
-      mount(queueHost, el("div", { class: "empty-cart", text: "NO CUSTOMERS IN QUEUE." }));
-      return;
-    }
-    mount(
-      queueHost,
-      el("div", { class: "table-wrap" }, [
-        el("table", { class: "table" }, [
-          el("thead", {}, [
-            el("tr", {}, [
-              el("th", { text: "Customer" }),
-              el("th", { text: "Priority" }),
-              el("th", { text: "Entered" }),
-              el("th", { text: "Status" }),
-              el("th", { attrs: { style: "text-align: right;" }, text: "Action" }),
-            ]),
-          ]),
-          el(
-            "tbody",
-            {},
-            state.queues.map((q) =>
-              el("tr", {}, [
-                el("td", { attrs: { style: "font-weight: 500;" }, text: q.customer_name }),
-                el("td", { text: String(q.priority_score) }),
-                el("td", { class: "label-mono", text: formatDateTime(q.entered_at) }),
-                el("td", {}, [
-                  el("span", {
-                    class: `pill ${String(q.status) === 'waiting' ? 'pill--warn' : 'pill--ok'}`,
-                    text: statusLabel(q.status).toUpperCase(),
-                  }),
-                ]),
-                el("td", { attrs: { style: "text-align: right;" } }, [
-                  String(q.status) === "waiting"
-                    ? el(
-                        "button",
-                        {
-                          class: "btn btn--primary btn--sm",
-                          attrs: { type: "button", title: "Admit" },
-                          on: {
-                            click: async () => {
-                              try {
-                                await organizerApi.admit(q.queue_id);
-                                await loadQueues();
-                              } catch (err) {
-                                events.emit("log", {
-                                  level: "error",
-                                  message: err instanceof Error ? err.message : String(err),
-                                });
-                              }
-                            },
-                          },
-                        },
-                        ["ADMIT"]
-                      )
-                    : el("span", { class: "label-mono", text: "—" }),
-                ]),
-              ])
-            )
-          ),
-        ]),
-      ])
-    );
   };
 
   const loadZones = async (): Promise<void> => {
@@ -213,87 +62,6 @@ export function renderOrganizerView(): HTMLElement {
     } catch {
       state.concertZones = [];
     }
-    renderConcertZones();
-  };
-
-  const renderConcertZones = (): void => {
-    if (state.selectedConcertId === null) {
-      mount(
-        concertZonesHost,
-        el("div", { class: "empty-cart", text: "SELECT A CONCERT TO VIEW ITS ZONES." })
-      );
-      return;
-    }
-    if (state.concertZones.length === 0) {
-      mount(
-        concertZonesHost,
-        el("div", { class: "empty-cart", text: "NO ZONES FOR THIS CONCERT." })
-      );
-      return;
-    }
-    mount(
-      concertZonesHost,
-      el("div", { class: "table-wrap" }, [
-        el("table", { class: "table" }, [
-          el("thead", {}, [
-            el("tr", {}, [
-              el("th", { text: "Zone Name" }),
-              el("th", { text: "Price" }),
-              el("th", { text: "Available" }),
-              el("th", { text: "Status" }),
-              el("th", { attrs: { style: "text-align: right;" }, text: "Action" }),
-            ]),
-          ]),
-          el(
-            "tbody",
-            {},
-            state.concertZones.map((z) => {
-              return el("tr", { attrs: { style: !z.is_active ? "opacity: 0.5;" : "" } }, [
-                el("td", { attrs: { style: "font-weight: 500;" }, text: z.zone_name }),
-                el("td", { text: formatBaht(z.price) }),
-                el("td", { class: "label-mono", text: `${z.available_count} / ${z.total_seats}` }),
-                el("td", {}, [
-                  el("span", {
-                    class: `pill ${z.is_active ? "pill--ok" : "pill--err"}`,
-                    text: z.is_active ? "ACTIVE" : "CLOSED",
-                  }),
-                ]),
-                el("td", { attrs: { style: "text-align: right;" } }, [
-                  z.is_active
-                    ? el(
-                        "button",
-                        {
-                          class: "btn btn--danger btn--sm",
-                          attrs: { type: "button" },
-                          on: {
-                            click: async () => {
-                              if (!window.confirm(`Close zone "${z.zone_name}"? This cannot be undone.`)) return;
-                              try {
-                                const r = await organizerApi.closeZone(z.zone_id);
-                                events.emit("log", {
-                                  level: "warn",
-                                  message: `${r.message} — ${r.affected_bookings} bookings affected`,
-                                });
-                                await Promise.all([loadZones(), loadDashboard()]);
-                              } catch (err) {
-                                events.emit("log", {
-                                  level: "error",
-                                  message: err instanceof Error ? err.message : String(err),
-                                });
-                              }
-                            },
-                          },
-                        },
-                        ["CLOSE ZONE"]
-                      )
-                    : el("span", { class: "label-mono", text: "—" }),
-                ]),
-              ]);
-            })
-          ),
-        ]),
-      ])
-    );
   };
 
   const loadDashboard = async (): Promise<void> => {
@@ -303,312 +71,610 @@ export function renderOrganizerView(): HTMLElement {
     } catch {
       state.dashboard = null;
     }
-    renderDashboard();
   };
 
-  const renderDashboard = (): void => {
-    if (!state.dashboard) {
-      mount(
-        dashboardHost,
-        el("div", { class: "empty-cart", text: "SELECT A CONCERT TO VIEW FINANCIALS." })
-      );
-      return;
+  const loadPendingRefunds = async (): Promise<void> => {
+    if (state.selectedConcertId === null) return;
+    try {
+      state.pendingRefunds = await organizerApi.listPendingRefunds(state.selectedConcertId);
+    } catch {
+      state.pendingRefunds = [];
     }
+  };
+
+  // ---------------- UI Components ----------------
+
+  const renderIcon = (name: string, extraClass: string = ""): HTMLElement => {
+    return el("span", { class: `material-symbols-outlined ${extraClass}`, text: name });
+  };
+
+  // Local sidebar and header removed to use the global navbar
+
+  const renderConcertsTable = (): HTMLElement => {
+    if (state.concerts.length === 0) {
+      return el("div", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm text-center font-body-md text-slate-500", text: "NO CONCERTS YET." });
+    }
+
+    return el("section", { class: "bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden" }, [
+      el("div", { class: "px-8 py-6 border-b border-slate-100 flex items-center justify-between" }, [
+        el("h3", { class: "font-headline-md text-slate-900", text: "Live Schedule" }),
+        el("button", { class: "p-2 text-slate-400 hover:text-slate-900 transition-colors", on: { click: refreshConcerts } }, [ renderIcon("refresh") ])
+      ]),
+      el("div", { class: "overflow-x-auto" }, [
+        el("table", { class: "w-full text-left border-collapse" }, [
+          el("thead", {}, [
+            el("tr", { class: "bg-slate-50/50" }, [
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "EVENT & ARTIST" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "DATE & VENUE" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "STATUS" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100 text-right", text: "ACTIONS" }),
+            ])
+          ]),
+          el("tbody", { class: "divide-y divide-slate-100" }, 
+            state.concerts.map(c => {
+              const isSelected = state.selectedConcertId === c.concert_id;
+              const isOk = String(c.status) === 'published' || String(c.status) === 'publish' || String(c.status) === 'on_sale';
+              return el("tr", { class: `hover:bg-slate-50 transition-colors group ${isSelected ? 'bg-surface-variant/20' : ''}` }, [
+                el("td", { class: "px-8 py-5" }, [
+                  el("div", { class: "flex items-center gap-4" }, [
+                    el("div", { class: "w-12 h-12 rounded-xl overflow-hidden shrink-0 bg-slate-100 flex items-center justify-center" }, [
+                      c.image_url ? el("img", { class: "w-full h-full object-cover", attrs: { src: `/${c.image_url}` } }) : renderIcon("image", "text-slate-400 text-2xl")
+                    ]),
+                    el("div", {}, [
+                      el("p", { class: "font-body-md font-semibold text-slate-900", text: c.title }),
+                      el("p", { class: "text-[11px] font-label-sm text-slate-500 uppercase", text: c.artist })
+                    ])
+                  ])
+                ]),
+                el("td", { class: "px-8 py-5" }, [
+                  el("p", { class: "font-body-md text-slate-900", text: formatDateTime(c.concert_datetime) }),
+                  el("p", { class: "text-xs text-slate-500 flex items-center gap-1 mt-1" }, [
+                    renderIcon("location_on", "text-xs"),
+                    c.venue
+                  ])
+                ]),
+                el("td", { class: "px-8 py-5" }, [
+                  el("span", { class: `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-label-sm text-[10px] ${isOk ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'}` }, [
+                    isOk ? el("span", { class: "w-1.5 h-1.5 rounded-full bg-green-600 status-pulse" }) : null,
+                    statusLabel(c.status).toUpperCase()
+                  ])
+                ]),
+                el("td", { class: "px-8 py-5 text-right" }, [
+                  el("div", { class: "flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity" }, [
+                    el("button", {
+                      class: "px-3 py-1.5 bg-white border border-slate-200 rounded-lg font-label-sm text-slate-700 hover:border-secondary transition-colors",
+                      on: { click: async () => {
+                        state.selectedConcertId = c.concert_id;
+                        state.navState = "dashboard";
+                        await Promise.all([loadQueues(), loadDashboard(), loadZones(), loadPendingRefunds()]);
+                        renderMainContent();
+                      }}
+                    }, ["Manage"]),
+                    el("button", {
+                      class: "p-1.5 text-slate-400 hover:text-secondary",
+                      attrs: { title: "Auto-sort Queue" },
+                      on: { click: async () => {
+                        try {
+                          const r = await organizerApi.autoSortQueues(c.concert_id);
+                          events.emit("log", { level: "info", message: r.message });
+                        } catch (err) {
+                          events.emit("log", { level: "error", message: err instanceof Error ? err.message : String(err) });
+                        }
+                      }}
+                    }, [ renderIcon("sort") ])
+                  ])
+                ])
+              ]);
+            })
+          )
+        ])
+      ])
+    ]);
+  };
+
+  const renderDashboardData = (): HTMLElement => {
+    if (state.selectedConcertId === null) {
+      return el("div", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm text-center font-body-md text-slate-500", text: "SELECT A CONCERT TO VIEW FINANCIALS." });
+    }
+
+    if (!state.dashboard) {
+      return el("div", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm text-center font-body-md text-slate-500", text: "LOADING FINANCIALS..." });
+    }
+
     const { grand_totals, daily_stats } = state.dashboard;
 
-    const summary = el(
-      "div",
-      { attrs: { style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-6);" } },
-      [
-        statCard("TOTAL INCOME", formatBaht(grand_totals.total_income)),
-        statCard("TOTAL EXPENSE", formatBaht(grand_totals.total_expense)),
-        statCard("NET PROFIT", formatBaht(grand_totals.total_net_profit)),
-      ]
-    );
-
-    const breakdown =
-      daily_stats.length === 0
-        ? el("div", { class: "empty-cart", text: "NO TRANSACTIONS YET." })
-        : el("div", { class: "table-wrap" }, [
-            el("table", { class: "table" }, [
-              el("thead", {}, [
-                el("tr", {}, [
-                  el("th", { text: "Date" }),
-                  el("th", { text: "Income" }),
-                  el("th", { text: "Expense" }),
-                  el("th", { attrs: { style: "text-align: right;" }, text: "Net Profit" }),
-                ]),
-              ]),
-              el(
-                "tbody",
-                {},
-                daily_stats.map((d) =>
-                  el("tr", {}, [
-                    el("td", { attrs: { style: "font-weight: 500;" }, text: d.date }),
-                    el("td", { text: formatBaht(d.income) }),
-                    el("td", { text: formatBaht(d.expense) }),
-                    el("td", { attrs: { style: "text-align: right;" } }, [
-                      el("span", {
-                        class: `pill ${d.net_profit >= 0 ? "pill--ok" : "pill--err"}`,
-                        text: formatBaht(d.net_profit),
-                      }),
-                    ]),
-                  ])
-                )
-              ),
-            ]),
-          ]);
-
-    mount(dashboardHost, summary, breakdown);
-  };
-
-  // ---------- Concert creation form ----------
-  const inputs = {
-    title: input("c-title", "text"),
-    artist: input("c-artist", "text"),
-    venue: input("c-venue", "text"),
-    address: input("c-address", "text"),
-    concert_datetime: input("c-when", "datetime-local"),
-    sale_open_at: input("c-sale-open", "datetime-local"),
-    sale_close_at: input("c-sale-close", "datetime-local"),
-    image: input("c-image", "file"),
-  };
-  
-  const formStatus = el("p", { class: "field__error", attrs: { style: "margin-top: var(--space-3); text-align: center;" } });
-
-  const addZone = (): void => {
-    state.zones.push({
-      zone_name: `ZONE ${state.zones.length + 1}`,
-      price: 1000,
-      total_seats: 50,
-      rows: 5,
-      cols: 10,
-    });
-    renderZoneDrafts();
-  };
-
-  const renderZoneDrafts = (): void => {
-    if (state.zones.length === 0) {
-      mount(zoneDraftHost, el("div", { class: "empty-cart", text: "NO ZONES ADDED YET." }));
-      return;
-    }
-    mount(
-      zoneDraftHost,
-      ...state.zones.map((z, i) =>
-        el("div", { class: "card card--cream", attrs: { style: "margin-bottom: var(--space-3); padding: var(--space-4);" } }, [
-          el("div", { class: "form-grid" }, [
-            zoneField(`ZONE NAME`, z.zone_name, (v) => {
-              state.zones[i]!.zone_name = v;
-            }),
-            zoneField(
-              `PRICE (THB)`,
-              String(z.price),
-              (v) => { state.zones[i]!.price = Number(v) || 0; },
-              "number"
-            ),
-            zoneField(
-              `ROWS`,
-              String(z.rows),
-              (v) => {
-                state.zones[i]!.rows = Number(v) || 0;
-                state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
-                renderZoneDrafts();
-              },
-              "number"
-            ),
-            zoneField(
-              `COLUMNS`,
-              String(z.cols),
-              (v) => {
-                state.zones[i]!.cols = Number(v) || 0;
-                state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
-                renderZoneDrafts();
-              },
-              "number"
-            ),
-          ]),
-          el("div", { class: "form-actions", attrs: { style: "justify-content: space-between; align-items: center;" } }, [
-            el("span", { class: "label-mono", text: `TOTAL SEATS: ${z.rows * z.cols}` }),
-            el("button", {
-                class: "btn btn--danger btn--sm",
-                attrs: { type: "button" },
-                on: { click: () => { state.zones.splice(i, 1); renderZoneDrafts(); } },
-              },
-              ["REMOVE ZONE"]
-            ),
-          ]),
+    const summary = el("div", { class: "grid grid-cols-1 md:grid-cols-3 gap-gutter mb-8" }, [
+      el("div", { class: "bg-white p-6 rounded-3xl border border-slate-200 flex flex-col justify-between" }, [
+        el("div", { class: "flex justify-between items-start" }, [
+          el("div", { class: "w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary" }, [ renderIcon("payments") ])
+        ]),
+        el("div", { class: "mt-4" }, [
+          el("p", { class: "text-slate-500 font-label-sm mb-1", text: "TOTAL INCOME" }),
+          el("h4", { class: "font-display-xl text-slate-900", text: formatBaht(grand_totals.total_income) })
         ])
-      )
-    );
+      ]),
+      el("div", { class: "bg-white p-6 rounded-3xl border border-slate-200 flex flex-col justify-between" }, [
+        el("div", { class: "flex justify-between items-start" }, [
+          el("div", { class: "w-12 h-12 rounded-2xl bg-error/10 flex items-center justify-center text-error" }, [ renderIcon("receipt_long") ])
+        ]),
+        el("div", { class: "mt-4" }, [
+          el("p", { class: "text-slate-500 font-label-sm mb-1", text: "TOTAL EXPENSE" }),
+          el("h4", { class: "font-display-xl text-slate-900", text: formatBaht(grand_totals.total_expense) })
+        ])
+      ]),
+      el("div", { class: "bg-primary-container p-6 rounded-3xl flex flex-col justify-between" }, [
+        el("div", { class: "flex justify-between items-start" }, [
+          el("div", { class: "w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center text-white" }, [ renderIcon("account_balance") ])
+        ]),
+        el("div", { class: "mt-4" }, [
+          el("p", { class: "text-slate-400 font-label-sm mb-1", text: "NET PROFIT" }),
+          el("h4", { class: "font-display-xl text-white", text: formatBaht(grand_totals.total_net_profit) })
+        ])
+      ])
+    ]);
+
+    const breakdown = daily_stats.length === 0 ? 
+      el("div", { class: "text-center text-slate-500 font-body-md py-8", text: "NO TRANSACTIONS YET." }) :
+      el("div", { class: "overflow-x-auto" }, [
+        el("table", { class: "w-full text-left border-collapse" }, [
+          el("thead", {}, [
+            el("tr", { class: "bg-slate-50/50" }, [
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "DATE" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "INCOME" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "EXPENSE" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100 text-right", text: "NET PROFIT" }),
+            ])
+          ]),
+          el("tbody", { class: "divide-y divide-slate-100" }, 
+            daily_stats.map(d => el("tr", { class: "hover:bg-slate-50 transition-colors" }, [
+              el("td", { class: "px-8 py-4 font-body-md text-slate-900", text: d.date }),
+              el("td", { class: "px-8 py-4 font-data-mono text-slate-900", text: formatBaht(d.income) }),
+              el("td", { class: "px-8 py-4 font-data-mono text-slate-900", text: formatBaht(d.expense) }),
+              el("td", { class: "px-8 py-4 font-data-mono text-right" }, [
+                el("span", { class: `inline-flex px-2 py-0.5 rounded-full font-label-sm text-[10px] ${d.net_profit >= 0 ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`, text: formatBaht(d.net_profit) })
+              ])
+            ]))
+          )
+        ])
+      ]);
+
+    return el("div", {}, [
+      summary,
+      el("div", { class: "bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden" }, [
+        el("div", { class: "px-8 py-6 border-b border-slate-100" }, [
+          el("h3", { class: "font-headline-md text-slate-900", text: "Daily Breakdown" })
+        ]),
+        breakdown
+      ])
+    ]);
   };
 
-  const submitConcert = async (): Promise<void> => {
-    formStatus.textContent = "";
-    formStatus.style.color = "var(--color-danger)";
+  const renderQueueList = (): HTMLElement => {
+    if (state.selectedConcertId === null) return el("div");
 
-    const title = inputs.title.value.trim();
-    const artist = inputs.artist.value.trim();
-    const venue = inputs.venue.value.trim();
-    const address = inputs.address.value.trim();
-    const concert_datetime = inputs.concert_datetime.value;
-    const sale_open_at = inputs.sale_open_at.value;
-    const sale_close_at = inputs.sale_close_at.value;
-
-    if (!title || !artist || !venue || !concert_datetime || state.zones.length === 0) {
-      formStatus.textContent = "PLEASE PROVIDE TITLE, ARTIST, VENUE, DATETIME, AND AT LEAST ONE ZONE.";
-      return;
+    if (state.queues.length === 0) {
+      return el("div", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm text-center font-body-md text-slate-500 mt-8", text: "NO CUSTOMERS IN QUEUE." });
     }
 
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("artist", artist);
-    formData.append("venue", venue);
-    formData.append("address", address);
-    formData.append("concert_datetime", concert_datetime);
-    formData.append("sale_open_at", sale_open_at);
-    if (sale_close_at) formData.append("sale_close_at", sale_close_at);
-    formData.append("status", "on_sale");
-    formData.append("zones_json", JSON.stringify(state.zones));
-    
-    if (inputs.image.files?.[0]) {
-      formData.append("image", inputs.image.files[0]);
+    return el("section", { class: "bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mt-8" }, [
+      el("div", { class: "px-8 py-6 border-b border-slate-100 flex items-center justify-between" }, [
+        el("h3", { class: "font-headline-md text-slate-900", text: "Real-time Queue" }),
+        el("button", { class: "p-2 text-slate-400 hover:text-slate-900 transition-colors", on: { click: loadQueues } }, [ renderIcon("refresh") ])
+      ]),
+      el("div", { class: "overflow-x-auto max-h-96" }, [
+        el("table", { class: "w-full text-left border-collapse relative" }, [
+          el("thead", { class: "sticky top-0 bg-slate-50/50 z-10 backdrop-blur-md" }, [
+            el("tr", {}, [
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "CUSTOMER" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "PRIORITY" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "ENTERED" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "STATUS" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100 text-right", text: "ACTION" }),
+            ])
+          ]),
+          el("tbody", { class: "divide-y divide-slate-100" }, 
+            state.queues.map(q => el("tr", { class: "hover:bg-slate-50 transition-colors" }, [
+              el("td", { class: "px-8 py-4 font-body-md font-semibold text-slate-900", text: q.customer_name }),
+              el("td", { class: "px-8 py-4 font-data-mono text-slate-900", text: String(q.priority_score) }),
+              el("td", { class: "px-8 py-4 font-body-md text-slate-500", text: formatDateTime(q.entered_at) }),
+              el("td", { class: "px-8 py-4" }, [
+                el("span", { class: `inline-flex px-2 py-0.5 rounded-full font-label-sm text-[10px] ${String(q.status) === 'waiting' ? 'bg-amber-50 text-amber-700' : 'bg-green-50 text-green-700'}`, text: statusLabel(q.status).toUpperCase() })
+              ]),
+              el("td", { class: "px-8 py-4 text-right" }, [
+                String(q.status) === "waiting" ?
+                  el("button", {
+                    class: "px-3 py-1.5 bg-secondary text-white rounded-lg font-label-sm hover:bg-secondary/90 transition-colors",
+                    on: { click: async () => {
+                      try {
+                        await organizerApi.admit(q.queue_id);
+                        await loadQueues();
+                        renderMainContent();
+                      } catch (err) {
+                        events.emit("log", { level: "error", message: err instanceof Error ? err.message : String(err) });
+                      }
+                    }}
+                  }, ["ADMIT"]) :
+                  el("span", { class: "text-slate-400", text: "—" })
+              ])
+            ]))
+          )
+        ])
+      ])
+    ]);
+  };
+
+  const renderConcertZones = (): HTMLElement => {
+    if (state.selectedConcertId === null) return el("div");
+
+    if (state.concertZones.length === 0) {
+      return el("div", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm text-center font-body-md text-slate-500 mt-8", text: "NO ZONES FOR THIS CONCERT." });
     }
 
-    try {
-      const r = await organizerApi.createConcert(formData as unknown as CreateConcertPayload);
-      formStatus.style.color = "var(--color-midnight)";
-      formStatus.textContent = `${r.message.toUpperCase()} (CONCERT #${r.concert_id})`;
-      state.zones = [];
+    return el("section", { class: "bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mt-8" }, [
+      el("div", { class: "px-8 py-6 border-b border-slate-100 flex items-center justify-between" }, [
+        el("h3", { class: "font-headline-md text-slate-900", text: "Zone Availability" }),
+        el("button", { class: "p-2 text-slate-400 hover:text-slate-900 transition-colors", on: { click: loadZones } }, [ renderIcon("refresh") ])
+      ]),
+      el("div", { class: "overflow-x-auto" }, [
+        el("table", { class: "w-full text-left border-collapse" }, [
+          el("thead", {}, [
+            el("tr", { class: "bg-slate-50/50" }, [
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "ZONE NAME" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "PRICE" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "AVAILABLE" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "STATUS" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100 text-right", text: "ACTION" }),
+            ])
+          ]),
+          el("tbody", { class: "divide-y divide-slate-100" }, 
+            state.concertZones.map(z => {
+              const capacity = z.total_seats > 0 ? Math.round(((z.total_seats - z.available_count) / z.total_seats) * 100) : 0;
+              return el("tr", { class: `hover:bg-slate-50 transition-colors ${!z.is_active ? 'opacity-50' : ''}` }, [
+                el("td", { class: "px-8 py-4 font-body-md font-semibold text-slate-900", text: z.zone_name }),
+                el("td", { class: "px-8 py-4 font-data-mono text-slate-900", text: formatBaht(z.price) }),
+                el("td", { class: "px-8 py-4" }, [
+                  el("div", { class: "flex items-center gap-3" }, [
+                    el("span", { class: "font-data-mono text-slate-900 w-16", text: `${z.available_count} / ${z.total_seats}` }),
+                    el("div", { class: "flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden min-w-[60px]" }, [
+                      el("div", { class: `h-full ${capacity > 90 ? 'bg-error' : 'bg-secondary'}`, attrs: { style: `width: ${capacity}%` } })
+                    ])
+                  ])
+                ]),
+                el("td", { class: "px-8 py-4" }, [
+                  el("span", { class: `inline-flex px-2 py-0.5 rounded-full font-label-sm text-[10px] ${z.is_active ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-600'}`, text: z.is_active ? "ACTIVE" : "CLOSED" })
+                ]),
+                el("td", { class: "px-8 py-4 text-right" }, [
+                  z.is_active ?
+                    el("button", {
+                      class: "px-3 py-1.5 bg-white border border-error text-error rounded-lg font-label-sm hover:bg-error hover:text-white transition-colors",
+                      on: { click: async () => {
+                        if (!window.confirm(`Close zone "${z.zone_name}"? This cannot be undone.`)) return;
+                        try {
+                          const r = await organizerApi.closeZone(z.zone_id);
+                          events.emit("log", { level: "warn", message: `${r.message} — ${r.affected_bookings} bookings affected` });
+                          await Promise.all([loadZones(), loadDashboard()]);
+                          renderMainContent();
+                        } catch (err) {
+                          events.emit("log", { level: "error", message: err instanceof Error ? err.message : String(err) });
+                        }
+                      }}
+                    }, ["CLOSE ZONE"]) :
+                    el("span", { class: "text-slate-400", text: "—" })
+                ])
+              ]);
+            })
+          )
+        ])
+      ])
+    ]);
+  };
+
+  const renderRefundList = (): HTMLElement => {
+    if (state.selectedConcertId === null) return el("div");
+    if (state.pendingRefunds.length === 0) {
+      return el("div", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm text-center font-body-md text-slate-500 mt-8", text: "NO PENDING REFUNDS." });
+    }
+
+    return el("section", { class: "bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden mt-8" }, [
+      el("div", { class: "px-8 py-6 border-b border-slate-100 flex items-center justify-between" }, [
+        el("h3", { class: "font-headline-md text-slate-900", text: "Pending Refunds" }),
+        el("button", { class: "p-2 text-slate-400 hover:text-slate-900 transition-colors", on: { click: loadPendingRefunds } }, [ renderIcon("refresh") ])
+      ]),
+      el("div", { class: "overflow-x-auto" }, [
+        el("table", { class: "w-full text-left border-collapse" }, [
+          el("thead", {}, [
+            el("tr", { class: "bg-slate-50/50" }, [
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "BOOKING" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "CUSTOMER" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "BANK INFO" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100", text: "AMOUNT" }),
+              el("th", { class: "px-8 py-4 font-label-sm text-slate-400 border-b border-slate-100 text-right", text: "ACTION" }),
+            ])
+          ]),
+          el("tbody", { class: "divide-y divide-slate-100" }, 
+            state.pendingRefunds.map(r => el("tr", { class: "hover:bg-slate-50 transition-colors" }, [
+              el("td", { class: "px-8 py-4" }, [
+                el("p", { class: "font-body-md font-semibold text-slate-900", text: `BKG-${r.booking_id}` }),
+                el("p", { class: "text-[10px] font-label-sm text-slate-500", text: `${r.total_tickets} ticket(s)` })
+              ]),
+              el("td", { class: "px-8 py-4" }, [
+                el("p", { class: "font-body-md text-slate-900", text: r.customer_name }),
+                el("p", { class: "text-[10px] font-label-sm text-slate-500", text: r.customer_email })
+              ]),
+              el("td", { class: "px-8 py-4 font-data-mono text-xs" }, [
+                el("p", { text: r.bank_name || "—" }),
+                el("p", { text: r.account_number || "—" }),
+                el("p", { text: r.account_name || "" })
+              ]),
+              el("td", { class: "px-8 py-4 font-data-mono font-semibold text-slate-900", text: formatBaht(r.total_amount) }),
+              el("td", { class: "px-8 py-4 text-right" }, [
+                el("button", {
+                  class: "px-3 py-1.5 bg-primary-container text-white rounded-lg font-label-sm hover:bg-primary-container/90 transition-colors",
+                  on: { click: async () => {
+                    if (!window.confirm(`Approve refund of ${formatBaht(r.total_amount)}?`)) return;
+                    try {
+                      const res = await organizerApi.approveRefund(r.booking_id);
+                      events.emit("log", { level: "info", message: `${res.message} — ${res.seats_released} seats released` });
+                      await Promise.all([loadPendingRefunds(), loadDashboard(), loadZones()]);
+                      renderMainContent();
+                    } catch (err) {
+                      events.emit("log", { level: "error", message: err instanceof Error ? err.message : String(err) });
+                    }
+                  }}
+                }, ["APPROVE"])
+              ])
+            ]))
+          )
+        ])
+      ])
+    ]);
+  };
+
+  const renderCreateConcert = (): HTMLElement => {
+    const inputs = {
+      title: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "text", placeholder: "e.g. Summer Solstice Tour" } }) as HTMLInputElement,
+      artist: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "text", placeholder: "e.g. Midnight Sky" } }) as HTMLInputElement,
+      venue: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "text", placeholder: "e.g. The Royal Albert Hall" } }) as HTMLInputElement,
+      address: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "text", placeholder: "Full Address" } }) as HTMLInputElement,
+      concert_datetime: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "datetime-local" } }) as HTMLInputElement,
+      sale_open_at: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "datetime-local" } }) as HTMLInputElement,
+      sale_close_at: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "datetime-local" } }) as HTMLInputElement,
+      image: el("input", { class: "w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 focus:border-secondary outline-none", attrs: { type: "file", accept: "image/*" } }) as HTMLInputElement,
+    };
+
+    const formStatus = el("p", { class: "text-center font-label-sm mt-4 text-error" });
+    const zoneDraftHost = el("div", { class: "space-y-4 mt-6" });
+
+    const renderZoneDrafts = (): void => {
+      if (state.zones.length === 0) {
+        mount(zoneDraftHost, el("div", { class: "text-center py-6 text-slate-500 font-body-md border-2 border-dashed border-slate-200 rounded-xl", text: "NO ZONES ADDED YET." }));
+        return;
+      }
+
+      mount(
+        zoneDraftHost,
+        ...state.zones.map((z, i) =>
+          el("div", { class: "bg-slate-50 p-6 rounded-2xl border border-slate-200 relative" }, [
+            el("div", { class: "grid grid-cols-2 gap-4" }, [
+              el("div", {}, [
+                el("label", { class: "block font-label-sm text-slate-500 mb-1", text: "ZONE NAME" }),
+                el("input", {
+                  class: "w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 outline-none",
+                  attrs: { type: "text", value: z.zone_name },
+                  on: { input: (e) => { state.zones[i]!.zone_name = (e.target as HTMLInputElement).value; } }
+                })
+              ]),
+              el("div", {}, [
+                el("label", { class: "block font-label-sm text-slate-500 mb-1", text: "PRICE (THB)" }),
+                el("input", {
+                  class: "w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 outline-none",
+                  attrs: { type: "number", value: String(z.price) },
+                  on: { input: (e) => { state.zones[i]!.price = Number((e.target as HTMLInputElement).value) || 0; } }
+                })
+              ]),
+              el("div", {}, [
+                el("label", { class: "block font-label-sm text-slate-500 mb-1", text: "ROWS" }),
+                el("input", {
+                  class: "w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 outline-none",
+                  attrs: { type: "number", value: String(z.rows) },
+                  on: { input: (e) => {
+                    state.zones[i]!.rows = Number((e.target as HTMLInputElement).value) || 0;
+                    state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
+                    renderZoneDrafts();
+                  }}
+                })
+              ]),
+              el("div", {}, [
+                el("label", { class: "block font-label-sm text-slate-500 mb-1", text: "COLUMNS" }),
+                el("input", {
+                  class: "w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-body-md focus:ring-2 focus:ring-secondary/20 outline-none",
+                  attrs: { type: "number", value: String(z.cols) },
+                  on: { input: (e) => {
+                    state.zones[i]!.cols = Number((e.target as HTMLInputElement).value) || 0;
+                    state.zones[i]!.total_seats = state.zones[i]!.rows * state.zones[i]!.cols;
+                    renderZoneDrafts();
+                  }}
+                })
+              ])
+            ]),
+            el("div", { class: "flex items-center justify-between mt-4 pt-4 border-t border-slate-200" }, [
+              el("span", { class: "font-label-sm text-slate-500", text: `TOTAL SEATS: ${z.rows * z.cols}` }),
+              el("button", {
+                class: "text-error hover:text-red-700 font-label-sm flex items-center gap-1 transition-colors",
+                on: { click: () => { state.zones.splice(i, 1); renderZoneDrafts(); } }
+              }, [ renderIcon("delete", "text-sm"), "REMOVE" ])
+            ])
+          ])
+        )
+      );
+    };
+
+    renderZoneDrafts();
+
+    const addZone = (): void => {
+      state.zones.push({
+        zone_name: `ZONE ${state.zones.length + 1}`,
+        price: 1000,
+        total_seats: 50,
+        rows: 5,
+        cols: 10,
+      });
       renderZoneDrafts();
-      await refreshConcerts();
-    } catch (err) {
-      formStatus.textContent = err instanceof Error ? err.message.toUpperCase() : "COULD NOT CREATE CONCERT.";
-    }
+    };
+
+    const submitConcert = async (): Promise<void> => {
+      formStatus.textContent = "";
+      formStatus.className = "text-center font-label-sm mt-4 text-error";
+
+      const title = inputs.title.value.trim();
+      const artist = inputs.artist.value.trim();
+      const venue = inputs.venue.value.trim();
+      const address = inputs.address.value.trim();
+      const concert_datetime = inputs.concert_datetime.value;
+      const sale_open_at = inputs.sale_open_at.value;
+      const sale_close_at = inputs.sale_close_at.value;
+
+      if (!title || !artist || !venue || !concert_datetime || state.zones.length === 0) {
+        formStatus.textContent = "PLEASE PROVIDE TITLE, ARTIST, VENUE, DATETIME, AND AT LEAST ONE ZONE.";
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("title", title);
+      formData.append("artist", artist);
+      formData.append("venue", venue);
+      formData.append("address", address);
+      formData.append("concert_datetime", concert_datetime);
+      formData.append("sale_open_at", sale_open_at);
+      if (sale_close_at) formData.append("sale_close_at", sale_close_at);
+      formData.append("status", "on_sale");
+      formData.append("zones_json", JSON.stringify(state.zones));
+      
+      if (inputs.image.files?.[0]) {
+        formData.append("image", inputs.image.files[0]);
+      }
+
+      try {
+        const r = await organizerApi.createConcert(formData as unknown as CreateConcertPayload);
+        formStatus.className = "text-center font-label-sm mt-4 text-green-600";
+        formStatus.textContent = `${r.message.toUpperCase()} (CONCERT #${r.concert_id})`;
+        state.zones = [];
+        renderZoneDrafts();
+        
+        // Reset form
+        Object.values(inputs).forEach(input => {
+          if (input.type !== 'file') input.value = '';
+        });
+        
+        await refreshConcerts();
+      } catch (err) {
+        formStatus.textContent = err instanceof Error ? err.message.toUpperCase() : "COULD NOT CREATE CONCERT.";
+      }
+    };
+
+    return el("section", { class: "bg-white p-8 rounded-[2rem] border border-slate-200 shadow-sm max-w-4xl mx-auto" }, [
+      el("div", { class: "border-b border-slate-100 pb-6 mb-6" }, [
+        el("h2", { class: "font-display-xl text-slate-900", text: "Create Event" }),
+        el("p", { class: "font-body-md text-slate-500", text: "Setup a new concert, venue details, and ticketing zones." })
+      ]),
+      el("div", { class: "grid grid-cols-1 md:grid-cols-2 gap-6" }, [
+        el("div", { class: "md:col-span-2" }, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "CONCERT NAME" }),
+          inputs.title
+        ]),
+        el("div", {}, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "ARTIST" }),
+          inputs.artist
+        ]),
+        el("div", {}, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "VENUE" }),
+          inputs.venue
+        ]),
+        el("div", { class: "md:col-span-2" }, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "FULL ADDRESS" }),
+          inputs.address
+        ]),
+        el("div", { class: "md:col-span-2" }, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "WHEN (DATE & TIME)" }),
+          inputs.concert_datetime
+        ]),
+        el("div", {}, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "SALE OPENS" }),
+          inputs.sale_open_at
+        ]),
+        el("div", {}, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "SALE CLOSES" }),
+          inputs.sale_close_at
+        ]),
+        el("div", { class: "md:col-span-2" }, [
+          el("label", { class: "block font-label-sm text-slate-500 mb-2", text: "CONCERT IMAGE (POSTER)" }),
+          inputs.image
+        ]),
+      ]),
+      
+      el("div", { class: "mt-10 border-t border-slate-100 pt-8" }, [
+        el("div", { class: "flex items-center justify-between mb-4" }, [
+          el("h3", { class: "font-headline-md text-slate-900", text: "Zone Configuration" }),
+          el("button", {
+            class: "flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-label-sm hover:bg-slate-200 transition-colors",
+            on: { click: addZone }
+          }, [ renderIcon("add", "text-lg"), "Add Zone" ])
+        ]),
+        zoneDraftHost
+      ]),
+
+      el("div", { class: "mt-10" }, [
+        el("button", {
+          class: "w-full bg-primary-container text-white py-4 rounded-xl font-label-sm tracking-widest hover:bg-primary-container/90 transition-colors shadow-lg",
+          on: { click: submitConcert }
+        }, ["PUBLISH CONCERT"]),
+        formStatus
+      ])
+    ]);
   };
 
+  const renderMainContent = (): void => {
+    let content: HTMLElement;
+
+    if (state.navState === "create") {
+      content = renderCreateConcert();
+    } else if (state.navState === "dashboard") {
+      content = el("div", { class: "space-y-section-gap" }, [
+        el("div", { class: "flex items-center justify-between mb-6" }, [
+          el("div", {}, [
+            el("h2", { class: "font-display-xl text-slate-900", text: "Dashboard" }),
+            el("p", { class: "font-body-md text-slate-500", text: "Financials and Analytics for selected event." })
+          ]),
+          el("button", {
+            class: "flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-600 rounded-xl font-label-sm hover:bg-slate-200 transition-colors",
+            on: { click: () => { state.navState = "events"; renderMainContent(); } }
+          }, [ renderIcon("arrow_back", "text-lg"), "BACK TO ALL EVENTS" ])
+        ]),
+        renderDashboardData(),
+        renderQueueList(),
+        renderConcertZones(),
+        renderRefundList()
+      ]);
+    } else { // "events"
+      content = el("div", { class: "space-y-section-gap" }, [
+        el("div", { class: "flex items-center justify-between mb-6" }, [
+          el("div", {}, [
+            el("h2", { class: "font-display-xl text-slate-900", text: "Active Events" }),
+            el("p", { class: "font-body-md text-slate-500", text: `Managing ${state.concerts.length} live performances.` })
+          ])
+        ]),
+        renderConcertsTable()
+      ]);
+    }
+
+    mount(mainContentHost, content);
+  };
+
+  // Initial Data Load
+  renderMainContent();
   void refreshConcerts();
-  renderZoneDrafts();
-  renderQueues();
-  renderConcertZones();
-  renderDashboard();
 
-  return el("div", { class: "coastal-page" }, [
-    el("div", { attrs: { style: "max-width: 1400px; margin: 0 auto;" } }, [
-      // Page Header
-      el("div", { class: "selection-header" }, [
-        el("div", {}, [
-          el("span", { class: "label-mono", text: "PORTAL / ORGANIZER" }),
-          el("h1", { class: "coastal-title", text: "Performance Dashboard" }),
-        ]),
-      ]),
-
-      // Main Grid Layout (2 Columns)
-      el("div", { attrs: { style: "display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: var(--space-6); align-items: start;" } }, [
-        
-        // LEFT COLUMN: Creation Forms
-        el("div", { attrs: { style: "display: flex; flex-direction: column; gap: var(--space-6);" } }, [
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Create Concert" }),
-              el("span", { class: "label-mono", text: "CRAFT / SETUP" }),
-            ]),
-            el("div", { class: "form-grid" }, [
-              el("div", { class: "form-grid--full" }, [ field("c-title", "CONCERT NAME", inputs.title) ]),
-              field("c-artist", "ARTIST", inputs.artist),
-              field("c-venue", "VENUE (LOCATION)", inputs.venue),
-              el("div", { class: "form-grid--full" }, [ field("c-address", "FULL ADDRESS", inputs.address) ]),
-              el("div", { class: "form-grid--full" }, [ field("c-when", "WHEN (DATE & TIME)", inputs.concert_datetime) ]),
-              field("c-sale-open", "SALE OPENS", inputs.sale_open_at),
-              field("c-sale-close", "SALE CLOSES", inputs.sale_close_at),
-              el("div", { class: "form-grid--full" }, [ field("c-image", "CONCERT IMAGE (POSTER)", inputs.image) ]),
-            ]),
-            
-            el("div", { class: "divider", text: "ZONE CONFIGURATION" }),
-            zoneDraftHost,
-            
-            el("div", { class: "form-actions" }, [
-              el("button", { class: "btn btn--secondary btn--block", attrs: { type: "button" }, on: { click: addZone } }, ["+ ADD ZONE"]),
-              el("button", { class: "btn btn--primary btn--block", attrs: { type: "button", style: "margin-top: var(--space-2);" }, on: { click: () => void submitConcert() } }, ["PUBLISH CONCERT"]),
-            ]),
-            formStatus,
-          ]),
-        ]),
-
-        // RIGHT COLUMN: Dashboard & Management
-        el("div", { attrs: { style: "display: flex; flex-direction: column; gap: var(--space-6);" } }, [
-          
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Active Events" }),
-              el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void refreshConcerts() } }, ["REFRESH"]),
-            ]),
-            concertListHost,
-          ]),
-
-          el("section", { class: "card card--dark" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Financial Dashboard" }),
-              el("button", { class: "btn btn--dark btn--sm", attrs: { type: "button" }, on: { click: () => void loadDashboard() } }, ["RELOAD"]),
-            ]),
-            dashboardHost,
-          ]),
-
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Real-time Queue" }),
-              el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadQueues() } }, ["RELOAD"]),
-            ]),
-            queueHost,
-          ]),
-
-          el("section", { class: "card" }, [
-            el("div", { class: "card__header" }, [
-              el("h3", { class: "card__title", text: "Zone Availability" }),
-              el("button", { class: "btn btn--ghost btn--sm", attrs: { type: "button" }, on: { click: () => void loadZones() } }, ["RELOAD"]),
-            ]),
-            concertZonesHost,
-          ]),
-
-        ]),
-      ]),
-    ]),
-  ]);
-}
-
-function input(id: string, type = "text"): HTMLInputElement {
-  return el("input", {
-    class: "input",
-    attrs: { id, type },
-  }) as HTMLInputElement;
-}
-
-function field(id: string, label: string, control: HTMLElement): HTMLElement {
-  return el("div", { class: "field" }, [
-    el("label", { class: "field__label", attrs: { for: id }, text: label }),
-    control,
-  ]);
-}
-
-function zoneField(
-  label: string,
-  value: string,
-  onChange: (v: string) => void,
-  type = "text"
-): HTMLElement {
-  const ctrl = el("input", {
-    class: "input",
-    attrs: { type, value },
-    on: { input: (e) => onChange((e.target as HTMLInputElement).value) },
-  });
-  return el("div", { class: "field" }, [
-    el("label", { class: "field__label", text: label }),
-    ctrl,
-  ]);
-}
-
-function statCard(label: string, value: string): HTMLElement {
-  return el("div", { class: "stat", attrs: { style: "background: var(--color-glass-light); padding: var(--space-4); border-radius: var(--radius-control);" } }, [
-    el("span", { class: "stat__value", attrs: { style: "color: var(--color-white);" }, text: value }),
-    el("span", { class: "stat__label", attrs: { style: "color: var(--color-primary-blue);" }, text: label }),
+  return el("div", { class: "bg-background text-on-background min-h-screen py-10 px-6" }, [
+    mainContentHost
   ]);
 }

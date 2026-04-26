@@ -1,3 +1,4 @@
+import "./styles/tailwind.css";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/components.css";
@@ -21,8 +22,7 @@ import { renderMyTicketsView } from "./views/MyTicketsView";
 import { renderZonesView } from "./views/Zones.view";
 import { renderSeatsView } from "./views/Seats.view";
 import { renderPaymentView } from "./views/Payment.view";
-import { renderControlRoomView } from "./views/ControlRoom.view";
-import { renderCreateConcertView } from "./views/CreateConcert.view";
+import { renderOrganizerView } from "./views/organizer.view";
 import { renderStaffView } from "./views/Staff.view";
 import { renderRefundView } from "./views/Refund.view";
 
@@ -214,14 +214,14 @@ router.register({
 router.register({ 
   path: "/organizer", 
   handler: () => { 
-    if (requireAuth("organizer")) render(renderControlRoomView()); 
+    if (requireAuth("organizer")) render(renderOrganizerView("events")); 
   } 
 });
 
 router.register({ 
   path: "/create-concert", 
   handler: () => { 
-    if (requireAuth("organizer")) render(renderCreateConcertView()); 
+    if (requireAuth("organizer")) render(renderOrganizerView("create")); 
   } 
 });
 
