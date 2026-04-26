@@ -42,7 +42,6 @@ export function renderOrganizerView(
   };
 
   const mainContentHost = el("div", { class: "p-container-padding space-y-section-gap max-w-[1600px] mx-auto" });
-  const sidebarHost = el("div");
 
   const refreshConcerts = async (): Promise<void> => {
     state.concerts = await bookingApi.listConcerts();

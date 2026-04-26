@@ -1,7 +1,6 @@
 import { el, mount, clear } from "../utils/dom";
-import { formatBaht, formatDateTime } from "../utils/format";
+import { formatDateTime } from "../utils/format";
 import { router } from "../router";
-import { bookingApi } from "../api/booking";
 
 // กำหนด Type ให้ชัดเจน
 interface Seat {
@@ -13,7 +12,7 @@ interface Seat {
   zone: string;
 }
 
-export function renderBookingView(concertId: number): HTMLElement {
+export function renderBookingView(_concertId: number): HTMLElement {
   // --- 1. State Management ---
   const state = {
     selectedSeats: [] as Seat[],
