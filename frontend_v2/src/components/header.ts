@@ -81,13 +81,15 @@ export function renderHeader(): HTMLElement {
         }, ["LOGIN"]),
     
     // BOOK NOW Button (Primary Action)
-    el("a", {
-      class: "btn btn--primary",
-      attrs: { 
-        href: "#/dashboard",
-        style: "padding: 8px 16px; font-size: 14px; font-family: 'The Future', sans-serif; text-decoration: none;"
-      }
-    }, ["BOOK NOW"])
+    ...(user?.role !== "organizer" && user?.role !== "staff" ? [
+      el("a", {
+        class: "btn btn--primary",
+        attrs: { 
+          href: "#/dashboard",
+          style: "padding: 8px 16px; font-size: 14px; font-family: 'The Future', sans-serif; text-decoration: none;"
+        }
+      }, ["BOOK NOW"])
+    ] : [])
   ]);
 
   return el("header", { 
