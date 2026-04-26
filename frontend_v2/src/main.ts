@@ -25,6 +25,7 @@ import { renderPaymentView } from "./views/Payment.view";
 import { renderOrganizerView } from "./views/organizer.view";
 import { renderStaffView } from "./views/Staff.view";
 import { renderRefundView } from "./views/Refund.view";
+import { renderEditConcertView } from "./views/EditConcert.view";
 
 const root = qs<HTMLDivElement>("#app");
 
@@ -207,7 +208,13 @@ router.register({
 router.register({
   path: "/organizer",
   handler: () => {
-    if (requireAuth("organizer")) render(renderOrganizerView("events"));
+    if (!requireAuth("organizer")) return;
+    const dashboardId = router.paramInt("dashboardConcertId");
+    if (dashboardId) {
+      render(renderOrganizerView("dashboard", dashboardId));
+    } else {
+      render(renderOrganizerView("events"));
+    }
   }
 });
 
@@ -215,6 +222,16 @@ router.register({
   path: "/create-concert",
   handler: () => {
     if (requireAuth("organizer")) render(renderOrganizerView("create"));
+  }
+});
+
+router.register({
+  path: "/edit-concert",
+  handler: () => {
+    if (!requireAuth("organizer")) return;
+    const id = router.paramInt("id");
+    if (!id) { router.navigate("/organizer"); return; }
+    render(renderEditConcertView({ concertId: id }));
   }
 });
 

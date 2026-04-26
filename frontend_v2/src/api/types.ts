@@ -188,6 +188,36 @@ export interface CreateConcertPayload {
   zones: CreateZonePayload[];
 }
 
+export interface ConcertEditZone {
+  zone_id: number;
+  zone_name: string;
+  total_seats: number;
+  price: number;
+  row_prefix: string;
+}
+
+export interface ConcertEditDetail {
+  concert_id: number;
+  title: string;
+  artist: string;
+  venue: string;
+  address: string;
+  concert_datetime: string | null;
+  sale_open_at: string | null;
+  sale_close_at: string | null;
+  status: ConcertStatus;
+  image_url: string | null;
+  zones: ConcertEditZone[];
+}
+
+export interface UpdateZonePayload {
+  zone_id?: number;
+  zone_name: string;
+  total_seats: number;
+  price: number;
+  row_prefix?: string;
+}
+
 export interface OrganizerQueueRow {
   queue_id: number;
   customer_id: number;

@@ -118,14 +118,15 @@ export function renderCustomerDashboard(): HTMLElement {
 
   const renderConcerts = (): void => {
     clear(concertsHost);
-    if (state.concerts.length === 0) {
+    const visibleConcerts = state.concerts.filter((c) => c.status !== "cancelled");
+    if (visibleConcerts.length === 0) {
       mount(concertsHost, el("div", { attrs: { style: "padding: 64px 0; text-align: center; color: rgba(1,1,32,0.4); font-family: 'The Future', sans-serif;" } }, ["NO CONCERTS AVAILABLE."]));
       return;
     }
 
     mount(
       concertsHost,
-      ...state.concerts.map((c) => {
+      ...visibleConcerts.map((c) => {
         const statusStr = String(c.status).toLowerCase();
         let statusBg = "background: rgba(255,255,255,0.9); color: #010120;";
         if (statusStr === "upcoming") statusBg = "background: #AAD6FA; color: #010120;";
@@ -219,7 +220,7 @@ export function renderCustomerDashboard(): HTMLElement {
       
       el("div", { attrs: { style: "margin-bottom: 48px;" } }, [
         el("span", { class: "label-mono", attrs: { style: "color: #AAD6FA; display: block; margin-bottom: 16px;" } }, ["CURATED / SELECTION"]),
-        el("h1", { attrs: { style: "font-family: 'The Future', sans-serif; font-size: clamp(32px, 5vw, 48px); margin: 0; color: #010120; letter-spacing: -0.8px;" } }, ["Featured Experiences"]),
+        el("h1", { attrs: { style: "font-family: 'The Future', sans-serif; font-size: clamp(32px, 5vw, 48px); margin: 0; color: #010120; letter-spacing: -0.8px;" } }, ["Events"]),
       ]),
 
       concertsHost,
