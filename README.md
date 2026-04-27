@@ -1,6 +1,6 @@
-# 🎫 Tooket-ther 
+# 🎫 Tooket-ther
 
-> แพลตฟอร์มจองตั๋วคอนเสิร์ตออนไลน์ยุคใหม่ — 
+> Premium concert ticketing — fairness, transparency, and a sophisticated concierge UX.
 > โครงงานรายวิชา **CN230 Database Systems** · ภาคเรียนที่ 2 ปีการศึกษา 2568
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.135-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
@@ -11,147 +11,199 @@
 
 ---
 
-## 📖 ภาพรวม (Overview)
+## 📖 Overview
 
-**Tooket-ther** คือเว็บแอปพลิเคชันจองตั๋วคอนเสิร์ตที่ออกแบบมาเพื่อแก้ปัญหาคลาสสิกของระบบจองตั๋ว เช่น เซิร์ฟเวอร์ล่มเมื่อมีผู้ใช้พร้อมกันจำนวนมาก, ลำดับคิวที่ไม่โปร่งใส และการแย่งที่นั่งกันแบบ race condition โดยมุ่งเน้นที่:
+**Tooket-ther** เป็นแพลตฟอร์มจองตั๋วคอนเสิร์ตแบบ end-to-end ที่ออกแบบมาเพื่อจัดการ **ปัญหาคลาสสิกของระบบจองตั๋ว** อย่างจริงจัง:
 
-1. **ความโปร่งใส (Fairness):** Priority queue ที่ตรวจสอบได้ + real-time seat locking
-2. **ความสะดวก (UX):** ขั้นตอนการจองสั้น เข้าใจง่าย รองรับทุก role
-3. **ประสิทธิภาพ (Performance):** Async background expiry + connection pooling + index ครบ
+- **Race conditions ในการเลือกที่นั่ง** — แก้ด้วย transactional `SELECT … FOR UPDATE` + state machine ของ `seat`
+- **คิวที่ไม่โปร่งใส** — แก้ด้วย priority queue ที่ score ตรวจสอบได้ + organizer-controlled admission
+- **Booking ค้างที่ปิดที่นั่งไว้ตลอดกาล** — แก้ด้วย background expiry loop ที่ cascade คืน seat / queue / payment
+- **การคืนเงินที่ผิดพลาด** — แก้ด้วย unique constraints + idempotent webhook + 7-day window policy
+
+ทุกอย่างห่อด้วย **Coastal Edition** — design system แนว premium concierge ที่เน้น glassmorphism, sharp radii, และ palette ฟ้า-ครีม-มิดไนต์
 
 ---
 
 ## 🚀 Key Features
 
 ### 👤 Customer
-- **Browse Events** — ดูคอนเสิร์ตที่กำลังเปิดขาย พร้อมรูป poster และข้อมูลสถานที่
-- **Priority Queue** — เข้าคิวรอตามคะแนน priority (entered_at + location_score)
-- **Real-time Seat Selection** — เลือกที่นั่งในโซนพร้อม seat locking ป้องกัน double booking
-- **Payment** — ชำระเงินผ่าน QR (PromptPay)
-- **My Tickets** — ตั๋วดิจิทัลพร้อม **QR Code** สำหรับเข้างาน
-- **Refund** — ขอคืนเงินพร้อมแนบบัญชีธนาคาร, ติดตามสถานะ
+- **Browse Events** — ดูคอนเสิร์ตที่กำลังเปิดขาย พร้อมรูป poster, รายละเอียดสถานที่, sale window
+- **Priority Queue** — เข้าคิวรอ คะแนน priority คำนวณจาก `customer_profile.location_score` + เวลาเข้าแถว (`entered_at`); status realtime polling ทุก 3 วินาที
+- **Real-time Seat Selection** — เลือกที่นั่งใน zone พร้อม **soft-lock 15 นาที** ป้องกัน double booking ผ่าน `SELECT FOR UPDATE`
+- **PromptPay Payment** — สร้าง EMVCo QR แบบ dynamic (CRC16/CCITT-FALSE checksum) ฝั่ง backend; frontend poll status จนกว่า webhook จะเข้ามา
+- **My Tickets** — แสดงตั๋วเป็น stub design พร้อม QR code (`qr_hash` per ticket) สำหรับ scan ที่หน้างาน
+- **Refund** — ขอคืนเงินเต็มจำนวนภายใน **7 วัน** หลัง payment ถ้ายังไม่ check-in; แนบบัญชีธนาคาร
+- **Voucher / Rebook** — ถ้า organizer ยกเลิก zone ที่จองไว้ booking จะเข้าสถานะ `zone_closed_action_required` ลูกค้าเลือกได้ระหว่าง refund หรือเปลี่ยนที่นั่งใหม่
 
 ### 🎤 Organizer
-- **Create / Edit Concert** — สร้าง-แก้ไขคอนเสิร์ต (วันเวลา, สถานที่, sale window, รูป poster)
-- **Zone & Pricing** — แบ่งโซนและกำหนดราคาแยก พร้อม `min_booking_threshold` สำหรับเปิด/ปิดโซนอัตโนมัติ
-- **Sales Dashboard** — สรุปยอดขาย + รายได้แยกตามโซน (รองรับ view `vw_concert_sales`)
-- **Refund Approval** — อนุมัติ/ปฏิเสธคำขอคืนเงิน
+- **Create Concert** — multipart form (title, artist, venue, sale window, รูป poster, zones JSON); auto-generate seats ตาม `total_seats` ของแต่ละ zone
+- **Edit Concert** — แก้ไขข้อมูลคอนเสิร์ต + เพิ่ม / ลบ / แก้ไข zone ได้ (ลบ zone ได้เฉพาะเมื่อยังไม่มีตั๋วถูกขาย)
+- **Soft-delete / Cancel Concert** — `DELETE` flip status เป็น `cancelled` (ไม่ลบ row จริง) เพื่อรักษา audit trail; bookings ที่ active จะถูก mark `zone_closed_action_required`
+- **Queue Admission Control** — ดู queue ทั้งหมด → กด admit ทีละกลุ่ม / override priority_score
+- **Sales Dashboard** — สรุปยอดขายรายคอนเสิร์ต + รายได้แยก zone (ผ่าน `vw_concert_sales`)
+- **Refund Approval** — review และอนุมัติ / ปฏิเสธคำขอคืนเงิน
 
 ### 🛡️ Staff
-- **QR Check-in** — สแกน QR ผ่านกล้อง (ใช้ `jsqr`) บันทึก `ticket_checkin` ป้องกันสแกนซ้ำ
+- **QR Check-in** — สแกน QR ของลูกค้าผ่านกล้อง (`jsqr`); backend ใช้ `SELECT … FOR UPDATE` กัน double check-in, validate booking=`paid` + `is_used=false`, บันทึกเข้า `ticket_checkin`
 
 ---
 
-## 🎨 Design System & UX/UI
+## 🎨 Design System — Coastal Edition
 
-ระบบดีไซน์ภายใต้ชื่อ **"Together AI: Coastal Edition"** — รายละเอียดเต็มอยู่ใน [`DESIGN.md`](./DESIGN.md)
+ระบบดีไซน์ภายใต้ชื่อ **"Together AI · Coastal Edition"** — premium / sophisticated concierge aesthetic
 
 | หัวข้อ | รายละเอียด |
 | --- | --- |
-| **Mood & Tone** | Airy / Optimistic / Professional |
+| **Mood & Tone** | Airy · Optimistic · Professional |
 | **Primary Palette** | Sky Blue `#AAD6FA` · Cream `#FCE6A9` · Midnight `#010120` · Sky Tint `#C5F6FA` |
-| **Typography** | Headlines: `The Future` (500 weight, tight tracking) · Labels: `PP Neue Montreal Mono` (uppercase) |
-| **Radii** | `8px` container · `4px` control (no pill shapes) |
+| **Typography** | Headlines: `The Future` (500 weight, tight tracking) · Mono labels: `PP Neue Montreal Mono` (uppercase) · Body: Inter |
+| **Radii** | `8px` containers · `4px` controls (no pill shapes — sharp by intention) |
 | **Shadow** | Blue-tinted soft: `rgba(1, 1, 32, 0.06) 0 4px 12px` |
 | **Glassmorphism** | `backdrop-filter: blur(20px)` + `rgba(255,255,255,0.55)` บน hero / cards |
 | **Gradient** | `linear-gradient(135deg, #AAD6FA, #FCE6A9)` |
+| **Premium touches** | Ticket stub perforated design · floating GFX · monospace coordinate footer |
 
 **Do:** ใช้ Midnight `#010120` เป็น anchor / Driftwood `#6f5e4e` สำหรับ metadata
 **Don't:** ใช้สีดำล้วน · ใช้ pill rounded shapes
+
+CSS tokens อยู่ใน `frontend_v2/src/styles/tokens.css`
 
 ---
 
 ## 🏗️ Technical Architecture
 
 ```
-┌──────────────────────┐      HTTPS/JSON      ┌─────────────────────┐      asyncpg pool      ┌──────────────────┐
-│  Frontend (Vite +    │  ─────────────────►  │  FastAPI Backend    │  ───────────────────►  │   PostgreSQL     │
-│  TypeScript strict)  │  ◄─────────────────  │  (uvicorn / async)  │  ◄───────────────────  │   14+            │
-│  Hash Router · jsqr  │                      │  JWT · CORS · OAuth │                        │  12 tables/8 vw  │
-└──────────────────────┘                      └─────────────────────┘                        └──────────────────┘
-                                                        │
-                                                        ▼
-                                              ┌────────────────────┐
-                                              │ Background Task    │
-                                              │ Expiry loop (60s)  │
-                                              │ pending → expired  │
-                                              └────────────────────┘
+┌──────────────────────┐      HTTPS / JSON     ┌─────────────────────┐    psycopg2 sync pool   ┌──────────────────┐
+│  Frontend (Vite +    │  ───────────────────► │  FastAPI Backend    │  ─────────────────────► │   PostgreSQL     │
+│  TypeScript strict)  │  ◄─────────────────── │  (uvicorn / async)  │  ◄───────────────────── │   14+            │
+│  Path Router · jsQR  │                       │  JWT · CORS · OAuth │                         │ 15 tables / 9 vw │
+└──────────────────────┘                       └─────────────────────┘                         └──────────────────┘
+                                                          │
+                                                          ▼
+                                                ┌────────────────────┐
+                                                │ Background Task    │
+                                                │ Expiry loop (60s)  │
+                                                │ pending → expired  │
+                                                │ + cascade revert   │
+                                                └────────────────────┘
 ```
 
-**สถาปัตยกรรมหลัก:**
-- **Decoupled Frontend / Backend** — frontend คือ static site, backend เปิด REST API ที่ `/api/*`
-- **Hash Router** (frontend) — `#/dashboard`, `#/seats?concertId=...` (no server config required)
-- **JWT Auth** — `routes/auth.py` ออก token, frontend เก็บใน `authStore` (`state/auth.ts`)
-- **Async Expiry Task** — `_expire_bookings_loop()` ใน [`app.py`](./app.py) รันทุก 60 วินาที คืน seat ของ booking ที่หมดเวลา และ cascade ไปที่ `payment` / `queue_session`
-- **OAuth** — รองรับ Line + Google (config ใน `config.py`)
-- **Payment Webhook** — ตรวจ HMAC-SHA256 ด้วย `PAYMENT_WEBHOOK_SECRET`
+### หลักการสถาปัตยกรรม
 
-**Routers (FastAPI):**
+- **Decoupled Frontend / Backend** — frontend เป็น static site (Vite build), backend เปิด REST API
+- **Path-based Router (no hash)** — hand-rolled router ใน `frontend_v2/src/router.ts`; `router.register({ path, handler })` map path → view; `requireAuth(role?)` guard ห่อทุก handler
+- **Stateless JWT** — `routes/auth.py` ออก HS256 token (TTL จาก `JWT_EXPIRE_MINUTES`); frontend เก็บใน `authStore` (localStorage); 401 ใด ๆ จะเคลียร์ store + emit `auth:logout`
+- **Connection Pooling** — `psycopg2.pool.SimpleConnectionPool` (min 1, max 10) ใน `models.py`; ทุก route ใช้ `get_db_connection()` context manager
+- **OAuth** — Line + Google ทั้งสองทำงานครบ flow (authorize URL → callback → token exchange → user upsert)
+- **Payment Webhook Security** — ตรวจ `X-Signature` ด้วย HMAC-SHA256 + `hmac.compare_digest()` (constant-time)
+
+### Concurrency & Transaction Safety
+
+หัวใจของระบบ — แก้ปัญหา race condition ที่ classic ของ ticketing:
+
+1. **Seat soft-lock** — ใน `routes/booking.py` การจองทำใน transaction เดียว: `SELECT … FOR UPDATE` ที่นั่งเป้าหมาย → ถ้า status = `available` → flip เป็น `locked` → insert `booking` (status `pending`) + `ticket` ทุก seat → commit
+2. **Idempotent payment webhook** — `WHERE status='pending'` + UNIQUE(`transaction_ref`) ทำให้ retry ของ gateway ไม่สร้าง state ซ้ำ
+3. **Background expiry cascade** — `_expire_bookings_loop()` ใน `app.py` รันทุก 60 วินาที:
+   - `booking` ที่ `status='pending'` และเลย `expired_at` → `expired`
+   - `seat` ที่ผูกกับ booking นั้น → คืนกลับ `available`
+   - `queue_session` ที่ `admitted` → `expired`
+   - `payment` ที่ `pending` → `expired`
+4. **Check-in dedup** — `staff.py` ใช้ `SELECT … FOR UPDATE` + UNIQUE(`ticket_id`) บน `ticket_checkin` กัน scan ซ้ำ
+5. **Refund idempotency** — UNIQUE(`payment_id`) บน `refund` + `ON CONFLICT DO NOTHING`
+
+### Routers (FastAPI)
 
 | Prefix | ไฟล์ | หน้าที่ |
 | --- | --- | --- |
-| `/auth` | `routes/auth.py` | สมัคร, login, OAuth callback, forgot password |
-| `/booking` | `routes/booking.py` | List concerts, queue, zones, seats, create booking |
-| `/organizer` | `routes/organizer.py` | CRUD concert, zone, pricing, sales reports, refund approval |
-| `/payment` | `routes/payment.py` | Initiate, QR generation, webhook callback |
-| `/refund` | `routes/refund.py` | Request, list, status |
-| `/staff` | `routes/staff.py` | QR check-in |
+| `/auth` | `routes/auth.py` | register · login (SHA-256) · OAuth Line/Google · `/me` · `PATCH /profiles` · forgot-password |
+| `/booking` | `routes/booking.py` | concert list · queue join/status · zones · seats · `POST /book` (transactional soft-lock) · `/my` · ticket QR fetch |
+| `/organizer` | `routes/organizer.py` | concert CRUD + soft-delete · zone diff · queue admit / priority override · sales reporting |
+| `/api/v1/payments` | `routes/payment.py` | `generate-qr` (PromptPay) · `status/{ref}` (poll) · `webhook` (HMAC verified) |
+| `/api/v1/refunds` | `routes/refund.py` | `request` (7-day full refund) · `voucher/{booking_id}` (zone-closure) |
+| `/staff` | `routes/staff.py` | `verify-ticket` (QR scan check-in) |
 
-ดู API spec ฉบับเต็มที่ [`routes/FRONTEND_API_GUIDE.md`](./routes/FRONTEND_API_GUIDE.md) หรือ Swagger ที่ `http://localhost:8000/docs`
+
+ดู API contract เต็ม: [`routes/FRONTEND_API_GUIDE.md`](./routes/FRONTEND_API_GUIDE.md) · Swagger: `http://localhost:8000/docs`
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend (`frontend_v2/`)
-- **Vite 5** + **TypeScript 5.4** (strict, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`)
-- **Vanilla DOM** (no React/Vue) — render ผ่าน helper `el()` ใน `utils/dom.ts`
+- **Vite 5** + **TypeScript 5.4 strict** (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`)
+- **Vanilla DOM** — ไม่มี React / Vue; render ด้วย `el()` helper ใน `utils/dom.ts`
 - **Tailwind CSS 3.4** + design tokens จาก `src/styles/tokens.css`
-- **jsQR 1.4** — สำหรับสแกน QR code ฝั่ง staff
-- ไม่มี runtime dependency อื่น
+- **jsQR 1.4** — สแกน QR code (staff check-in)
+- **Custom EventBus** (`state/events.ts`) สำหรับ pub/sub — ไม่มี state framework
 
-### Backend (`/`)
-- **FastAPI 0.135** + **Uvicorn**
-- **psycopg2** + connection pool (`models.py`)
-- **Alembic 1.18** สำหรับ migrations (`database/migrations/`)
-- **PyJWT** สำหรับ access token, **bcrypt/passlib** สำหรับ password hashing
+### Backend
+- **FastAPI 0.135** + **Uvicorn 0.44**
+- **psycopg2-binary 2.9** + `SimpleConnectionPool` (sync; `models.py`)
+- **PyJWT 2.12** สำหรับ JWT HS256
+- **Pydantic 2.12** + **pydantic-settings**
+- **Alembic 1.18** สำหรับ DB migrations (`database/migrations/`)
+- **python-multipart** สำหรับ file upload (concert poster)
 - **python-dotenv** อ่าน `.env`
 
 ### Database
 - **PostgreSQL 14+**
-- 12 tables · 8 views · ครอบคลุมทุก index ที่ query ใช้บ่อย (ดู `schema.sql`)
+- **15 tables · 9 views · 14 indexes** — รายละเอียดด้านล่าง
 
 ---
 
 ## 🗄️ Database Schema
 
-ดูไฟล์เต็ม: [`database/schema.sql`](./database/schema.sql) · ER diagram: [`database/update_ERD.png`](./database/update_ERD.png) / [`database/ERD_photo.png`](./database/ERD_photo.png)
+ดูไฟล์เต็ม: [`database/schema.sql`](./database/schema.sql) · ER diagram: [`database/update_ERD.png`](./database/update_ERD.png) · Sample queries: [`queries.sql`](./queries.sql)
 
-### Tables (12)
+### 3NF Compliance
 
-| Table | หน้าที่ |
-| --- | --- |
-| `users` | บัญชีผู้ใช้กลาง (id_card unique, role: customer/organizer/staff) |
-| `social_account` | เชื่อม OAuth (line / facebook / google / email) |
-| `customer_profile` | ข้อมูลเฉพาะลูกค้า + `location_score` สำหรับ priority queue |
-| `organizer_profile` | ข้อมูลผู้จัด (tax_id, company_name) |
-| `staff_profile` | สังกัด organizer + shift + `staff_code` |
-| `concert` | คอนเสิร์ต (sale window, status, image_url) |
-| `zone` | โซนภายในคอนเสิร์ต (price, total_seats, min_booking_threshold) |
-| `seat` | ที่นั่งรายตัว (status: available/locked/sold/closed) |
-| `queue_session` | เซสชันคิว (priority_score, entered_at, status) |
-| `booking` | การจองรวม (status: pending/paid/cancelled/expired/...) |
-| `ticket` | ตั๋วต่อที่นั่ง + `qr_hash` + `is_used` |
-| `payment` / `refund` / `ticket_checkin` / `finance` | ชำระเงิน, คืนเงิน, check-in, รายงานการเงิน |
+Schema ออกแบบเป็น **Third Normal Form** อย่างจงใจ:
 
-### Views (8) — สำหรับ reporting & UI
+- **ไม่มี role-specific column บน `users`** — ทุกอย่างเฉพาะ role อยู่ใน `customer_profile` / `organizer_profile` / `staff_profile` (FK กลับมา)
+- **ไม่มี repeating group** — seat / payment / refund / check-in เป็น atomic record
+- **ไม่มี transitive dependency** — `payment` อ้างถึง `booking` (ไม่ข้ามไป customer); `refund` อ้างถึง `payment` (ไม่ข้ามไป booking)
+
+### Tables (15)
+
+| กลุ่ม | Table | หน้าที่ |
+| --- | --- | --- |
+| **Identity** | `users` | บัญชีกลาง (email/id_card unique, role: customer/organizer/staff) |
+|  | `social_account` | OAuth mapping (line / google / facebook / email) |
+|  | `customer_profile` | ข้อมูลลูกค้า + `location_score` สำหรับ priority queue |
+|  | `organizer_profile` | ผู้จัด (tax_id, company_name) |
+|  | `staff_profile` | สังกัด organizer + shift + `staff_code` |
+| **Catalog** | `concert` | คอนเสิร์ต (sale window, status, image_url) |
+|  | `zone` | โซน (price, total_seats, min_booking_threshold) |
+|  | `seat` | ที่นั่งรายตัว (status: available/locked/sold/closed) |
+| **Pipeline** | `queue_session` | คิว (priority_score, entered_at, status) |
+|  | `booking` | การจอง (7 statuses incl. `zone_closed_action_required`, `refund_pending`) |
+|  | `ticket` | ตั๋วต่อที่นั่ง (UNIQUE seat_id กัน double-book; `qr_hash`, `is_used`) |
+|  | `ticket_checkin` | บันทึก check-in (UNIQUE ticket_id) |
+| **Money** | `payment` | การชำระเงิน (qr_code/credit_card/bank_transfer; UNIQUE `transaction_ref`) |
+|  | `refund` | คำขอคืนเงิน (UNIQUE payment_id; รองรับ bank transfer + voucher) |
+|  | `finance` | Audit ledger (income/expense/refund/payout) |
+
+### Views (9) — รองรับ reporting & UI
 
 `vw_booking_summary` · `vw_ticket_detail` · `vw_available_seat` · `vw_payment_status` · `vw_concert_sales` · `vw_expired_bookings` · `vw_queue_status` · `vw_refund_status` · `vw_checkin_status`
 
-### Indexes ที่สำคัญ
-- `idx_queue_priority_score (concert_id, priority_score DESC, entered_at ASC)` — สำหรับ admit คิว
-- `idx_seat_zone_status` — สำหรับเช็คที่นั่งว่างใน zone
-- `idx_booking_expired_pending` (partial, `WHERE status='pending'`) — สำหรับ background expiry
+### Critical Indexes
+
+- `idx_queue_priority_score (concert_id, priority_score DESC, entered_at ASC)` — เร่งการ admit คิว
+- `idx_seat_zone_status` — เช็คที่นั่งว่างใน zone
+- `idx_booking_expired_pending` (partial, `WHERE status='pending'`) — ใช้โดย background expiry
+- `idx_ticket_qr_hash` — gate scan O(log n)
+
+### State Machines
+
+| Entity | States |
+| --- | --- |
+| `concert` | draft → on_sale → closed / cancelled |
+| `seat` | available → locked → sold / closed |
+| `queue_session` | waiting → admitted → completed / expired |
+| `booking` | pending → paid / cancelled / expired / zone_closed_action_required → refund_pending → refunded |
+| `payment` | pending → paid / failed / expired |
+| `refund` | pending_transfer → requested → approved → processing → completed / rejected |
 
 ---
 
@@ -160,37 +212,39 @@
 ```
 CN230_tooket-ther/
 ├── app.py                       # FastAPI entry + lifespan + expiry loop
-├── config.py                    # Env config
-├── models.py                    # DB connection pool
+├── config.py                    # Env-driven Config class
+├── models.py                    # psycopg2 SimpleConnectionPool wrapper
 ├── requirements.txt
-├── routes/                      # FastAPI routers
-│   ├── auth.py
-│   ├── booking.py
-│   ├── organizer.py
-│   ├── payment.py
-│   ├── refund.py
-│   ├── staff.py
-│   └── FRONTEND_API_GUIDE.md    # API contract
+├── queries.sql                  # Sample / analytic queries
+├── routes/
+│   ├── auth.py                  # /auth — register, login, OAuth, /me
+│   ├── booking.py               # /booking — queue, seats, transactional booking
+│   ├── organizer.py             # /organizer — concert CRUD, queue admit
+│   ├── payment.py               # /api/v1/payments — PromptPay + webhook
+│   ├── refund.py                # /api/v1/refunds — 7-day + voucher
+│   ├── staff.py                 # /staff — QR check-in
+│   ├── deps.py                  # CurrentUser dependency
+│   └── FRONTEND_API_GUIDE.md
 ├── database/
-│   ├── schema.sql               # DDL + indexes + views
+│   ├── schema.sql               # 15 tables · 9 views · 14 indexes
 │   ├── seed.sql                 # Sample data
 │   ├── migrations/              # Alembic
-│   └── image/                   # Concert poster assets
-├── frontend_v2/                 # Active frontend (TypeScript)
+│   ├── image/                   # Uploaded concert posters (served as static)
+│   └── update_ERD.png
+├── frontend_v2/                 # Active frontend
 │   ├── index.html
 │   ├── package.json
-│   ├── vite.config.ts
+│   ├── vite.config.ts           # Proxies to 127.0.0.1:5000 (see warning below)
 │   └── src/
-│       ├── main.ts              # Entry, route registration
+│       ├── main.ts              # Entry, route registration, auth guards
+│       ├── router.ts            # Hand-rolled path-based router
 │       ├── styles/              # tokens.css, base.css, components.css
-│       ├── api/                 # Typed fetch clients
+│       ├── api/                 # client.ts + per-domain endpoint modules
 │       ├── state/               # authStore, EventBus
-│       ├── views/               # หน้าแต่ละ route
-│       ├── components/          # header, modals, seatGrid
-│       └── utils/               # dom helpers, formatters
-├── frontend/                    # Legacy frontend (kept for reference)
-├── DESIGN.md
-├── about_projrct.md
+│       ├── views/               # render*View() per route
+│       ├── components/          # header, modals, seat grid
+│       └── utils/               # el(), dom helpers, formatters
+├── CLAUDE.md
 └── README.md
 ```
 
@@ -217,7 +271,6 @@ cd CN230_tooket-ther
 ### 2. Backend setup
 
 ```bash
-# สร้าง virtual env
 python -m venv venv
 # Windows
 venv\Scripts\activate
@@ -229,33 +282,28 @@ pip install -r requirements.txt
 
 ### 3. Environment variables
 
-คัดลอก `.env.example` แล้วเติมค่าตามต้องการ:
-
 ```bash
 cp .env.example .env
 ```
 
-Keys หลักที่ต้องตั้ง:
+Keys หลัก:
 
 | Key | คำอธิบาย |
 | --- | --- |
 | `DATABASE_URL` | `postgresql://user:pass@localhost:5432/tookettherdb` |
-| `SECRET_KEY` / `JWT_SECRET_KEY` | Random string สำหรับเซ็น JWT |
+| `SECRET_KEY` / `JWT_SECRET_KEY` | Random string สำหรับเซ็น JWT (HS256) |
 | `JWT_EXPIRE_MINUTES` | อายุ token (default 60) |
 | `LINE_CLIENT_ID` / `LINE_CLIENT_SECRET` | OAuth Line (optional) |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | OAuth Google (optional) |
-| `PAYMENT_WEBHOOK_SECRET` | Shared secret กับ payment gateway (HMAC-SHA256) |
-| `PROMPTPAY_ID` | เบอร์มือถือ/เลขบัตรประชาชน สำหรับ QR PromptPay |
+| `PAYMENT_WEBHOOK_SECRET` | Shared HMAC-SHA256 secret กับ payment gateway |
+| `PROMPTPAY_ID` | เบอร์มือถือ / เลขบัตรประชาชน สำหรับ QR PromptPay |
 | `PORT` | Default `8000` |
 | `APP_DEBUG` | `true` เปิด auto-reload |
 
 ### 4. Database bootstrap
 
 ```bash
-# สร้างฐานข้อมูล
 createdb tookettherdb
-
-# โหลด schema + seed
 psql tookettherdb < database/schema.sql
 psql tookettherdb < database/seed.sql
 ```
@@ -276,8 +324,13 @@ python app.py
 cd frontend_v2
 npm install
 npm run dev
-# → http://localhost:5173 (proxy /api → http://localhost:8000)
+# → http://localhost:5173
 ```
+
+> ⚠️ **Port mismatch warning** — `frontend_v2/vite.config.ts` proxy ตรงไปที่ **`http://127.0.0.1:5000`** (ไม่มี `/api` umbrella; แต่ละ prefix `/auth` `/booking` `/organizer` `/staff` `/payment` `/refund` `/database/image` `/health` ถูก proxy แยก) — ในขณะที่ backend default คือ port `8000` (`config.py`).
+> เวลา dev end-to-end ให้เลือกอย่างใดอย่างหนึ่ง:
+> 1. รัน FastAPI ที่ `:5000` (เช่น `PORT=5000 python app.py`) — ไม่ต้องแก้ config, **แนะนำ**
+> 2. แก้ proxy target ใน `vite.config.ts` ให้ชี้ `:8000`
 
 ---
 
@@ -287,15 +340,17 @@ npm run dev
 | คำสั่ง | หน้าที่ |
 | --- | --- |
 | `python app.py` | รัน FastAPI + uvicorn (reload เมื่อ `APP_DEBUG=true`) |
+| `uvicorn app:app --reload --port 8000` | ทางเลือก |
 | `alembic upgrade head` | รัน migrations |
+| `ruff check .` | Lint |
 
 ### Frontend (`cd frontend_v2`)
 | คำสั่ง | หน้าที่ |
 | --- | --- |
 | `npm run dev` | Vite dev server (port 5173) |
-| `npm run build` | typecheck + build production bundle ลง `dist/` |
+| `npm run build` | typecheck + production build → `dist/` |
 | `npm run typecheck` | `tsc --noEmit` strict |
-| `npm run preview` | preview build |
+| `npm run preview` | preview production build |
 
 ---
 
@@ -303,7 +358,7 @@ npm run dev
 
 - **Swagger UI:** `http://localhost:8000/docs`
 - **ReDoc:** `http://localhost:8000/redoc`
-- **Frontend Contract:** [`routes/FRONTEND_API_GUIDE.md`](./routes/FRONTEND_API_GUIDE.md) — รายการ endpoint + payload ที่ frontend ใช้ตรง ๆ
+- **Frontend Contract:** [`routes/FRONTEND_API_GUIDE.md`](./routes/FRONTEND_API_GUIDE.md) — endpoint + payload ที่ frontend เรียกตรง ๆ
 
 ---
 
@@ -318,4 +373,4 @@ npm run dev
 
 ---
 
-
+> Built for CN230 · © 2026 · *Infrastructure for Live Intelligence.*
