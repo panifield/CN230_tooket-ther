@@ -178,8 +178,8 @@ ORDER BY q.priority_score DESC, q.entered_at ASC;
 /* Expected Result (2 rows — Akira priority สูงกว่าจึงได้ position 1):
      name      | location_score | priority_score |     entered_at      | status  | queue_position
 ---------------+----------------+----------------+---------------------+---------+----------------
- Akira Tanaka  |              3 |             73 | 2025-05-01 10:00:40 | waiting |              1
- สุดา รักดนตรี   |              2 |             62 | 2025-05-01 10:00:15 | waiting |              2
+ Akira Tanaka  |              3 |             10 | 2025-05-01 10:00:40 | waiting |              1
+ สุดา รักดนตรี   |              2 |             100 | 2025-05-01 10:00:15 | waiting |              2
 */
 
 
@@ -214,12 +214,16 @@ FROM users u
 LEFT JOIN customer_profile  cp ON cp.user_id = u.id
 LEFT JOIN organizer_profile op ON op.user_id = u.id
 LEFT JOIN staff_profile     sp ON sp.user_id = u.id
-WHERE u.id = 4;
 
 /* Expected Result (1 row — Anunda customer):
  id |    name    |       email        |   role   | customer_profile_id | location_score | organizer_profile_id |   phone    | address | id_card     | staff_profile_id
 ----+------------+--------------------+----------+---------------------+----------------+----------------------+------------+---------+-------------+------------------
-  4 | อนันต์ ใจดี | anunda_d@gmail.com | customer |                   1 |              1 |                 NULL | 0548763088 | Bangkok | 12382938491 |             NULL
+  4 | อนันต์ ใจดี  | anunda_d@gmail.com | customer |                   1 |              1 |                 NULL | 0548763088 | Bangkok | 12382938491 |             NULL
+  5| สุดา รักดนตรี |  suda_s@gmail.com  |  customer|                    2|               2|                  NULL|  0888763066| Chiangmai| 29384719182|             NULL
+ 1| สุพรัตน์ วงศวาง|  Suparat_t@gmail.com| organizer|                NULL|            NULL|                     1|  0648763092| Bangkok  | 94038203838|             NULL
+  .
+  .
+  .
 */
 
 
