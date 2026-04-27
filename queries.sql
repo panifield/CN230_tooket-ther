@@ -742,12 +742,3 @@ WHERE  booking_id IN (2)
 */
 
 
--- ============================================================
--- จบ queries.sql
---   • Section 0 มี 6 query ตรงเกณฑ์รายวิชา (JOIN, GROUP BY/SUM,
---     subquery-style, aggregate, HAVING, window function)
---   • Section 1–7 รวมอีก ~20 query ที่ backend ใช้จริง ครอบคลุม
---     pattern: CASE/WHEN, FILTER aggregate, CTE, scalar subquery,
---     timezone cast, multi-table UPDATE chain, FOR UPDATE lock,
---     และ view query
--- ============================================================
